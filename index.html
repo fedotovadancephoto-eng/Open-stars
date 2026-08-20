@@ -2,147 +2,196 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>OPEN STARS — Электронный дневник</title>
-
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OPEN STARS</title>
 <style>
 *{box-sizing:border-box}
-
 body{
-  margin:0;
-  min-height:100vh;
-  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;
-  background:#f5f4f8;
-  color:#171717;
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  padding:20px;
+margin:0;background:#f5f4f8;color:#171717;
+font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif
 }
-
+.wrap{max-width:520px;margin:auto;padding:20px}
 .card{
-  width:100%;
-  max-width:430px;
-  background:#fff;
-  border-radius:28px;
-  padding:38px 25px;
-  box-shadow:0 10px 35px rgba(0,0,0,.06);
+background:#fff;border-radius:26px;padding:25px;
+margin:15px 0;box-shadow:0 5px 20px #0000000a
 }
-
-.logo{
-  text-align:center;
-  font-size:58px;
-}
-
-h1{
-  text-align:center;
-  margin:10px 0 5px;
-  font-size:34px;
-}
-
-.subtitle{
-  text-align:center;
-  color:#777;
-  margin-bottom:32px;
-}
-
-h2{
-  margin:0 0 20px;
-  font-size:24px;
-}
-
-label{
-  display:block;
-  font-size:14px;
-  font-weight:600;
-  margin:15px 0 7px;
-}
-
+.logo{text-align:center;font-size:55px}
+h1{text-align:center;margin:8px 0}
+.sub{text-align:center;color:#888;margin-bottom:28px}
+label{display:block;font-weight:600;margin:15px 0 7px}
 input,select{
-  width:100%;
-  padding:15px;
-  border:1px solid #ddd;
-  border-radius:14px;
-  font-size:16px;
-  background:white;
+width:100%;padding:15px;border:1px solid #ddd;
+border-radius:14px;font-size:16px;background:#fff
 }
-
 button{
-  width:100%;
-  border:0;
-  border-radius:16px;
-  padding:16px;
-  margin-top:22px;
-  background:#171717;
-  color:white;
-  font-size:18px;
-  font-weight:600;
+width:100%;padding:16px;border:0;border-radius:15px;
+background:#171717;color:white;font-size:17px;
+font-weight:600;margin-top:20px
 }
-
-.status{
-  text-align:center;
-  color:#888;
-  margin-top:25px;
-  font-size:14px;
+#error{text-align:center;color:#c62828;margin-top:15px}
+.hidden{display:none}
+.top{
+display:flex;justify-content:space-between;
+align-items:center;margin-bottom:15px
 }
-
-#error{
-  color:#c62828;
-  text-align:center;
-  margin-top:15px;
-  min-height:20px;
+.avatar{
+width:52px;height:52px;border-radius:50%;
+background:#ffe9a8;display:flex;align-items:center;
+justify-content:center;font-size:27px
 }
-
+.name{font-size:23px;font-weight:700}
+.muted{color:#888;font-size:14px}
+.stars{
+background:#fff5cf;border-radius:18px;
+padding:18px;margin:15px 0
+}
+.stars strong{font-size:28px}
+.section{font-size:20px;font-weight:700;margin:25px 0 10px}
+.lesson{
+background:white;border-radius:18px;padding:17px;
+margin:10px 0
+}
+.row{display:flex;justify-content:space-between;gap:15px}
+.time{font-weight:700}
+.badge{
+font-size:13px;padding:6px 9px;border-radius:20px;
+background:#e9f7ed;color:#237a3b;white-space:nowrap
+}
+.homework{
+background:#eef3ff;border-radius:18px;padding:17px;
+margin-top:10px
+}
+.logout{background:#eee;color:#333;margin-top:25px}
 </style>
 </head>
 
 <body>
 
+<div class="wrap">
+
+<div id="loginPage" class="card">
+<div class="logo">⭐</div>
+<h1>OPEN STARS</h1>
+<div class="sub">Электронный дневник модельной школы</div>
+
+<h2>Вход в дневник</h2>
+
+<label>Кто входит?</label>
+<select id="role">
+<option value="parent">Родитель</option>
+<option value="student">Ученик</option>
+</select>
+
+<label>Логин</label>
+<input id="login" placeholder="Введите логин">
+
+<label>Пароль</label>
+<input id="password" type="password" placeholder="Введите пароль">
+
+<button onclick="enterDiary()">Войти</button>
+<div id="error"></div>
+</div>
+
+
+<div id="diary" class="hidden">
+
 <div class="card">
+<div class="top">
+<div>
+<div class="muted" id="roleText">Кабинет</div>
+<div class="name">София ⭐</div>
+<div class="muted">OPEN STARS</div>
+</div>
+<div class="avatar">💃</div>
+</div>
 
-  <div class="logo">⭐</div>
-  <h1>OPEN STARS</h1>
-  <div class="subtitle">Электронный дневник модельной школы</div>
+<div class="stars">
+<div class="muted">Звёзды за этот месяц</div>
+<strong>⭐ 24</strong>
+<div>Отличный результат!</div>
+</div>
+</div>
 
-  <h2>Вход в дневник</h2>
+<div class="section">Сегодня</div>
 
-  <label>Кто входит?</label>
-  <select id="role">
-    <option value="parent">Родитель</option>
-    <option value="student">Ученик</option>
-  </select>
+<div class="lesson">
+<div class="row">
+<div>
+<div class="time">16:00</div>
+<strong>Модельная подготовка</strong>
+</div>
+<span class="badge">Посещено ✓</span>
+</div>
+<div class="muted">Преподаватель: Анна</div>
+</div>
 
-  <label>Логин</label>
-  <input id="login" type="text" placeholder="Введите логин">
+<div class="lesson">
+<div class="row">
+<div>
+<div class="time">17:30</div>
+<strong>Дефиле</strong>
+</div>
+<span class="badge">По расписанию</span>
+</div>
+<div class="muted">Зал №2</div>
+</div>
 
-  <label>Пароль</label>
-  <input id="password" type="password" placeholder="Введите пароль">
+<div class="section">Задание</div>
 
-  <button onclick="login()">Войти</button>
+<div class="homework">
+<strong>📚 Домашнее задание</strong>
+<p>Повторить базовую проходку и положение рук.</p>
+<div class="muted">До следующего занятия</div>
+</div>
 
-  <div id="error"></div>
+<div class="section">Последние результаты</div>
 
-  <div class="status">OPEN STARS ✨</div>
+<div class="lesson">
+<div class="row">
+<strong>Дефиле</strong>
+<span>⭐⭐⭐⭐⭐</span>
+</div>
+<div class="muted">«Отличная работа и уверенная подача!»</div>
+</div>
 
+<div class="lesson">
+<div class="row">
+<strong>Фотопозирование</strong>
+<span>⭐⭐⭐⭐</span>
+</div>
+<div class="muted">Продолжаем работать над пластикой.</div>
+</div>
+
+<button class="logout" onclick="logout()">Выйти</button>
+
+</div>
 </div>
 
 <script>
-function login(){
-  const login=document.getElementById("login").value.trim();
-  const password=document.getElementById("password").value.trim();
-  const role=document.getElementById("role").value;
-  const error=document.getElementById("error");
+function enterDiary(){
+const login=document.getElementById("login").value.trim();
+const password=document.getElementById("password").value.trim();
+const role=document.getElementById("role").value;
+const error=document.getElementById("error");
 
-  if(!login || !password){
-    error.textContent="Введите логин и пароль";
-    return;
-  }
+if(!login||!password){
+error.textContent="Введите логин и пароль";
+return;
+}
 
-  error.style.color="#188038";
-  error.textContent=
-    role==="parent"
-    ? "Вход родителя выполнен ✓"
-    : "Вход ученика выполнен ✓";
+document.getElementById("roleText").textContent=
+role==="parent" ? "Кабинет родителя" : "Кабинет ученика";
+
+document.getElementById("loginPage").classList.add("hidden");
+document.getElementById("diary").classList.remove("hidden");
+window.scrollTo(0,0);
+}
+
+function logout(){
+document.getElementById("diary").classList.add("hidden");
+document.getElementById("loginPage").classList.remove("hidden");
+document.getElementById("password").value="";
+window.scrollTo(0,0);
 }
 </script>
 
