@@ -324,6 +324,7 @@ export const schedule = [
   },
 ];
 
+export const upcomingClasses = schedule;
 export const schedules = schedule;
 
 /* =========================
@@ -359,3 +360,19 @@ export const photos = [
 ];
 
 export const photoSessions = photos;
+
+/* =========================
+   СОВМЕСТИМОСТЬ СО СТАРЫМИ
+   КОМПОНЕНТАМИ
+========================= */
+
+export const student = child;
+export const studentData = child;
+
+export const recentEarnings = coinHistory;
+
+export const assignments = homework;
+
+export const messages = comments;
+
+export const rewards = achievements;
