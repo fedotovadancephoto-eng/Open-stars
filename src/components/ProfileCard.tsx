@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 
 import { Card } from "@/components/Card";
-import { child } from "@/data/demoData";
+import { child, schedule } from "@/data/demoData";
 
 function valueOrFallback(value: string | undefined, fallback: string) {
   return value && value.trim() ? value : fallback;
@@ -15,8 +15,24 @@ function valueOrFallback(value: string | undefined, fallback: string) {
 
 export function ProfileCard() {
   const branch = valueOrFallback(child.branch, "Филиал не указан");
-  const lessonDay = valueOrFallback(child.lessonDay, "День уточняется");
-  const lessonTime = valueOrFallback(child.lessonTime, "");
+
+  const firstLesson = schedule[0];
+  const lastLesson = schedule[schedule.length - 1];
+
+  const lessonDay = valueOrFallback(
+    child.lessonDay || firstLesson?.day,
+    "День уточняется"
+  );
+
+  const scheduleTime = firstLesson?.time
+    ? `${firstLesson.time}${lastLesson?.endTime ? `–${lastLesson.endTime}` : ""}`
+    : "";
+
+  const lessonTime = valueOrFallback(
+    child.lessonTime || scheduleTime,
+    "Время уточняется"
+  );
+
   const administrator = valueOrFallback(
     child.administrator || child.mentorName,
     "Администратор не указан"
@@ -86,7 +102,7 @@ export function ProfileCard() {
                 <div>
                   <p className="text-xs text-black/40">Время занятий</p>
                   <p className="mt-0.5 text-[16px] font-semibold text-[#171717]">
-                    {lessonDay}{lessonTime ? ` ${lessonTime}` : ""}
+                    {lessonDay} {lessonTime}
                   </p>
                 </div>
               </div>
