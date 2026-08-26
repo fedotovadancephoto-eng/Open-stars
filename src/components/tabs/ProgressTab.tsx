@@ -1,131 +1,147 @@
-import { Zap } from 'lucide-react';
-import { Card } from '@/components/Card';
-import { Badge } from '@/components/Badge';
-import { progress, attendance } from '@/data/demoData';
+import { BookOpenCheck, CalendarCheck2, TrendingUp } from "lucide-react";
+
+import { Card } from "@/components/Card";
+import { attendance, grades, progress } from "@/data/demoData";
 
 export function ProgressTab() {
-  const xpPct = Math.round((progress.xp / progress.xpToNext) * 100);
-
   return (
     <div className="grid gap-5 lg:grid-cols-2 lg:gap-6">
-      <Card className="p-5 sm:p-6">
-        <div className="flex items-center justify-between">
+      <Card className="p-5 sm:p-6" hover={false}>
+        <div className="flex items-start justify-between gap-4">
           <div>
-            <h3 className="font-display text-lg font-700 text-ink">Learning Progress</h3>
-            <p className="mt-0.5 text-sm text-ink-muted">
-              Level {progress.level} · {progress.levelName}
+            <p className="text-[11px] font-bold uppercase tracking-[0.20em] text-black/40">
+              Развитие ребёнка
+            </p>
+            <h2 className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-[#171717]">
+              Успеваемость
+            </h2>
+          </div>
+          <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[#5F6338]/10 text-[#4D512E]">
+            <TrendingUp className="h-5 w-5" />
+          </div>
+        </div>
+
+        {grades.length === 0 ? (
+          <div className="mt-5 rounded-[20px] border border-black/[0.06] bg-[#FAF9F5] p-5">
+            <p className="font-semibold text-[#171717]">Оценок пока нет</p>
+            <p className="mt-1 text-sm leading-6 text-black/45">
+              После выставления оценок педагогами здесь появятся средний результат и динамика по направлениям.
             </p>
           </div>
-          <Badge variant="olive">
-            <Zap className="h-3 w-3" /> {progress.xp} XP
-          </Badge>
-        </div>
-
-        <div className="mt-4">
-          <div className="mb-1.5 flex items-center justify-between text-xs font-bold text-ink-muted">
-            <span>Progress to Level {progress.level + 1}</span>
-            <span>
-              {progress.xp} / {progress.xpToNext} XP
-            </span>
-          </div>
-          <div className="h-2.5 w-full overflow-hidden rounded-full bg-neutral-100">
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-olive-400 to-olive-600 transition-all duration-1000"
-              style={{ width: `${xpPct}%` }}
-            />
-          </div>
-        </div>
-
-        <div className="mt-5 space-y-3">
-          {progress.skills.map((skill) => (
-            <div key={skill.name}>
-              <div className="mb-1 flex items-center justify-between text-sm">
-                <span className="font-semibold text-ink-soft">{skill.name}</span>
-                <span className="font-bold text-ink">{skill.mastery}%</span>
+        ) : (
+          <>
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              <div className="rounded-[20px] bg-[#D96A24]/[0.07] p-4">
+                <p className="text-xs text-black/40">Средняя оценка</p>
+                <p className="mt-2 text-3xl font-semibold text-[#C95320]">
+                  {progress.averageGrade}
+                </p>
               </div>
-              <div className="h-2 w-full overflow-hidden rounded-full bg-neutral-100">
-                <div
-                  className="h-full rounded-full bg-orange-500 transition-all duration-1000"
-                  style={{ width: `${skill.mastery}%` }}
-                />
+              <div className="rounded-[20px] bg-[#5F6338]/[0.07] p-4">
+                <p className="text-xs text-black/40">Общий результат</p>
+                <p className="mt-2 text-3xl font-semibold text-[#4D512E]">
+                  {progress.overall}%
+                </p>
               </div>
             </div>
-          ))}
-        </div>
+
+            <div className="mt-5 space-y-4">
+              {progress.skills.map((skill: any) => (
+                <div key={skill.name}>
+                  <div className="mb-1.5 flex items-center justify-between text-sm">
+                    <span className="font-semibold text-[#171717]">{skill.name}</span>
+                    <span className="font-bold text-black/55">{skill.mastery}%</span>
+                  </div>
+                  <div className="h-2.5 overflow-hidden rounded-full bg-black/[0.055]">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-[#D96A24] to-[#E98A34]"
+                      style={{ width: `${skill.mastery}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-6 divide-y divide-black/[0.06]">
+              {grades.slice(0, 6).map((item: any) => (
+                <div key={item.id} className="flex items-center justify-between gap-4 py-3">
+                  <div>
+                    <p className="text-sm font-semibold text-[#171717]">{item.subject}</p>
+                    <p className="mt-1 text-xs text-black/40">{item.date}</p>
+                  </div>
+                  <div className="grid h-10 w-10 place-items-center rounded-full bg-[#D96A24]/10 text-lg font-bold text-[#C95320]">
+                    {item.grade}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
       </Card>
 
-      <div className="space-y-5 lg:space-y-6">
-        <Card className="p-5 sm:p-6">
-          <h3 className="font-display text-lg font-700 text-ink">Attendance Overview</h3>
-          <div className="mt-4 flex items-center gap-5">
-            <div className="relative shrink-0">
-              <svg className="h-24 w-24 -rotate-90" viewBox="0 0 120 120">
-                <circle cx="60" cy="60" r="52" fill="none" stroke="#F3F3F3" strokeWidth="10" />
-                <circle
-                  cx="60"
-                  cy="60"
-                  r="52"
-                  fill="none"
-                  stroke="#F97316"
-                  strokeWidth="10"
-                  strokeLinecap="round"
-                  strokeDasharray={2 * Math.PI * 52}
-                  strokeDashoffset={2 * Math.PI * 52 - (attendance.percentage / 100) * 2 * Math.PI * 52}
-                  className="transition-all duration-1000 ease-out"
-                />
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="font-display text-2xl font-700 text-ink">
-                  {attendance.percentage}%
-                </span>
-              </div>
-            </div>
-            <div className="flex-1">
-              <p className="text-sm font-semibold text-ink">
-                {attendance.attended} sessions attended
-              </p>
-              <p className="text-xs text-ink-muted">
-                out of {attendance.total} scheduled
-              </p>
-              <div className="mt-3 flex items-end gap-1.5">
-                {attendance.monthly.map((m) => (
-                  <div key={m.label} className="flex flex-1 flex-col items-center gap-1">
-                    <div className="flex h-12 w-full items-end justify-center">
-                      <div
-                        className="w-full max-w-6 rounded-t-md bg-gradient-to-t from-orange-200 to-orange-500 transition-all duration-700"
-                        style={{ height: `${m.value}%` }}
-                      />
-                    </div>
-                    <span className="text-[10px] font-medium text-ink-muted">{m.label}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+      <Card className="p-5 sm:p-6" hover={false}>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-[0.20em] text-black/40">
+              Посещаемость
+            </p>
+            <h2 className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-[#171717]">
+              Занятия
+            </h2>
           </div>
-        </Card>
+          <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[#D96A24]/10 text-[#C95320]">
+            <CalendarCheck2 className="h-5 w-5" />
+          </div>
+        </div>
 
-        <Card className="p-5 sm:p-6">
-          <p className="mb-2.5 text-xs font-bold uppercase tracking-wide text-ink-muted">
-            Recent Achievements
-          </p>
-          <div className="flex flex-wrap gap-2.5">
-            {progress.achievements.map((a) => (
-              <div
-                key={a.label}
-                className="group flex items-center gap-2 rounded-2xl border border-neutral-100 bg-neutral-50 px-3 py-2 transition-all hover:-translate-y-0.5 hover:bg-orange-50"
-              >
-                <span className="text-lg transition-transform group-hover:scale-110 group-hover:animate-wiggle">
-                  {a.icon}
-                </span>
-                <div className="leading-tight">
-                  <p className="text-sm font-bold text-ink">{a.label}</p>
-                  <p className="text-[11px] text-ink-muted">{a.month} 2026</p>
-                </div>
-              </div>
-            ))}
+        {attendance.total === 0 ? (
+          <div className="mt-5 rounded-[20px] border border-black/[0.06] bg-[#FAF9F5] p-5">
+            <p className="font-semibold text-[#171717]">Посещаемость пока не отмечена</p>
+            <p className="mt-1 text-sm leading-6 text-black/45">
+              После первого отмеченного занятия здесь появится статистика посещений.
+            </p>
           </div>
-        </Card>
-      </div>
+        ) : (
+          <>
+            <div className="mt-5 flex items-center gap-5 rounded-[22px] bg-[#FAF9F5] p-5">
+              <div className="grid h-24 w-24 shrink-0 place-items-center rounded-full border-[9px] border-[#D96A24]/20 bg-white">
+                <span className="text-2xl font-semibold text-[#171717]">{attendance.percentage}%</span>
+              </div>
+              <div>
+                <p className="font-semibold text-[#171717]">
+                  Посещено {attendance.present} из {attendance.total}
+                </p>
+                <p className="mt-1 text-sm text-black/45">
+                  Пропусков: {attendance.absent}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-5 divide-y divide-black/[0.06]">
+              {attendance.slice(0, 8).map((item: any) => (
+                <div key={item.id} className="flex items-center justify-between gap-4 py-3">
+                  <div className="flex items-center gap-3">
+                    <BookOpenCheck className="h-4 w-4 text-[#5F6338]" />
+                    <div>
+                      <p className="text-sm font-semibold text-[#171717]">{item.subject}</p>
+                      <p className="mt-1 text-xs text-black/40">{item.date}</p>
+                    </div>
+                  </div>
+                  <span
+                    className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                      item.present
+                        ? "bg-[#5F6338]/10 text-[#4D512E]"
+                        : "bg-red-50 text-red-600"
+                    }`}
+                  >
+                    {item.present ? "Посещено" : "Пропуск"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </Card>
     </div>
   );
 }

@@ -1,77 +1,101 @@
-import { CheckCircle2, Clock, Circle, BookOpen } from 'lucide-react';
-import { Card } from '@/components/Card';
-import { Badge } from '@/components/Badge';
-import { homework } from '@/data/demoData';
+import { BookOpen, CheckCircle2, Clock3 } from "lucide-react";
 
-const statusConfig = {
-  new: {
-    icon: Circle,
-    label: 'New',
-    badge: 'orange' as const,
-    bg: 'bg-orange-100 text-orange-600',
-  },
-  'in-progress': {
-    icon: Clock,
-    label: 'In Progress',
-    badge: 'olive' as const,
-    bg: 'bg-olive-100 text-olive-700',
-  },
-  completed: {
-    icon: CheckCircle2,
-    label: 'Completed',
-    badge: 'success' as const,
-    bg: 'bg-olive-100 text-olive-800',
-  },
-};
+import { Card } from "@/components/Card";
+import { homework } from "@/data/demoData";
 
 export function HomeworkTab() {
   return (
     <Card className="p-5 sm:p-6" hover={false}>
-      <div className="flex items-center justify-between">
-        <h3 className="font-display text-lg font-700 text-ink">Homework Assignments</h3>
-        <Badge variant="soft">
-          <BookOpen className="h-3 w-3" /> {homework.length} total
-        </Badge>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-[11px] font-bold uppercase tracking-[0.20em] text-black/40">
+            Развитие ребёнка
+          </p>
+          <h2 className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-[#171717]">
+            Домашние задания
+          </h2>
+          <p className="mt-2 text-sm text-black/45">
+            Задания от педагогов OPEN STARS.
+          </p>
+        </div>
+        <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[#D96A24]/10 text-[#C95320]">
+          <BookOpen className="h-5 w-5" />
+        </div>
       </div>
 
-      <div className="mt-4 space-y-3">
-        {homework.map((hw) => {
-          const config = statusConfig[hw.status as keyof typeof statusConfig];
-          const StatusIcon = config.icon;
-          return (
-            <div
-              key={hw.id}
-              className="group flex flex-col gap-3 rounded-3xl border border-neutral-100 p-4 transition-all hover:border-neutral-200 hover:bg-neutral-50 sm:flex-row sm:items-center"
-            >
-              <div className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl ${config.bg}`}>
-                <StatusIcon className="h-5 w-5" />
-              </div>
+      {homework.length === 0 ? (
+        <div className="mt-5 rounded-[20px] border border-black/[0.06] bg-[#FAF9F5] p-5">
+          <p className="font-semibold text-[#171717]">Домашних заданий пока нет</p>
+          <p className="mt-1 text-sm leading-6 text-black/45">
+            Когда педагог добавит задание, оно появится здесь вместе со сроком выполнения.
+          </p>
+        </div>
+      ) : (
+        <div className="mt-5 space-y-3">
+          {homework.map((item: any) => {
+            const completed = item.status === "completed";
+            const inProgress = item.status === "in-progress";
 
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-bold text-ink">{hw.title}</p>
-                  <Badge variant={config.badge} className="shrink-0">
-                    {config.label}
-                  </Badge>
-                </div>
-                <p className="mt-1 text-sm text-ink-muted">{hw.description}</p>
-                <div className="mt-2 flex items-center gap-3 text-xs font-medium text-ink-muted">
-                  <span className="rounded-md bg-neutral-100 px-2 py-0.5 text-ink-soft">
-                    {hw.subject}
-                  </span>
-                  <span>Due: {hw.dueDate}</span>
+            return (
+              <div
+                key={item.id}
+                className="rounded-[22px] border border-black/[0.06] bg-white p-4 shadow-[0_7px_20px_rgba(0,0,0,0.035)]"
+              >
+                <div className="flex items-start gap-4">
+                  <div
+                    className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl ${
+                      completed
+                        ? "bg-[#5F6338]/10 text-[#4D512E]"
+                        : "bg-[#D96A24]/10 text-[#C95320]"
+                    }`}
+                  >
+                    {completed ? (
+                      <CheckCircle2 className="h-5 w-5" />
+                    ) : (
+                      <Clock3 className="h-5 w-5" />
+                    )}
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="rounded-full bg-black/[0.04] px-2.5 py-1 text-[11px] font-semibold text-black/55">
+                        {item.subject}
+                      </span>
+                      <span
+                        className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                          completed
+                            ? "bg-[#5F6338]/10 text-[#4D512E]"
+                            : "bg-[#D96A24]/10 text-[#C95320]"
+                        }`}
+                      >
+                        {completed
+                          ? "Выполнено"
+                          : inProgress
+                            ? "В работе"
+                            : "Новое"}
+                      </span>
+                    </div>
+
+                    <h3 className="mt-3 text-lg font-semibold tracking-[-0.02em] text-[#171717]">
+                      {item.title}
+                    </h3>
+                    {item.description && (
+                      <p className="mt-2 text-sm leading-7 text-black/55">
+                        {item.description}
+                      </p>
+                    )}
+                    {item.dueDate && (
+                      <p className="mt-3 text-xs font-medium text-black/40">
+                        Выполнить до: {item.dueDate}
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
-
-              {hw.status !== 'completed' && (
-                <button className="shrink-0 rounded-full bg-ink px-4 py-2 text-xs font-bold text-white transition-transform hover:scale-105 active:scale-95">
-                  {hw.status === 'new' ? 'Start' : 'Continue'}
-                </button>
-              )}
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </Card>
   );
 }
