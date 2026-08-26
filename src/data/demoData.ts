@@ -137,6 +137,46 @@ export const progress = {
 
 export const progressData = progress;
 
+export const attendance = Object.assign(
+  [
+    {
+      id: "attendance-1",
+      date: "25 авг.",
+      subject: "Хореография",
+      present: true,
+      status: "present",
+    },
+    {
+      id: "attendance-2",
+      date: "23 авг.",
+      subject: "Фотопозирование",
+      present: true,
+      status: "present",
+    },
+    {
+      id: "attendance-3",
+      date: "20 авг.",
+      subject: "Актёрское мастерство",
+      present: true,
+      status: "present",
+    },
+    {
+      id: "attendance-4",
+      date: "18 авг.",
+      subject: "Дефиле и подиумный шаг",
+      present: false,
+      status: "absent",
+    },
+  ],
+  {
+    percentage: 92,
+    rate: 92,
+    total: 12,
+    present: 11,
+    absent: 1,
+  }
+);
+
 /* =========================
    ДОМАШНИЕ ЗАДАНИЯ
 ========================= */
