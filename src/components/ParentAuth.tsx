@@ -625,7 +625,7 @@ export function ParentAuth({
                   ? "Подождите..."
                   : mode === "login"
                     ? "Войти"
-                    : "Создать аккаунт"}
+                    : "Активировать доступ"}
               </button>
             </form>
 
