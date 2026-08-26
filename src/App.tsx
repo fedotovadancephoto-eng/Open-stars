@@ -27,7 +27,7 @@ import { ScheduleTab } from "@/components/tabs/ScheduleTab";
 import { PaymentsTab } from "@/components/tabs/PaymentsTab";
 import { PhotosTab } from "@/components/tabs/PhotosTab";
 
-import { child, parent } from "@/data/demoData";
+import { child } from "@/data/demoData";
 
 import {
   DEMO_USER_ROLE,
@@ -292,7 +292,7 @@ function App() {
               "
             >
               С возвращением,{" "}
-              {parent.firstName}
+              
             </h1>
 
             <p
