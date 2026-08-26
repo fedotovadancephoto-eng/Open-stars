@@ -1,177 +1,321 @@
+export const parent = {
+  firstName: "Мама",
+  name: "Родитель",
+};
+
 export const child = {
-  name: 'Mia Anderson',
+  name: "Алисия Федотова",
+  firstName: "Алисия",
+
   age: 9,
-  group: 'Rising Stars · Junior Cohort',
-  photo: 'https://images.pexels.com/photos/29311763/pexels-photo-29311763.jpeg?auto=compress&cs=tinysrgb&h=650&w=940',
-  enrolledSince: 'January 2026',
-  mentor: 'Ms. Eleanor Vance',
-  streak: 8,
+
+  group: "PRO",
+  groupName: "PRO",
+
+  branch: "Октябрьский",
+  campus: "Октябрьский",
+
+  level: "PRO",
+
+  lessonDay: "Суббота",
+  lesson_day: "Суббота",
+
+  lessonTime: "16:00",
+  lesson_time: "16:00",
+
+  mentorName: "Мария Иванова",
+  mentor_name: "Мария Иванова",
+
+  administrator: "Мария Иванова",
+  administratorName: "Мария Иванова",
+
+  coins: 480,
+
+  photo: "",
+  avatar: "",
 };
 
 export const quickStats = {
   coins: 480,
   progress: 78,
-  upcomingClasses: 3,
   homeworkPending: 2,
 };
 
-export const attendance = {
-  percentage: 94,
-  attended: 32,
-  total: 34,
-  trend: '+3% this month',
-  monthly: [
-    { label: 'Mar', value: 88 },
-    { label: 'Apr', value: 91 },
-    { label: 'May', value: 90 },
-    { label: 'Jun', value: 96 },
-    { label: 'Jul', value: 94 },
-  ],
-};
-
-export const progress = {
-  level: 2,
-  levelName: 'Rising Stars',
-  xp: 1240,
-  xpToNext: 1500,
-  skills: [
-    { name: 'Posture & Poise', mastery: 92 },
-    { name: 'Runway Walk', mastery: 78 },
-    { name: 'Posing & Expression', mastery: 85 },
-    { name: 'Confidence', mastery: 70 },
-  ],
-  achievements: [
-    { icon: '🏆', label: 'Best Effort', month: 'Jul' },
-    { icon: '⭐', label: 'Perfect Week', month: 'Jun' },
-    { icon: '🌟', label: 'First Showcase', month: 'May' },
-  ],
-};
+/* =========================
+   STAR COIN
+========================= */
 
 export const coins = {
   balance: 480,
   earnedThisMonth: 120,
-  history: [
-    { label: 'Outstanding participation', amount: 50, date: 'Aug 19', reason: 'participation' },
-    { label: 'Neat appearance in class', amount: 30, date: 'Aug 12', reason: 'appearance' },
-    { label: 'Great teamwork in group shoot', amount: 40, date: 'Aug 5', reason: 'teamwork' },
-  ],
 };
 
-export const coinReasons = [
-  { icon: '🎤', label: 'Participation', description: 'Active engagement in class activities' },
-  { icon: '✨', label: 'Neat Appearance', description: 'Arriving well-groomed and prepared' },
-  { icon: '💪', label: 'Effort', description: 'Showing dedication and hard work' },
-  { icon: '😎', label: 'Confidence', description: 'Demonstrating self-assurance on stage' },
-  { icon: '🤝', label: 'Teamwork', description: 'Supporting peers during group sessions' },
+export const coinHistory = [
+  {
+    id: "coin-1",
+    amount: 5,
+    title: "Хореография · оценка 5",
+    date: "25 авг.",
+    source: "Автоматически",
+    type: "auto",
+  },
+  {
+    id: "coin-2",
+    amount: 4,
+    title: "Фотопозирование · оценка 4",
+    date: "23 авг.",
+    source: "Автоматически",
+    type: "auto",
+  },
+  {
+    id: "coin-3",
+    amount: 10,
+    title: "Участие в показе",
+    date: "20 авг.",
+    source: "Администратор",
+    type: "manual",
+  },
+  {
+    id: "coin-4",
+    amount: 5,
+    title: "Без пропусков за месяц",
+    date: "1 авг.",
+    source: "Автоматически",
+    type: "auto",
+  },
 ];
+
+/* =========================
+   УСПЕВАЕМОСТЬ
+========================= */
+
+export const grades = [
+  {
+    id: "grade-1",
+    subject: "Хореография",
+    grade: 5,
+    value: 5,
+    date: "25 авг.",
+    teacher: "Преподаватель",
+    comment: "Отличная работа на занятии.",
+  },
+  {
+    id: "grade-2",
+    subject: "Фотопозирование",
+    grade: 4,
+    value: 4,
+    date: "23 авг.",
+    teacher: "Преподаватель",
+    comment: "Хороший результат.",
+  },
+  {
+    id: "grade-3",
+    subject: "Актёрское мастерство",
+    grade: 5,
+    value: 5,
+    date: "20 авг.",
+    teacher: "Преподаватель",
+    comment: "Очень уверенная работа.",
+  },
+  {
+    id: "grade-4",
+    subject: "Дефиле и подиумный шаг",
+    grade: 4,
+    value: 4,
+    date: "18 авг.",
+    teacher: "Преподаватель",
+    comment: "Продолжаем работать над техникой.",
+  },
+];
+
+export const progress = {
+  overall: 78,
+  month: 78,
+  attendance: 92,
+  averageGrade: 4.5,
+};
+
+export const progressData = progress;
+
+/* =========================
+   ДОМАШНИЕ ЗАДАНИЯ
+========================= */
 
 export const homework = [
   {
-    id: 'hw1',
-    title: 'Runway Walk Practice',
-    description: 'Practice the basic T-walk and pivot turn for 20 minutes daily. Focus on posture and stride length.',
-    dueDate: 'Aug 27, 2026',
-    status: 'new',
-    subject: 'Runway',
+    id: "homework-1",
+    subject: "Хореография",
+    title: "Повторить комбинацию",
+    description:
+      "Повторить комбинацию с последнего занятия и обратить внимание на положение рук.",
+    dueDate: "30 авг.",
+    date: "30 авг.",
+    status: "pending",
+    completed: false,
   },
   {
-    id: 'hw2',
-    title: 'Pose Study Sheet',
-    description: 'Review the 5 classic posing angles and record yourself attempting each one.',
-    dueDate: 'Aug 29, 2026',
-    status: 'in-progress',
-    subject: 'Posing',
-  },
-  {
-    id: 'hw3',
-    title: 'Confidence Journal',
-    description: 'Write three things you felt confident about this week and one thing to improve.',
-    dueDate: 'Aug 20, 2026',
-    status: 'completed',
-    subject: 'Mindset',
+    id: "homework-2",
+    subject: "Фотопозирование",
+    title: "Отработать 5 поз",
+    description:
+      "Выбрать пять поз и потренировать плавные переходы между ними.",
+    dueDate: "31 авг.",
+    date: "31 авг.",
+    status: "pending",
+    completed: false,
   },
 ];
+
+export const homeworks = homework;
+
+/* =========================
+   КОММЕНТАРИИ
+========================= */
+
+export const comments = [
+  {
+    id: "comment-1",
+    subject: "Хореография",
+    teacher: "Преподаватель",
+    title: "Хорошая динамика",
+    text: "Алисия хорошо включается в работу и уверенно запоминает материал.",
+    comment:
+      "Алисия хорошо включается в работу и уверенно запоминает материал.",
+    date: "25 авг.",
+  },
+  {
+    id: "comment-2",
+    subject: "Фотопозирование",
+    teacher: "Преподаватель",
+    title: "Работа с камерой",
+    text: "Стала увереннее чувствовать себя перед камерой.",
+    comment:
+      "Стала увереннее чувствовать себя перед камерой.",
+    date: "23 авг.",
+  },
+];
+
+/* =========================
+   ДОСТИЖЕНИЯ
+========================= */
+
+export const achievements = [
+  {
+    id: "achievement-1",
+    title: "Участие в показе",
+    description: "Участие в школьном показе OPEN STARS.",
+    date: "20 авг.",
+    coins: 10,
+    amount: 10,
+  },
+  {
+    id: "achievement-2",
+    title: "Месяц без пропусков",
+    description: "Все занятия месяца посещены.",
+    date: "1 авг.",
+    coins: 5,
+    amount: 5,
+  },
+];
+
+/* =========================
+   НОВОСТИ
+========================= */
 
 export const news = [
   {
-    id: 'n1',
-    category: 'Event',
-    title: 'OPEN STARS Junior Showcase 2026',
-    body: 'Our annual junior showcase is approaching! All Rising Stars students will present their runway and posing skills. Detailed schedule and wardrobe notes will be sent home next week.',
-    date: 'Aug 24, 2026',
-    tag: 'event',
+    id: "news-1",
+    title: "Подготовка к новому учебному месяцу",
+    description:
+      "В OPEN STARS начинается новый учебный период. Следите за расписанием и объявлениями в личном кабинете.",
+    excerpt:
+      "В OPEN STARS начинается новый учебный период.",
+    date: "26 авг.",
+    category: "Школа",
   },
   {
-    id: 'n2',
-    category: 'Reminder',
-    title: 'Photo Day — September 5th',
-    body: 'Please ensure your child arrives in neat academy attire with hair styled. Group and individual photos will be taken for the yearbook and portfolio.',
-    date: 'Aug 22, 2026',
-    tag: 'reminder',
+    id: "news-2",
+    title: "Фотосессии учеников",
+    description:
+      "Информация о ближайших фотосессиях будет опубликована в разделе «Фотосессии».",
+    excerpt:
+      "Информация о ближайших фотосессиях появится в личном кабинете.",
+    date: "24 авг.",
+    category: "Фотосессия",
   },
   {
-    id: 'n3',
-    category: 'Announcement',
-    title: 'New Workshop: Stage Presence',
-    body: 'We are adding a special Stage Presence workshop every Friday this September. Spaces are limited and will be assigned on a first-come basis.',
-    date: 'Aug 18, 2026',
-    tag: 'announcement',
+    id: "news-3",
+    title: "Star Coin",
+    description:
+      "Напоминаем: Star Coin начисляются за оценки, посещаемость и дополнительные достижения.",
+    excerpt:
+      "Star Coin начисляются за учебные и дополнительные достижения.",
+    date: "22 авг.",
+    category: "Star Coin",
   },
 ];
 
-export const upcomingClasses = [
+/* =========================
+   РАСПИСАНИЕ
+========================= */
+
+export const schedule = [
   {
-    day: 'Wed',
-    date: 'Aug 27',
-    time: '4:00 PM',
-    duration: '60 min',
-    title: 'Runway Fundamentals',
-    instructor: 'Ms. Eleanor',
-    room: 'Studio A',
-    color: 'orange',
+    id: "schedule-1",
+    day: "Суббота",
+    date: "29 авг.",
+    time: "16:00",
+    subject: "Хореография",
+    teacher: "Преподаватель",
+    instructor: "Преподаватель",
+    room: "Зал 1",
+    branch: "Октябрьский",
   },
   {
-    day: 'Sat',
-    date: 'Aug 30',
-    time: '10:30 AM',
-    duration: '90 min',
-    title: 'Posing & Expression Lab',
-    instructor: 'Mr. Daniel',
-    room: 'Studio B',
-    color: 'olive',
-  },
-  {
-    day: 'Mon',
-    date: 'Sep 1',
-    time: '4:00 PM',
-    duration: '60 min',
-    title: 'Confidence & Stage Presence',
-    instructor: 'Ms. Eleanor',
-    room: 'Studio A',
-    color: 'orange',
+    id: "schedule-2",
+    day: "Суббота",
+    date: "29 авг.",
+    time: "17:00",
+    subject: "Фотопозирование",
+    teacher: "Преподаватель",
+    instructor: "Преподаватель",
+    room: "Студия",
+    branch: "Октябрьский",
   },
 ];
+
+export const schedules = schedule;
+
+/* =========================
+   ОПЛАТА
+========================= */
 
 export const payments = [
   {
-    title: 'Monthly Tuition · September',
-    dueDate: 'Sep 1, 2026',
-    status: 'upcoming',
-  },
-  {
-    title: 'Portfolio Materials Fee',
-    dueDate: 'Sep 15, 2026',
-    status: 'upcoming',
-  },
-  {
-    title: 'Monthly Tuition · August',
-    dueDate: 'Aug 1, 2026',
-    status: 'paid',
+    id: "payment-1",
+    month: "Сентябрь",
+    amount: 0,
+    status: "pending",
+    statusLabel: "Ожидает оплаты",
+    dueDate: "до 5 сентября",
   },
 ];
 
-export const paymentMethod = {
-  brand: 'Visa',
-  last4: '4242',
-  expiry: '08/27',
-};
+/* =========================
+   ФОТОСЕССИИ
+========================= */
+
+export const photos = [
+  {
+    id: "photo-1",
+    title: "Фотосессии OPEN STARS",
+    description:
+      "Здесь появятся фотографии после публикации администратором школы.",
+    date: "",
+    galleryUrl: "",
+    url: "",
+    published: false,
+  },
+];
+
+export const photoSessions = photos;

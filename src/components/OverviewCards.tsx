@@ -1,81 +1,189 @@
-import { Coins, TrendingUp, CalendarDays, BookOpen } from 'lucide-react';
-import { Card } from '@/components/Card';
-import { quickStats } from '@/data/demoData';
+import {
+  Star,
+  TrendingUp,
+  Newspaper,
+  BookOpen,
+  ArrowUpRight,
+} from "lucide-react";
+
+import { Card } from "@/components/Card";
+import { quickStats, news } from "@/data/demoData";
 
 interface OverviewCardsProps {
   onTabSelect: (tab: string) => void;
 }
 
-export function OverviewCards({ onTabSelect }: OverviewCardsProps) {
+export function OverviewCards({
+  onTabSelect,
+}: OverviewCardsProps) {
   const cards = [
     {
-      label: 'Coins',
+      label: "Star Coin",
       value: quickStats.coins,
-      icon: Coins,
-      accent: 'orange',
-      tab: 'coins',
-      sublabel: 'earned',
+      subtitle: "начислено за неделю",
+      icon: Star,
+      color: "#D96A24",
+      softColor: "bg-[#D96A24]/10",
+      tab: "coins",
     },
     {
-      label: 'Progress',
+      label: "Успеваемость",
       value: `${quickStats.progress}%`,
+      subtitle: "за месяц",
       icon: TrendingUp,
-      accent: 'olive',
-      tab: 'progress',
-      sublabel: 'overall',
+      color: "#5F6338",
+      softColor: "bg-[#5F6338]/10",
+      tab: "progress",
     },
     {
-      label: 'Upcoming',
-      value: quickStats.upcomingClasses,
-      icon: CalendarDays,
-      accent: 'orange',
-      tab: 'schedule',
-      sublabel: 'this week',
+      label: "Новости",
+      value: news.length,
+      subtitle: "на этой неделе",
+      icon: Newspaper,
+      color: "#D96A24",
+      softColor: "bg-[#D96A24]/10",
+      tab: "news",
     },
     {
-      label: 'Homework',
+      label: "Задания",
       value: quickStats.homeworkPending,
+      subtitle: "ждут выполнения",
       icon: BookOpen,
-      accent: 'olive',
-      tab: 'homework',
-      sublabel: 'pending',
+      color: "#5F6338",
+      softColor: "bg-[#5F6338]/10",
+      tab: "homework",
     },
   ];
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-      {cards.map((c, i) => {
-        const isOrange = c.accent === 'orange';
-        const Icon = c.icon;
+    <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      {cards.map((card) => {
+        const Icon = card.icon;
+
         return (
           <button
-            key={c.label}
-            onClick={() => onTabSelect(c.tab)}
-            className="group text-left animate-fade-up"
-            style={{ animationDelay: `${i * 0.05}s` }}
+            key={card.label}
+            type="button"
+            onClick={() => onTabSelect(card.tab)}
+            className="
+              group
+              block
+              w-full
+              text-left
+              outline-none
+            "
           >
-            <Card className="p-4 sm:p-5">
-              <div className="flex items-center justify-between">
+            <Card
+              className="
+                relative
+                min-h-[168px]
+                overflow-hidden
+                rounded-[24px]
+                border
+                border-black/[0.055]
+                bg-white
+                p-5
+                shadow-[0_9px_26px_rgba(0,0,0,0.045)]
+                transition-all
+                duration-300
+                group-hover:-translate-y-1
+                group-hover:shadow-[0_15px_34px_rgba(0,0,0,0.075)]
+              "
+            >
+              {/* Фирменная линия слева */}
+              <div
+                className="
+                  absolute
+                  bottom-5
+                  left-0
+                  top-5
+                  w-[3px]
+                  rounded-r-full
+                "
+                style={{
+                  backgroundColor: card.color,
+                }}
+              />
+
+              {/* Верх карточки */}
+              <div className="flex items-start justify-between">
                 <div
-                  className={`grid h-10 w-10 place-items-center rounded-2xl ${
-                    isOrange ? 'bg-orange-100 text-orange-600' : 'bg-olive-100 text-olive-700'
-                  }`}
+                  className={`
+                    grid
+                    h-12
+                    w-12
+                    place-items-center
+                    rounded-[15px]
+                    ${card.softColor}
+                  `}
                 >
-                  <Icon className="h-5 w-5" />
+                  <Icon
+                    size={24}
+                    strokeWidth={2.2}
+                    style={{
+                      color: card.color,
+                    }}
+                  />
                 </div>
-                <span
-                  className={`text-xs font-bold uppercase tracking-wide ${
-                    isOrange ? 'text-orange-500' : 'text-olive-500'
-                  } opacity-0 transition-opacity group-hover:opacity-100`}
-                >
-                  View →
-                </span>
+
+                <ArrowUpRight
+                  className="
+                    h-4
+                    w-4
+                    text-black/30
+                    transition-all
+                    duration-200
+                    group-hover:-translate-y-0.5
+                    group-hover:translate-x-0.5
+                    group-hover:text-black/60
+                  "
+                  strokeWidth={1.8}
+                />
               </div>
-              <p className="mt-3 font-display text-2xl font-700 text-ink sm:text-3xl">
-                {c.value}
-              </p>
-              <p className="mt-0.5 text-sm font-semibold text-ink-soft">{c.label}</p>
-              <p className="text-xs text-ink-muted">{c.sublabel}</p>
+
+              {/* Значение */}
+              <div className="mt-5">
+                <div
+                  className="
+                    text-[35px]
+                    font-semibold
+                    leading-none
+                    tracking-[-0.045em]
+                  "
+                  style={{
+                    color:
+                      card.tab === "coins" ||
+                      card.tab === "news"
+                        ? "#A84423"
+                        : "#171717",
+                  }}
+                >
+                  {card.value}
+                </div>
+
+                <div
+                  className="
+                    mt-3
+                    text-[15px]
+                    font-semibold
+                    tracking-[-0.01em]
+                    text-[#171717]
+                  "
+                >
+                  {card.label}
+                </div>
+
+                <div
+                  className="
+                    mt-1
+                    text-[13px]
+                    leading-snug
+                    text-black/45
+                  "
+                >
+                  {card.subtitle}
+                </div>
+              </div>
             </Card>
           </button>
         );
