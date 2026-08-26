@@ -38,7 +38,7 @@ import type { NotificationTarget } from "@/data/notificationsData";
 
 import { getValidParentSession } from "@/openStarsApi";
 
-import Sidebar from "./components/Sidebar";
+
 
 type TabId =
   | "coins"
@@ -237,7 +237,7 @@ function App() {
 
   return (
     <div className="flex min-h-screen bg-[#faf9f5]">
-      <Sidebar />
+
 
       <div className="min-w-0 flex-1">
         <Header
