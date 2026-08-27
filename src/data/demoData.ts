@@ -39,6 +39,13 @@ export const coins = {
   earnedThisMonth: 0,
 };
 
+export const starCoinRules: Array<{
+  code: string;
+  title: string;
+  amount: number;
+  active: boolean;
+}> = [];
+
 export const coinHistory: any[] = [];
 export const grades: any[] = [];
 
@@ -99,6 +106,7 @@ export function applyDashboardData(data: any) {
   if (data.coins) Object.assign(coins, data.coins);
   if (data.progress) Object.assign(progress, data.progress);
 
+  replaceArray(starCoinRules, data.starCoinRules);
   replaceArray(coinHistory, data.coinHistory);
   replaceArray(grades, data.grades);
   replaceArray(homework, data.homework);
