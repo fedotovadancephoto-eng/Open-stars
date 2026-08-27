@@ -161,6 +161,19 @@ export async function getValidStaffSession() {
   return refreshStaffSession();
 }
 
+function authUserIdFromAccessToken(token: string) {
+  try {
+    const encoded = token.split(".")[1];
+    if (!encoded) return "";
+    const normalized = encoded.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
+    const payload = JSON.parse(window.atob(padded));
+    return typeof payload?.sub === "string" ? payload.sub : "";
+  } catch {
+    return "";
+  }
+}
+
 async function restSelect<T>(table: string, query: string, token: string): Promise<T[]> {
   const response = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${query}`, {
     headers: { apikey: SUPABASE_PUBLISHABLE_KEY, Authorization: `Bearer ${token}` },
@@ -259,9 +272,15 @@ export async function fetchStaffIdentity(): Promise<StaffIdentity> {
   const session = await getValidStaffSession();
   if (!session) throw new Error("Сессия сотрудника не найдена.");
 
+  const authUserId = authUserIdFromAccessToken(session.access_token);
+  if (!authUserId) {
+    clearStaffSession();
+    throw new Error("Не удалось определить аккаунт сотрудника. Войдите снова.");
+  }
+
   const rows = await restSelect<any>(
     "users_profile",
-    "select=id,full_name,staff_display_name,phone,auth_user_id,roles(name)&limit=1",
+    `select=id,full_name,staff_display_name,phone,auth_user_id,roles(name)&auth_user_id=eq.${encodeURIComponent(authUserId)}&limit=1`,
     session.access_token
   );
   const row = rows[0];
