@@ -7,7 +7,9 @@ import {
   Coins,
   CreditCard,
   ImagePlus,
+  KeyRound,
   Menu,
+  MessageSquareHeart,
   Newspaper,
   UserPlus,
   X,
@@ -16,6 +18,7 @@ import {
 const items = [
   { label: "Добавить ученика", icon: UserPlus, accent: "orange" },
   { label: "Выбывшие", icon: Archive, accent: "neutral" },
+  { label: "Активация родителей", icon: KeyRound, accent: "orange" },
   { label: "Фото ребёнка", icon: ImagePlus, accent: "olive" },
   { label: "Расписание", icon: CalendarDays, accent: "neutral" },
   { label: "Учебная часть", icon: BookOpenCheck, accent: "orange" },
@@ -23,6 +26,7 @@ const items = [
   { label: "Новости", icon: Newspaper, accent: "neutral" },
   { label: "Оплата", icon: CreditCard, accent: "olive" },
   { label: "Фотосессии", icon: Camera, accent: "orange" },
+  { label: "Обратная связь", icon: MessageSquareHeart, accent: "olive" },
 ] as const;
 
 type MenuLabel = (typeof items)[number]["label"];
