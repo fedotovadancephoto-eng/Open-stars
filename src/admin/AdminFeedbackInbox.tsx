@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  Bell,
+  BellOff,
   CheckCircle2,
   Inbox,
   LoaderCircle,
@@ -13,6 +15,7 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_1MORh5rY7uMDVYLYVX5VAA_cyoph4-7
 
 type FeedbackStatus = "new" | "read" | "closed";
 type FeedbackCategory = "app" | "education";
+type NotificationState = NotificationPermission | "unsupported";
 
 type FeedbackRow = {
   id: string;
@@ -48,6 +51,38 @@ function formatDate(value: string) {
     hour: "2-digit",
     minute: "2-digit",
   }).format(date);
+}
+
+function currentNotificationState(): NotificationState {
+  if (typeof window === "undefined" || !("Notification" in window)) return "unsupported";
+  return Notification.permission;
+}
+
+function showSystemNotification(count: number, latest?: FeedbackRow) {
+  if (typeof window === "undefined" || !("Notification" in window) || Notification.permission !== "granted") return;
+
+  const details = [
+    latest?.parent_name_snapshot,
+    latest?.child_name_snapshot,
+    latest?.branch_snapshot,
+  ].filter(Boolean).join(" · ");
+
+  try {
+    const notification = new Notification(
+      count === 1 ? "Новая обратная связь OPEN STARS" : `Новых сообщений: ${count}`,
+      {
+        body: details || "Родитель отправил новое сообщение.",
+        tag: "open-stars-parent-feedback",
+      }
+    );
+
+    notification.onclick = () => {
+      window.focus();
+      notification.close();
+    };
+  } catch {
+    // Некоторые мобильные браузеры поддерживают разрешение только через установленное веб-приложение.
+  }
 }
 
 async function staffRequest(path: string, options?: RequestInit) {
@@ -97,17 +132,51 @@ export function AdminFeedbackInbox() {
   const [updatingId, setUpdatingId] = useState("");
   const [filter, setFilter] = useState<"all" | FeedbackStatus>("all");
   const [toastCount, setToastCount] = useState(0);
+  const [notificationState, setNotificationState] = useState<NotificationState>(() => currentNotificationState());
   const previousNewCount = useRef<number | null>(null);
+
+  async function enableNotifications() {
+    if (typeof window === "undefined" || !("Notification" in window)) {
+      setNotificationState("unsupported");
+      return;
+    }
+
+    try {
+      const permission = await Notification.requestPermission();
+      setNotificationState(permission);
+      if (permission === "granted") {
+        showSystemNotification(1, {
+          id: "preview",
+          category: "app",
+          message: "",
+          status: "new",
+          branch_snapshot: null,
+          child_name_snapshot: null,
+          parent_name_snapshot: "Уведомления включены",
+          created_at: new Date().toISOString(),
+          read_at: null,
+          closed_at: null,
+        });
+      }
+    } catch {
+      setNotificationState(currentNotificationState());
+    }
+  }
 
   async function refresh(silent = false) {
     if (!silent) setLoading(true);
     try {
       const next = await loadFeedback();
-      const newCount = next.filter((item) => item.status === "new").length;
+      const newRows = next.filter((item) => item.status === "new");
+      const newCount = newRows.length;
+
       if (previousNewCount.current !== null && newCount > previousNewCount.current) {
-        setToastCount(newCount - previousNewCount.current);
+        const delta = newCount - previousNewCount.current;
+        setToastCount(delta);
+        showSystemNotification(delta, newRows[0]);
         window.setTimeout(() => setToastCount(0), 6500);
       }
+
       previousNewCount.current = newCount;
       setRows(next);
       setError("");
@@ -119,6 +188,7 @@ export function AdminFeedbackInbox() {
   }
 
   useEffect(() => {
+    setNotificationState(currentNotificationState());
     refresh();
     const timer = window.setInterval(() => refresh(true), 5000);
     return () => window.clearInterval(timer);
@@ -168,6 +238,21 @@ export function AdminFeedbackInbox() {
           </div>
 
           <div className="flex flex-wrap gap-2">
+            {notificationState === "default" && (
+              <button type="button" onClick={enableNotifications} className="flex items-center gap-1.5 rounded-full bg-[#D96A24] px-3.5 py-2 text-xs font-semibold text-white">
+                <Bell size={14} /> Включить уведомления
+              </button>
+            )}
+            {notificationState === "granted" && (
+              <span className="flex items-center gap-1.5 rounded-full bg-[#5F6338]/10 px-3.5 py-2 text-xs font-semibold text-[#4D512E]">
+                <Bell size={14} /> Уведомления включены
+              </span>
+            )}
+            {notificationState === "denied" && (
+              <span className="flex items-center gap-1.5 rounded-full bg-black/[0.06] px-3.5 py-2 text-xs font-semibold text-black/40">
+                <BellOff size={14} /> Уведомления запрещены в браузере
+              </span>
+            )}
             {(["all", "new", "read", "closed"] as const).map((item) => (
               <button
                 key={item}
@@ -180,6 +265,12 @@ export function AdminFeedbackInbox() {
             ))}
           </div>
         </div>
+
+        {notificationState === "unsupported" && (
+          <div className="mt-4 rounded-[15px] bg-[#F5F3EC] px-4 py-3 text-xs leading-5 text-black/45">
+            Этот браузер не поддерживает системные уведомления для обычной вкладки. Внутренний счётчик и всплывающее уведомление в админке продолжат работать.
+          </div>
+        )}
 
         {error && <div className="mt-4 rounded-[15px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
 
