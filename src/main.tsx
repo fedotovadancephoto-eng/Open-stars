@@ -1,7 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
-import AdminApp from './admin/AdminApp.tsx';
+import AdminWorkspace from './admin/AdminWorkspace.tsx';
 import { installSupabaseFetchGuard } from './supabaseFetchGuard';
 import './index.css';
 
@@ -11,6 +11,6 @@ const isAdminPath = window.location.pathname === '/admin' || window.location.pat
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    {isAdminPath ? <AdminApp /> : <App />}
+    {isAdminPath ? <AdminWorkspace /> : <App />}
   </StrictMode>
 );
