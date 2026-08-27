@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 
-import { getValidStaffSession } from "@/admin/adminApi";
+import { fetchStaffIdentity, getValidStaffSession } from "@/admin/adminApi";
 
 const SUPABASE_URL = "https://yiwiykbuaggyslfyhlfo.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_1MORh5rY7uMDVYLYVX5VAA_cyoph4-7";
@@ -38,20 +38,13 @@ async function staffClient() {
   });
 }
 
-function roleFromProfile(row: any) {
-  const value = Array.isArray(row?.roles) ? row.roles[0]?.name : row?.roles?.name;
-  return String(value ?? "");
-}
-
 export async function fetchPhotoUploadContext(): Promise<PhotoUploadContext> {
-  const client = await staffClient();
-  const { data: profiles, error: profileError } = await client.from("users_profile").select("id,roles(name)").limit(1);
-  if (profileError) throw new Error("Не удалось проверить права на загрузку фото.");
-
-  const role = roleFromProfile(profiles?.[0]);
+  const identity = await fetchStaffIdentity();
+  const role = identity.role;
   const canUpload = ["owner", "project_director", "manager", "admin"].includes(role);
   if (!canUpload) return { role, canUpload: false, students: [] };
 
+  const client = await staffClient();
   const { data: children, error: childrenError } = await client
     .from("children")
     .select("id,first_name,last_name,branch,group_name,photo_url")
