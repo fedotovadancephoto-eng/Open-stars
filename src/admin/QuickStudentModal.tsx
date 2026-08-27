@@ -34,7 +34,7 @@ export function QuickStudentModal({
   onCreated,
 }: {
   onClose: () => void;
-  onCreated: () => Promise<void>;
+  onCreated: (addNext: boolean) => Promise<void>;
 }) {
   const [form, setForm] = useState<QuickStudentInput>(emptyForm);
   const [saving, setSaving] = useState(false);
@@ -53,7 +53,6 @@ export function QuickStudentModal({
     setSuccess("");
     try {
       await quickCreateStudent(form);
-      await onCreated();
 
       if (addNext) {
         setSuccess(`${form.firstName} ${form.lastName} добавлен(а). Можно вводить следующего.`);
@@ -64,7 +63,9 @@ export function QuickStudentModal({
           lessonDay: current.lessonDay,
           lessonTime: current.lessonTime,
         }));
+        await onCreated(true);
       } else {
+        await onCreated(false);
         onClose();
       }
     } catch (err) {
