@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { LoaderCircle, Plus, Save, X } from "lucide-react";
 
 import {
@@ -8,6 +8,7 @@ import {
   quickCreateStudent,
 } from "@/admin/adminApi";
 import { administratorForBranch } from "@/admin/branchAdministrators";
+import { getCurrentStaffScope } from "@/admin/staffScopeApi";
 
 const branches: BranchName[] = ["Свердловский", "НЛО", "Октябрьский"];
 const groups: GroupName[] = ["Базовый", "Продвинутый", "PRO"];
@@ -37,9 +38,22 @@ export function QuickStudentModal({
   onCreated: (addNext: boolean) => Promise<void>;
 }) {
   const [form, setForm] = useState<QuickStudentInput>(emptyForm);
+  const [fixedBranch, setFixedBranch] = useState<BranchName | "">("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    getCurrentStaffScope().then((scope) => {
+      if (!active) return;
+      if (scope.role === "admin" && scope.branch) {
+        setFixedBranch(scope.branch);
+        setForm((current) => ({ ...current, branch: scope.branch }));
+      }
+    });
+    return () => { active = false; };
+  }, []);
 
   function field<K extends keyof QuickStudentInput>(key: K, value: QuickStudentInput[K]) {
     setForm((current) => ({ ...current, [key]: value }));
@@ -58,7 +72,7 @@ export function QuickStudentModal({
         setSuccess(`${form.firstName} ${form.lastName} добавлен(а). Можно вводить следующего.`);
         setForm((current) => ({
           ...emptyForm,
-          branch: current.branch,
+          branch: fixedBranch || current.branch,
           groupName: current.groupName,
           lessonDay: current.lessonDay,
           lessonTime: current.lessonTime,
@@ -94,7 +108,18 @@ export function QuickStudentModal({
           <label className="text-xs font-semibold text-black/55">Имя ребёнка *<input className={inputClass} value={form.firstName} onChange={(e) => field("firstName", e.target.value)} /></label>
           <label className="text-xs font-semibold text-black/55">Имя родителя *<input className={inputClass} value={form.parentName} onChange={(e) => field("parentName", e.target.value)} placeholder="Например, Анна" /></label>
           <label className="text-xs font-semibold text-black/55">Телефон родителя *<input inputMode="tel" className={inputClass} value={form.parentPhone} onChange={(e) => field("parentPhone", e.target.value)} placeholder="+7 999 123-45-67" /></label>
-          <label className="text-xs font-semibold text-black/55">Филиал *<select className={inputClass} value={form.branch} onChange={(e) => field("branch", e.target.value as BranchName | "")}><option value="">Выберите филиал</option>{branches.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
+          <label className="text-xs font-semibold text-black/55">Филиал *
+            <select
+              className={`${inputClass} ${fixedBranch ? "cursor-not-allowed bg-[#F0EEE5]" : ""}`}
+              value={form.branch}
+              disabled={Boolean(fixedBranch)}
+              onChange={(e) => field("branch", e.target.value as BranchName | "")}
+            >
+              <option value="">Выберите филиал</option>
+              {branches.map((item) => <option key={item} value={item}>{item}</option>)}
+            </select>
+            {fixedBranch && <span className="mt-1.5 block text-[11px] font-normal leading-5 text-black/35">Ваш филиал закреплён за аккаунтом.</span>}
+          </label>
           <label className="text-xs font-semibold text-black/55">Группа *<select className={inputClass} value={form.groupName} onChange={(e) => field("groupName", e.target.value as GroupName | "")}><option value="">Выберите группу</option>{groups.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
           <label className="text-xs font-semibold text-black/55">День занятий<select className={inputClass} value={form.lessonDay} onChange={(e) => field("lessonDay", e.target.value)}><option value="">Заполнить позже</option>{days.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
           <label className="text-xs font-semibold text-black/55">Время группы<select className={inputClass} value={form.lessonTime} onChange={(e) => field("lessonTime", e.target.value)}><option value="">Заполнить позже</option>{times.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
