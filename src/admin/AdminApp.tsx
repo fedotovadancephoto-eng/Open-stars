@@ -8,8 +8,11 @@ import {
   Coins,
   CreditCard,
   LayoutDashboard,
+  LoaderCircle,
   LogOut,
   Newspaper,
+  Pencil,
+  Save,
   Search,
   Settings,
   ShieldCheck,
@@ -21,12 +24,15 @@ import {
 import { Logo } from "@/components/Logo";
 import {
   AdminChild,
+  ChildUpdateInput,
   StaffIdentity,
   StaffRole,
   clearStaffSession,
   fetchAdminChildren,
   fetchStaffIdentity,
   getValidStaffSession,
+  updateAdminChild,
+  updateParentDisplayName,
 } from "@/admin/adminApi";
 import { StaffAuth } from "@/admin/StaffAuth";
 
@@ -43,7 +49,7 @@ type SectionId =
   | "team";
 
 const roleLabels: Record<StaffRole, string> = {
-  owner: "Владелец",
+  owner: "Директор",
   admin: "Администратор",
   manager: "Управляющий",
   teacher: "Преподаватель",
@@ -87,65 +93,246 @@ function initials(child: AdminChild) {
   return `${child.firstName.charAt(0)}${child.lastName.charAt(0)}`.toUpperCase() || "OS";
 }
 
-function StudentDetails({ child, role, onClose }: { child: AdminChild; role: StaffRole; onClose: () => void }) {
+const inputClass =
+  "mt-1.5 w-full rounded-[13px] border border-black/[0.08] bg-[#FAF9F5] px-3.5 py-3 text-sm text-[#171717] outline-none placeholder:text-black/25 focus:border-[#D96A24]/45 focus:ring-4 focus:ring-[#D96A24]/[0.06]";
+
+function StudentDetails({
+  child,
+  role,
+  onClose,
+  onSaved,
+}: {
+  child: AdminChild;
+  role: StaffRole;
+  onClose: () => void;
+  onSaved: (childId: string) => Promise<void>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [parentName, setParentName] = useState(child.parentName);
+  const [form, setForm] = useState<ChildUpdateInput>({
+    firstName: child.firstName,
+    lastName: child.lastName,
+    birthDate: child.birthDate,
+    groupName: child.groupName,
+    branch: child.branch,
+    level: child.level,
+    lessonDay: child.lessonDay,
+    lessonTime: child.lessonTime,
+    mentorName: child.mentorName,
+    photoUrl: child.photoUrl,
+  });
+
+  useEffect(() => {
+    setParentName(child.parentName);
+    setForm({
+      firstName: child.firstName,
+      lastName: child.lastName,
+      birthDate: child.birthDate,
+      groupName: child.groupName,
+      branch: child.branch,
+      level: child.level,
+      lessonDay: child.lessonDay,
+      lessonTime: child.lessonTime,
+      mentorName: child.mentorName,
+      photoUrl: child.photoUrl,
+    });
+  }, [child]);
+
+  function field<K extends keyof ChildUpdateInput>(key: K, value: ChildUpdateInput[K]) {
+    setForm((current) => ({ ...current, [key]: value }));
+  }
+
+  async function saveChanges() {
+    setSaving(true);
+    setError("");
+    try {
+      await updateAdminChild(child.id, form);
+      if (child.parentProfileId && parentName.trim() !== child.parentName.trim()) {
+        await updateParentDisplayName(child.parentProfileId, parentName);
+      }
+      await onSaved(child.id);
+      setEditing(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Не удалось сохранить изменения.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/25 backdrop-blur-[2px]" onClick={onClose}>
       <div
         className="h-full w-full max-w-md overflow-y-auto bg-[#FAF9F5] p-5 shadow-[-20px_0_50px_rgba(0,0,0,0.12)] sm:p-7"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="flex items-center justify-between">
+        <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#D96A24]">Карточка ученика</p>
             <h2 className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-[#171717]">{child.fullName}</h2>
           </div>
-          <button type="button" onClick={onClose} className="grid h-10 w-10 place-items-center rounded-full bg-white text-black/55 shadow-sm">
-            <X size={20} />
-          </button>
-        </div>
-
-        <div className="mt-6 rounded-[26px] border border-black/[0.06] bg-white p-5 shadow-[0_12px_35px_rgba(0,0,0,0.05)]">
-          <div className="flex items-center gap-4">
-            {child.photoUrl ? (
-              <img src={child.photoUrl} alt={child.fullName} className="h-20 w-20 rounded-[22px] object-cover" />
-            ) : (
-              <div className="grid h-20 w-20 place-items-center rounded-[22px] bg-[#F0EEE5] text-xl font-bold text-[#5F6338]">{initials(child)}</div>
+          <div className="flex gap-2">
+            {role !== "teacher" && !editing && (
+              <button
+                type="button"
+                onClick={() => setEditing(true)}
+                className="grid h-10 w-10 place-items-center rounded-full bg-[#171717] text-white shadow-sm"
+                aria-label="Редактировать"
+              >
+                <Pencil size={17} />
+              </button>
             )}
-            <div>
-              <p className="text-lg font-semibold text-[#171717]">{child.groupName || "Группа не указана"}</p>
-              <p className="mt-1 text-sm text-black/45">{child.branch || "Филиал не указан"}</p>
-              <p className="mt-1 text-sm text-black/45">
-                {[child.lessonDay, child.lessonTime].filter(Boolean).join(" · ") || "Время занятий не указано"}
-              </p>
-            </div>
+            <button type="button" onClick={onClose} className="grid h-10 w-10 place-items-center rounded-full bg-white text-black/55 shadow-sm">
+              <X size={20} />
+            </button>
           </div>
         </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-3">
-          <div className="rounded-[20px] border border-black/[0.06] bg-white p-4">
-            <p className="text-xs text-black/40">Star Coin</p>
-            <p className="mt-1 text-2xl font-semibold text-[#171717]">{child.coins}</p>
-          </div>
-          <div className="rounded-[20px] border border-black/[0.06] bg-white p-4">
-            <p className="text-xs text-black/40">Оплата</p>
-            <p className="mt-1 text-sm font-semibold text-[#171717]">{paymentLabels[child.paymentStatus] || "Статус не указан"}</p>
-          </div>
-        </div>
+        {editing ? (
+          <div className="mt-6 space-y-4">
+            <div className="rounded-[24px] border border-black/[0.06] bg-white p-5">
+              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-black/35">Основные данные</p>
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                <label className="text-xs font-semibold text-black/55">
+                  Имя
+                  <input className={inputClass} value={form.firstName} onChange={(e) => field("firstName", e.target.value)} />
+                </label>
+                <label className="text-xs font-semibold text-black/55">
+                  Фамилия
+                  <input className={inputClass} value={form.lastName} onChange={(e) => field("lastName", e.target.value)} />
+                </label>
+              </div>
+              <label className="mt-3 block text-xs font-semibold text-black/55">
+                Дата рождения
+                <input type="date" className={inputClass} value={form.birthDate} onChange={(e) => field("birthDate", e.target.value)} />
+              </label>
+              <label className="mt-3 block text-xs font-semibold text-black/55">
+                Фото — ссылка
+                <input className={inputClass} value={form.photoUrl} onChange={(e) => field("photoUrl", e.target.value)} placeholder="https://..." />
+              </label>
+            </div>
 
-        {role !== "teacher" && (
-          <div className="mt-4 rounded-[24px] border border-black/[0.06] bg-white p-5">
-            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-black/35">Родитель</p>
-            <p className="mt-3 font-semibold text-[#171717]">{child.parentName || "Не указан"}</p>
-            <p className="mt-1 text-sm text-black/45">{child.parentPhone || "Телефон не указан"}</p>
-            <div className="mt-4 inline-flex rounded-full bg-[#5F6338]/10 px-3 py-1.5 text-xs font-semibold text-[#4D512E]">
-              {activationLabels[child.activationStatus]}
+            <div className="rounded-[24px] border border-black/[0.06] bg-white p-5">
+              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-black/35">Обучение</p>
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                <label className="text-xs font-semibold text-black/55">
+                  Группа
+                  <input className={inputClass} value={form.groupName} onChange={(e) => field("groupName", e.target.value)} placeholder="PRO" />
+                </label>
+                <label className="text-xs font-semibold text-black/55">
+                  Уровень
+                  <input className={inputClass} value={form.level} onChange={(e) => field("level", e.target.value)} />
+                </label>
+              </div>
+              <label className="mt-3 block text-xs font-semibold text-black/55">
+                Филиал
+                <input className={inputClass} value={form.branch} onChange={(e) => field("branch", e.target.value)} />
+              </label>
+              <div className="mt-3 grid grid-cols-2 gap-3">
+                <label className="text-xs font-semibold text-black/55">
+                  День
+                  <input className={inputClass} value={form.lessonDay} onChange={(e) => field("lessonDay", e.target.value)} placeholder="Суббота" />
+                </label>
+                <label className="text-xs font-semibold text-black/55">
+                  Начало группы
+                  <input type="time" className={inputClass} value={form.lessonTime} onChange={(e) => field("lessonTime", e.target.value)} />
+                </label>
+              </div>
+              <label className="mt-3 block text-xs font-semibold text-black/55">
+                Наставник
+                <input className={inputClass} value={form.mentorName} onChange={(e) => field("mentorName", e.target.value)} />
+              </label>
+            </div>
+
+            {role !== "teacher" && (
+              <div className="rounded-[24px] border border-black/[0.06] bg-white p-5">
+                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-black/35">Родитель</p>
+                <label className="mt-4 block text-xs font-semibold text-black/55">
+                  Как отображать имя
+                  <input className={inputClass} value={parentName} onChange={(e) => setParentName(e.target.value)} />
+                </label>
+                <label className="mt-3 block text-xs font-semibold text-black/55">
+                  Телефон
+                  <input className={`${inputClass} cursor-not-allowed opacity-60`} value={child.parentPhone} readOnly />
+                </label>
+                <p className="mt-2 text-[11px] leading-5 text-black/35">Номер связан со входом в аккаунт. Его смена будет отдельным защищённым действием.</p>
+              </div>
+            )}
+
+            {error && <div className="rounded-[16px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
+
+            <div className="flex gap-3 pb-6">
+              <button
+                type="button"
+                onClick={() => setEditing(false)}
+                disabled={saving}
+                className="flex-1 rounded-[14px] border border-black/[0.08] bg-white px-4 py-3.5 text-sm font-semibold text-black/60"
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                onClick={saveChanges}
+                disabled={saving}
+                className="flex flex-1 items-center justify-center gap-2 rounded-[14px] bg-[#171717] px-4 py-3.5 text-sm font-semibold text-white disabled:opacity-50"
+              >
+                {saving ? <LoaderCircle className="animate-spin" size={17} /> : <Save size={17} />}
+                Сохранить
+              </button>
             </div>
           </div>
+        ) : (
+          <>
+            <div className="mt-6 rounded-[26px] border border-black/[0.06] bg-white p-5 shadow-[0_12px_35px_rgba(0,0,0,0.05)]">
+              <div className="flex items-center gap-4">
+                {child.photoUrl ? (
+                  <img src={child.photoUrl} alt={child.fullName} className="h-20 w-20 rounded-[22px] object-cover" />
+                ) : (
+                  <div className="grid h-20 w-20 place-items-center rounded-[22px] bg-[#F0EEE5] text-xl font-bold text-[#5F6338]">{initials(child)}</div>
+                )}
+                <div>
+                  <p className="text-lg font-semibold text-[#171717]">{child.groupName || "Группа не указана"}</p>
+                  <p className="mt-1 text-sm text-black/45">{child.branch || "Филиал не указан"}</p>
+                  <p className="mt-1 text-sm text-black/45">{[child.lessonDay, child.lessonTime].filter(Boolean).join(" · ") || "Время занятий не указано"}</p>
+                  {child.birthDate && <p className="mt-1 text-sm text-black/45">Дата рождения: {child.birthDate}</p>}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <div className="rounded-[20px] border border-black/[0.06] bg-white p-4">
+                <p className="text-xs text-black/40">Star Coin</p>
+                <p className="mt-1 text-2xl font-semibold text-[#171717]">{child.coins}</p>
+              </div>
+              <div className="rounded-[20px] border border-black/[0.06] bg-white p-4">
+                <p className="text-xs text-black/40">Оплата</p>
+                <p className="mt-1 text-sm font-semibold text-[#171717]">{paymentLabels[child.paymentStatus] || "Статус не указан"}</p>
+              </div>
+            </div>
+
+            {(child.level || child.mentorName) && (
+              <div className="mt-4 rounded-[24px] border border-black/[0.06] bg-white p-5">
+                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-black/35">Обучение</p>
+                {child.level && <p className="mt-3 font-semibold text-[#171717]">Уровень: {child.level}</p>}
+                {child.mentorName && <p className="mt-1 text-sm text-black/45">Наставник: {child.mentorName}</p>}
+              </div>
+            )}
+
+            {role !== "teacher" && (
+              <div className="mt-4 rounded-[24px] border border-black/[0.06] bg-white p-5">
+                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-black/35">Родитель</p>
+                <p className="mt-3 font-semibold text-[#171717]">{child.parentName || "Не указан"}</p>
+                <p className="mt-1 text-sm text-black/45">{child.parentPhone || "Телефон не указан"}</p>
+                <div className="mt-4 inline-flex rounded-full bg-[#5F6338]/10 px-3 py-1.5 text-xs font-semibold text-[#4D512E]">{activationLabels[child.activationStatus]}</div>
+              </div>
+            )}
+
+            <div className="mt-5 rounded-[24px] border border-dashed border-black/10 bg-white/50 p-5 text-sm leading-6 text-black/45">
+              Карточка уже редактируется. Следом подключим действия по расписанию, оценкам, посещаемости, Star Coin, оплате и фотосессиям.
+            </div>
+          </>
         )}
-
-        <div className="mt-5 rounded-[24px] border border-dashed border-black/10 bg-white/50 p-5 text-sm leading-6 text-black/45">
-          Следующим этапом здесь появятся действия: изменить данные, выдать активацию родителю, открыть расписание, оценки, посещаемость, Star Coin, оплату и фотосессии.
-        </div>
       </div>
     </div>
   );
@@ -205,9 +392,7 @@ export default function AdminApp() {
         <div className="w-full max-w-md rounded-[26px] bg-white p-6 text-center shadow-sm">
           <h2 className="text-xl font-semibold text-[#171717]">Не удалось открыть админ-панель</h2>
           <p className="mt-3 text-sm leading-6 text-black/45">{error}</p>
-          <button type="button" onClick={() => { clearStaffSession(); setState("guest"); }} className="mt-5 rounded-[14px] bg-[#171717] px-5 py-3 text-sm font-semibold text-white">
-            Войти снова
-          </button>
+          <button type="button" onClick={() => { clearStaffSession(); setState("guest"); }} className="mt-5 rounded-[14px] bg-[#171717] px-5 py-3 text-sm font-semibold text-white">Войти снова</button>
         </div>
       </div>
     );
@@ -217,6 +402,12 @@ export default function AdminApp() {
   const visibleNav = navItems.filter((item) => item.roles.includes(role));
   const groupsCount = new Set(children.map((child) => child.groupName).filter(Boolean)).size;
   const activeParents = children.filter((child) => child.activationStatus === "active").length;
+
+  async function handleChildSaved(childId: string) {
+    const rows = await fetchAdminChildren(role);
+    setChildren(rows);
+    setSelectedChild(rows.find((item) => item.id === childId) || null);
+  }
 
   return (
     <div className="min-h-screen bg-[#F6F5F1] text-[#171717] lg:flex">
@@ -240,9 +431,7 @@ export default function AdminApp() {
                   type="button"
                   disabled={!enabled}
                   onClick={() => enabled && setActiveSection(item.id)}
-                  className={`flex shrink-0 items-center gap-3 rounded-[14px] px-3 py-2.5 text-sm font-semibold transition lg:w-full ${
-                    active ? "bg-white text-[#171717]" : enabled ? "text-white/70 hover:bg-white/[0.07]" : "cursor-default text-white/25"
-                  }`}
+                  className={`flex shrink-0 items-center gap-3 rounded-[14px] px-3 py-2.5 text-sm font-semibold transition lg:w-full ${active ? "bg-white text-[#171717]" : enabled ? "text-white/70 hover:bg-white/[0.07]" : "cursor-default text-white/25"}`}
                 >
                   <Icon size={18} />
                   <span>{item.label}</span>
@@ -333,14 +522,8 @@ export default function AdminApp() {
                         <p className="truncate font-semibold text-[#171717]">{child.fullName}</p>
                         {child.groupName && <span className="rounded-full bg-[#5F6338]/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#4D512E]">{child.groupName}</span>}
                       </div>
-                      <p className="mt-1 truncate text-xs text-black/40">
-                        {[child.branch, child.lessonDay, child.lessonTime].filter(Boolean).join(" · ") || "Данные группы не заполнены"}
-                      </p>
-                      {role !== "teacher" && (
-                        <p className="mt-1 truncate text-xs text-black/35">
-                          {child.parentName || child.parentPhone || activationLabels[child.activationStatus]}
-                        </p>
-                      )}
+                      <p className="mt-1 truncate text-xs text-black/40">{[child.branch, child.lessonDay, child.lessonTime].filter(Boolean).join(" · ") || "Данные группы не заполнены"}</p>
+                      {role !== "teacher" && <p className="mt-1 truncate text-xs text-black/35">{child.parentName || child.parentPhone || activationLabels[child.activationStatus]}</p>}
                     </div>
                     <div className="hidden text-right sm:block">
                       {role !== "teacher" && <p className="text-xs font-semibold text-black/45">{activationLabels[child.activationStatus]}</p>}
@@ -354,12 +537,12 @@ export default function AdminApp() {
           </section>
 
           <div className="mt-5 flex items-center gap-2 text-xs text-black/30">
-            <Award size={15} /> Первый модуль админ-панели. Остальные разделы подключаются по ТЗ поэтапно.
+            <Award size={15} /> Карточка ученика уже редактируется. Следующим подключается расписание.
           </div>
         </div>
       </main>
 
-      {selectedChild && <StudentDetails child={selectedChild} role={role} onClose={() => setSelectedChild(null)} />}
+      {selectedChild && <StudentDetails child={selectedChild} role={role} onClose={() => setSelectedChild(null)} onSaved={handleChildSaved} />}
     </div>
   );
 }
