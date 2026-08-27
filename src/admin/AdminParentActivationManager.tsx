@@ -72,12 +72,16 @@ export function AdminParentActivationManager() {
     if (!session) return;
     const identity = await fetchStaffIdentity();
     if (identity.role === "teacher") return;
-    const rows = await fetchAdminChildren(identity.role);
+
+    // Показываем раздел сразу после подтверждения роли. Загрузка списка родителей
+    // не должна скрывать кнопку «Активация родителей» при временной ошибке чтения.
     setRole(identity.role);
+    setEnabled(true);
+
+    const rows = await fetchAdminChildren(identity.role);
     setChildren(rows.filter((item) => !item.archivedAt));
     const availableBranches = Array.from(new Set(rows.map((item) => item.branch).filter(Boolean)));
     if (identity.role === "admin" && availableBranches[0]) setBranch(availableBranches[0]);
-    setEnabled(true);
   }
 
   useEffect(() => {
