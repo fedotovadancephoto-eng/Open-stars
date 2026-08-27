@@ -8,6 +8,9 @@ import {
   uploadChildPhoto,
 } from "@/admin/photoUploadApi";
 
+export const OPEN_CHILD_PHOTO_UPLOAD_EVENT = "openstars:open-child-photo-upload";
+export const CHILD_PHOTO_UPDATED_EVENT = "openstars:child-photo-updated";
+
 function initials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   return parts.slice(0, 2).map((part) => part.charAt(0)).join("").toUpperCase() || "OS";
@@ -31,6 +34,18 @@ export function ChildPhotoUpload() {
   const [success, setSuccess] = useState("");
   const inputRef = useRef<HTMLInputElement | null>(null);
 
+  async function loadContext(selectChildId?: string) {
+    const context = await fetchPhotoUploadContext();
+    setEnabled(context.canUpload);
+    setStudents(context.students);
+    if (selectChildId) {
+      const student = context.students.find((item) => item.id === selectChildId) || null;
+      setSelected(student);
+      setPreview(student?.photoUrl || "");
+    }
+    return context;
+  }
+
   useEffect(() => {
     let cancelled = false;
     let timer = 0;
@@ -51,6 +66,24 @@ export function ChildPhotoUpload() {
     };
   }, []);
 
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<{ childId?: string }>).detail;
+      setOpen(true);
+      setLoading(true);
+      setError("");
+      setSuccess("");
+      setQuery("");
+      setFile(null);
+      setCrop(centerCrop);
+      loadContext(detail?.childId)
+        .catch((err) => setError(err instanceof Error ? err.message : "Не удалось загрузить список учеников."))
+        .finally(() => setLoading(false));
+    };
+    window.addEventListener(OPEN_CHILD_PHOTO_UPLOAD_EVENT, handler);
+    return () => window.removeEventListener(OPEN_CHILD_PHOTO_UPLOAD_EVENT, handler);
+  }, []);
+
   useEffect(() => () => {
     if (preview.startsWith("blob:")) URL.revokeObjectURL(preview);
   }, [preview]);
@@ -67,9 +100,7 @@ export function ChildPhotoUpload() {
     setError("");
     setSuccess("");
     try {
-      const context = await fetchPhotoUploadContext();
-      setEnabled(context.canUpload);
-      setStudents(context.students);
+      await loadContext();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Не удалось загрузить список учеников.");
     } finally {
@@ -155,7 +186,7 @@ export function ChildPhotoUpload() {
       setCrop(centerCrop);
       setStudents((current) => current.map((student) => student.id === selected.id ? { ...student, photoUrl: url } : student));
       setSuccess("Фото сохранено в вертикальном формате 4:5 и уже обновлено в карточке ребёнка.");
-      window.setTimeout(() => window.location.reload(), 1100);
+      window.dispatchEvent(new CustomEvent(CHILD_PHOTO_UPDATED_EVENT, { detail: { childId: selected.id, photoUrl: url } }));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Не удалось загрузить фотографию.");
     } finally {
