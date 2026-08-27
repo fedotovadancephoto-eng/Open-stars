@@ -36,7 +36,7 @@ type RpcError = { message?: string; details?: string };
 async function authorizedFetch(path: string, init?: RequestInit) {
   const session = await getValidStaffSession();
   if (!session) throw new Error("Сессия сотрудника не найдена. Войдите снова.");
-  const response = await fetch(`${SUPABASE_URL}${path}`, {
+  return fetch(`${SUPABASE_URL}${path}`, {
     ...init,
     headers: {
       apikey: SUPABASE_PUBLISHABLE_KEY,
@@ -44,7 +44,6 @@ async function authorizedFetch(path: string, init?: RequestInit) {
       ...(init?.headers || {}),
     },
   });
-  return response;
 }
 
 async function rpc<T>(name: string, body: Record<string, unknown>): Promise<T> {
@@ -65,6 +64,8 @@ async function rpc<T>(name: string, body: Record<string, unknown>): Promise<T> {
     if (message.includes("not authorized")) message = "Недостаточно прав для изменения расписания.";
     if (message.includes("three lessons")) message = "Нужно заполнить ровно три урока.";
     if (message.includes("subject required")) message = "Укажите название каждого из трёх уроков.";
+    if (message.includes("schedule conflict")) message = "На эту дату для этой группы уже есть расписание в выбранное время.";
+    if (message.includes("schedule not found")) message = "Расписание не найдено. Обновите список и попробуйте ещё раз.";
     throw new Error(message);
   }
   if (response.status === 204) return undefined as T;
@@ -135,6 +136,25 @@ export async function publishGroupSchedule(input: {
         room: lesson.room.trim(),
       })),
       p_weeks: input.weeks,
+    }
+  );
+}
+
+export async function updateGroupSchedule(input: {
+  batchId: string;
+  streamStart: ScheduleStream;
+  lessons: ScheduleLessonInput[];
+}) {
+  return rpc<Array<{ batch_id: string; students_count: number }>>(
+    "staff_update_group_schedule",
+    {
+      p_batch_id: input.batchId,
+      p_stream_start: input.streamStart,
+      p_lessons: input.lessons.map((lesson) => ({
+        subject: lesson.subject.trim(),
+        instructor: lesson.instructor.trim(),
+        room: lesson.room.trim(),
+      })),
     }
   );
 }
