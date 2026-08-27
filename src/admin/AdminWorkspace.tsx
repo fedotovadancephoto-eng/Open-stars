@@ -10,10 +10,12 @@ import { AdminStudentOperations } from "@/admin/AdminStudentOperations";
 import { AdminStudyManager } from "@/admin/AdminStudyManager";
 import { AdminTopMenu } from "@/admin/AdminTopMenu";
 import { ChildPhotoUpload } from "@/admin/ChildPhotoUpload";
+import { StaffModeSwitch } from "@/admin/StaffModeSwitch";
 
 export default function AdminWorkspace() {
   return (
     <>
+      <StaffModeSwitch />
       <AdminTopMenu />
       <AdminApp />
       <AdminStudentOperations />
