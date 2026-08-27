@@ -77,8 +77,29 @@ function roleFromProfile(row: any): ScheduleRole | null {
   return ["owner", "project_director", "manager", "admin", "teacher"].includes(raw) ? raw : null;
 }
 
+function authUserIdFromToken(accessToken: string) {
+  try {
+    const part = accessToken.split(".")[1];
+    if (!part) return "";
+    const normalized = part.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
+    const payload = JSON.parse(atob(padded));
+    return typeof payload?.sub === "string" ? payload.sub : "";
+  } catch {
+    return "";
+  }
+}
+
 export async function fetchScheduleContext() {
-  const response = await authorizedFetch("/rest/v1/users_profile?select=staff_branch,roles(name)&limit=1");
+  const session = await getValidStaffSession();
+  if (!session) throw new Error("Сессия сотрудника не найдена. Войдите снова.");
+
+  const authUserId = authUserIdFromToken(session.access_token);
+  if (!authUserId) throw new Error("Не удалось определить сотрудника.");
+
+  const response = await authorizedFetch(
+    `/rest/v1/users_profile?auth_user_id=eq.${encodeURIComponent(authUserId)}&select=staff_branch,roles(name)&limit=1`
+  );
   if (!response.ok) throw new Error("Не удалось определить права сотрудника.");
   const rows = await response.json();
   const row = rows[0];
