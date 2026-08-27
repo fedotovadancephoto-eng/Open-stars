@@ -2,14 +2,13 @@ import { useEffect, useMemo, useState } from "react";
 import { Archive, LoaderCircle, Plus, RotateCcw, Search, X } from "lucide-react";
 
 import {
-  AdminChild,
   StaffRole,
   archiveStudent,
-  fetchAdminChildren,
   fetchStaffIdentity,
   getValidStaffSession,
   restoreStudent,
 } from "@/admin/adminApi";
+import { ArchiveStudentRow, fetchStudentsForArchive } from "@/admin/archiveApi";
 import { QuickStudentModal } from "@/admin/QuickStudentModal";
 
 type View = "active" | "archived";
@@ -26,12 +25,12 @@ export function AdminStudentOperations() {
   const [role, setRole] = useState<StaffRole | null>(null);
   const [showQuick, setShowQuick] = useState(false);
   const [showArchive, setShowArchive] = useState(false);
-  const [children, setChildren] = useState<AdminChild[]>([]);
+  const [children, setChildren] = useState<ArchiveStudentRow[]>([]);
   const [view, setView] = useState<View>("active");
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [busyId, setBusyId] = useState("");
-  const [archiveChild, setArchiveChild] = useState<AdminChild | null>(null);
+  const [archiveChild, setArchiveChild] = useState<ArchiveStudentRow | null>(null);
   const [reason, setReason] = useState("");
   const [otherReason, setOtherReason] = useState("");
   const [error, setError] = useState("");
@@ -67,7 +66,7 @@ export function AdminStudentOperations() {
     setLoading(true);
     setError("");
     try {
-      setChildren(await fetchAdminChildren(role));
+      setChildren(await fetchStudentsForArchive());
     } catch (err) {
       setError(err instanceof Error ? err.message : "Не удалось загрузить список учеников.");
     } finally {
@@ -80,8 +79,8 @@ export function AdminStudentOperations() {
     await refresh();
   }
 
-  async function afterCreated() {
-    if (role) setChildren(await fetchAdminChildren(role));
+  async function afterCreated(addNext: boolean) {
+    if (!addNext) window.location.reload();
   }
 
   async function confirmArchive() {
@@ -107,7 +106,7 @@ export function AdminStudentOperations() {
     }
   }
 
-  async function restore(child: AdminChild) {
+  async function restore(child: ArchiveStudentRow) {
     setBusyId(child.id);
     setError("");
     try {
