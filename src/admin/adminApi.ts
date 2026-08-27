@@ -2,7 +2,7 @@ const SUPABASE_URL = "https://yiwiykbuaggyslfyhlfo.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_1MORh5rY7uMDVYLYVX5VAA_cyoph4-7";
 const STAFF_SESSION_KEY = "openstars_staff_session";
 
-export type StaffRole = "owner" | "admin" | "manager" | "teacher";
+export type StaffRole = "owner" | "project_director" | "admin" | "manager" | "teacher";
 export type BranchName = "Свердловский" | "НЛО" | "Октябрьский";
 export type GroupName = "Базовый" | "Продвинутый" | "PRO";
 
@@ -265,7 +265,7 @@ async function rpc<T>(functionName: string, body: Record<string, unknown>): Prom
 
 function roleFromRow(row: any): StaffRole | null {
   const raw = Array.isArray(row?.roles) ? row.roles[0]?.name : row?.roles?.name;
-  return ["owner", "admin", "manager", "teacher"].includes(raw) ? raw : null;
+  return ["owner", "project_director", "admin", "manager", "teacher"].includes(raw) ? raw : null;
 }
 
 export async function fetchStaffIdentity(): Promise<StaffIdentity> {
