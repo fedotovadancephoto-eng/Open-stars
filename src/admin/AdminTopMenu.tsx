@@ -15,6 +15,8 @@ import {
   X,
 } from "lucide-react";
 
+import { STAFF_VIEW_MODE_EVENT, STAFF_VIEW_MODE_KEY } from "@/admin/StaffModeSwitch";
+
 const items = [
   { label: "Добавить ученика", icon: UserPlus, accent: "orange" },
   { label: "Выбывшие", icon: Archive, accent: "neutral" },
@@ -30,6 +32,9 @@ const items = [
 ] as const;
 
 type MenuLabel = (typeof items)[number]["label"];
+type StaffViewMode = "primary" | "teacher";
+
+const teacherMenuLabels = new Set<MenuLabel>(["Расписание", "Учебная часть"]);
 
 const normalize = (value: string | null | undefined) =>
   (value || "").replace(/\s+/g, " ").trim();
@@ -52,6 +57,20 @@ const accentClass = {
 export function AdminTopMenu() {
   const [open, setOpen] = useState(false);
   const [available, setAvailable] = useState<Set<MenuLabel>>(new Set());
+  const [staffMode, setStaffMode] = useState<StaffViewMode>(
+    localStorage.getItem(STAFF_VIEW_MODE_KEY) === "teacher" ? "teacher" : "primary",
+  );
+
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<{ mode?: StaffViewMode }>).detail;
+      const next = detail?.mode === "teacher" ? "teacher" : "primary";
+      setStaffMode(next);
+      setOpen(false);
+    };
+    window.addEventListener(STAFF_VIEW_MODE_EVENT, handler);
+    return () => window.removeEventListener(STAFF_VIEW_MODE_EVENT, handler);
+  }, []);
 
   useEffect(() => {
     let raf = 0;
@@ -88,8 +107,8 @@ export function AdminTopMenu() {
   }, []);
 
   const visibleItems = useMemo(
-    () => items.filter((item) => available.has(item.label)),
-    [available],
+    () => items.filter((item) => available.has(item.label) && (staffMode !== "teacher" || teacherMenuLabels.has(item.label))),
+    [available, staffMode],
   );
 
   if (visibleItems.length === 0) return null;
@@ -134,10 +153,10 @@ export function AdminTopMenu() {
         >
           <div className="px-2 pb-2 pt-1">
             <p className="text-[10px] font-bold uppercase tracking-[0.19em] text-[#D96A24]">
-              OPEN STARS ADMIN
+              {staffMode === "teacher" ? "OPEN STARS · ПЕДАГОГ" : "OPEN STARS ADMIN"}
             </p>
             <p className="mt-1 text-lg font-semibold tracking-[-0.02em] text-[#171717]">
-              Разделы управления
+              {staffMode === "teacher" ? "Рабочие разделы педагога" : "Разделы управления"}
             </p>
           </div>
 
