@@ -201,6 +201,25 @@ async function restSelect<T>(
   return response.json();
 }
 
+function jwtSubject(accessToken: string) {
+  const part = accessToken.split(".")[1];
+  if (!part) return "";
+
+  try {
+    const normalized = part.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
+    const payload = JSON.parse(window.atob(padded));
+    return typeof payload?.sub === "string" ? payload.sub : "";
+  } catch {
+    return "";
+  }
+}
+
+function roleFromProfile(row: any) {
+  const raw = Array.isArray(row?.roles) ? row.roles[0]?.name : row?.roles?.name;
+  return typeof raw === "string" ? raw : "";
+}
+
 function formatDate(value?: string | null) {
   if (!value) return "";
   const date = new Date(`${value}T12:00:00`);
@@ -258,21 +277,40 @@ export async function fetchParentDashboard() {
   if (!session) throw new Error("Сессия истекла. Войдите снова.");
 
   const token = session.access_token;
+  const authUserId = jwtSubject(token);
+  if (!authUserId) {
+    clearParentSession();
+    throw new Error("Не удалось определить родительский аккаунт. Войдите снова.");
+  }
 
-  const [profiles, children] = await Promise.all([
-    restSelect<any>(
-      "users_profile",
-      "select=id,full_name&limit=1",
-      token
-    ),
-    restSelect<any>(
-      "children",
-      "select=id,first_name,last_name,group_name,photo_url,coins,payment_status,branch,level,lesson_day,lesson_time,mentor_name,birth_date&limit=1",
-      token
-    ),
-  ]);
-
+  const profiles = await restSelect<any>(
+    "users_profile",
+    `select=id,full_name,auth_user_id,roles(name)&auth_user_id=eq.${encodeURIComponent(authUserId)}&limit=1`,
+    token
+  );
   const profile = profiles[0];
+
+  if (!profile || roleFromProfile(profile) !== "parent") {
+    clearParentSession();
+    throw new Error("Эта сессия не относится к родительскому кабинету. Войдите снова.");
+  }
+
+  const memberships = await restSelect<any>(
+    "family_members",
+    `select=family_id,user_id&user_id=eq.${encodeURIComponent(profile.id)}&limit=1`,
+    token
+  );
+  const familyId = memberships[0]?.family_id;
+
+  if (!familyId) {
+    throw new Error("К аккаунту родителя не привязана семья.");
+  }
+
+  const children = await restSelect<any>(
+    "children",
+    `select=id,first_name,last_name,group_name,photo_url,coins,payment_status,branch,level,lesson_day,lesson_time,mentor_name,birth_date,family_id&family_id=eq.${encodeURIComponent(familyId)}&archived_at=is.null&limit=1`,
+    token
+  );
   const dbChild = children[0];
 
   if (!dbChild) {
