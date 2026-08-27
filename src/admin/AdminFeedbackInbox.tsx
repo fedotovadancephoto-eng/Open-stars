@@ -120,7 +120,7 @@ export function AdminFeedbackInbox() {
 
   useEffect(() => {
     refresh();
-    const timer = window.setInterval(() => refresh(true), 15000);
+    const timer = window.setInterval(() => refresh(true), 5000);
     return () => window.clearInterval(timer);
   }, []);
 
@@ -163,7 +163,7 @@ export function AdminFeedbackInbox() {
                 <h2 className="text-xl font-semibold tracking-[-0.025em]">Обратная связь от родителей</h2>
                 {newCount > 0 && <span className="rounded-full bg-[#D96A24] px-2.5 py-1 text-[11px] font-bold text-white">{newCount} новых</span>}
               </div>
-              <p className="mt-1 text-sm text-black/40">Сообщения об приложении и обучении. Список обновляется автоматически.</p>
+              <p className="mt-1 text-sm text-black/40">Сообщения о приложении и обучении. Список обновляется автоматически.</p>
             </div>
           </div>
 
