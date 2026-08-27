@@ -1,5 +1,6 @@
 const SUPABASE_HOST = "yiwiykbuaggyslfyhlfo.supabase.co";
 const MAX_CLOCK_SKEW_RETRIES = 3;
+const REFRESH_DEDUP_WINDOW_MS = 1800;
 
 function sleep(ms: number) {
   return new Promise<void>((resolve) => {
@@ -21,6 +22,29 @@ function getRequestMethod(input: RequestInfo | URL, init?: RequestInit) {
   return "GET";
 }
 
+function refreshRequestKey(input: RequestInfo | URL, init?: RequestInit) {
+  const url = getRequestUrl(input);
+  const method = getRequestMethod(input, init);
+  if (
+    method !== "POST" ||
+    !url.includes(SUPABASE_HOST) ||
+    !url.includes("/auth/v1/token") ||
+    !url.includes("grant_type=refresh_token")
+  ) {
+    return "";
+  }
+
+  if (typeof init?.body === "string") {
+    try {
+      const parsed = JSON.parse(init.body);
+      if (typeof parsed?.refresh_token === "string") return parsed.refresh_token;
+    } catch {
+      // Fall back to the URL key below.
+    }
+  }
+  return url;
+}
+
 async function isIssuedAtFutureResponse(response: Response) {
   if (response.status !== 401) return false;
 
@@ -39,6 +63,11 @@ async function isIssuedAtFutureResponse(response: Response) {
 }
 
 let installed = false;
+let refreshLock: {
+  key: string;
+  promise: Promise<Response>;
+  expiresAt: number;
+} | null = null;
 
 export function installSupabaseFetchGuard() {
   if (installed || typeof window === "undefined") return;
@@ -52,6 +81,32 @@ export function installSupabaseFetchGuard() {
   ): Promise<Response> => {
     const url = getRequestUrl(input);
     const method = getRequestMethod(input, init);
+    const refreshKey = refreshRequestKey(input, init);
+
+    if (refreshKey) {
+      const now = Date.now();
+      if (
+        refreshLock &&
+        refreshLock.key === refreshKey &&
+        refreshLock.expiresAt > now
+      ) {
+        const shared = await refreshLock.promise;
+        return shared.clone();
+      }
+
+      const entry = {
+        key: refreshKey,
+        promise: originalFetch(input, init),
+        expiresAt: now + REFRESH_DEDUP_WINDOW_MS,
+      };
+      refreshLock = entry;
+      window.setTimeout(() => {
+        if (refreshLock === entry) refreshLock = null;
+      }, REFRESH_DEDUP_WINDOW_MS);
+
+      const response = await entry.promise;
+      return response.clone();
+    }
 
     const shouldGuard =
       method === "GET" &&
@@ -77,10 +132,6 @@ export function installSupabaseFetchGuard() {
         break;
       }
 
-      // Supabase Auth and PostgREST can occasionally differ by a fraction
-      // of a second immediately after a token is issued. Waiting briefly and
-      // retrying the same read request prevents parents from seeing a false
-      // authentication error.
       await sleep(1200 * (attempt + 1));
     }
 
