@@ -86,6 +86,7 @@ export function Header({ onNavigate, onLogout }: HeaderProps) {
       } catch {}
     }
     if (item.target === "news") navigate("news");
+    if (item.target === "photos") navigate("photos");
   }
 
   const unreadCount = notifications.filter((item) => !item.isRead).length;
