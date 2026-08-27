@@ -11,42 +11,36 @@ import {
   Menu,
   MessageSquareHeart,
   Newspaper,
+  ShieldCheck,
   UserPlus,
   X,
 } from "lucide-react";
 
-import { STAFF_VIEW_MODE_EVENT, STAFF_VIEW_MODE_KEY } from "@/admin/StaffModeSwitch";
+import { fetchStaffIdentity, StaffRole } from "@/admin/adminApi";
+import { AdminSection, openAdminSection } from "@/admin/adminNavigation";
+import { STAFF_VIEW_MODE_EVENT, STAFF_VIEW_MODE_KEY, StaffViewMode } from "@/admin/StaffModeSwitch";
 
-const items = [
-  { label: "Добавить ученика", icon: UserPlus, accent: "orange" },
-  { label: "Выбывшие", icon: Archive, accent: "neutral" },
-  { label: "Активация родителей", icon: KeyRound, accent: "orange" },
-  { label: "Фото ребёнка", icon: ImagePlus, accent: "olive" },
-  { label: "Расписание", icon: CalendarDays, accent: "neutral" },
-  { label: "Учебная часть", icon: BookOpenCheck, accent: "orange" },
-  { label: "Star Coin", icon: Coins, accent: "olive" },
-  { label: "Новости", icon: Newspaper, accent: "neutral" },
-  { label: "Оплата", icon: CreditCard, accent: "olive" },
-  { label: "Фотосессии", icon: Camera, accent: "orange" },
-  { label: "Обратная связь", icon: MessageSquareHeart, accent: "olive" },
-] as const;
-
-type MenuLabel = (typeof items)[number]["label"];
-type StaffViewMode = "primary" | "teacher";
-
-const teacherMenuLabels = new Set<MenuLabel>(["Расписание", "Учебная часть"]);
-
-const normalize = (value: string | null | undefined) =>
-  (value || "").replace(/\s+/g, " ").trim();
-
-function findLegacyButton(label: MenuLabel) {
-  return Array.from(document.querySelectorAll<HTMLButtonElement>("button")).find((button) => {
-    if (button.dataset.adminTopMenu === "true") return false;
-    const className = typeof button.className === "string" ? button.className : "";
-    if (!className.includes("fixed")) return false;
-    return normalize(button.textContent).includes(label);
-  });
-}
+const items: Array<{
+  section: AdminSection;
+  label: string;
+  icon: typeof UserPlus;
+  accent: "orange" | "olive" | "neutral";
+  roles: StaffRole[];
+  teacherVisible?: boolean;
+}> = [
+  { section: "add-student", label: "Добавить ученика", icon: UserPlus, accent: "orange", roles: ["owner", "project_director", "admin", "manager"] },
+  { section: "archive", label: "Выбывшие", icon: Archive, accent: "neutral", roles: ["owner", "project_director", "admin", "manager"] },
+  { section: "parent-activation", label: "Активация родителей", icon: KeyRound, accent: "orange", roles: ["owner", "project_director", "admin", "manager"] },
+  { section: "child-photo", label: "Фото ребёнка", icon: ImagePlus, accent: "olive", roles: ["owner", "project_director", "admin", "manager"] },
+  { section: "schedule", label: "Расписание", icon: CalendarDays, accent: "neutral", roles: ["owner", "project_director", "admin", "manager", "teacher"], teacherVisible: true },
+  { section: "study", label: "Учебная часть", icon: BookOpenCheck, accent: "orange", roles: ["owner", "project_director", "admin", "manager", "teacher"], teacherVisible: true },
+  { section: "coins", label: "Star Coin", icon: Coins, accent: "olive", roles: ["owner", "project_director", "admin", "manager"] },
+  { section: "news", label: "Новости", icon: Newspaper, accent: "neutral", roles: ["owner", "project_director", "admin", "manager"] },
+  { section: "payments", label: "Оплата", icon: CreditCard, accent: "olive", roles: ["owner", "project_director", "admin", "manager"] },
+  { section: "photos", label: "Фотосессии", icon: Camera, accent: "orange", roles: ["owner", "project_director", "admin", "manager"] },
+  { section: "feedback", label: "Обратная связь", icon: MessageSquareHeart, accent: "olive", roles: ["owner", "project_director", "admin", "manager"] },
+  { section: "team", label: "Сотрудники", icon: ShieldCheck, accent: "neutral", roles: ["owner", "project_director"] },
+];
 
 const accentClass = {
   orange: "bg-[#D96A24]/10 text-[#C95320]",
@@ -54,131 +48,103 @@ const accentClass = {
   neutral: "bg-black/[0.055] text-[#171717]",
 };
 
+const legacyLabels = new Set(items.filter((item) => item.section !== "team").map((item) => item.label));
+
+function normalize(value: string | null | undefined) {
+  return (value || "").replace(/\s+/g, " ").trim();
+}
+
 export function AdminTopMenu() {
   const [open, setOpen] = useState(false);
-  const [available, setAvailable] = useState<Set<MenuLabel>>(new Set());
-  const [staffMode, setStaffMode] = useState<StaffViewMode>(
-    localStorage.getItem(STAFF_VIEW_MODE_KEY) === "teacher" ? "teacher" : "primary",
-  );
+  const [role, setRole] = useState<StaffRole | null>(null);
+  const [staffMode, setStaffMode] = useState<StaffViewMode>(localStorage.getItem(STAFF_VIEW_MODE_KEY) === "teacher" ? "teacher" : "primary");
+
+  useEffect(() => {
+    let cancelled = false;
+    let timer = 0;
+    async function detect() {
+      try {
+        const identity = await fetchStaffIdentity();
+        if (!cancelled) setRole(identity.role);
+      } catch {
+        if (!cancelled) timer = window.setTimeout(detect, 1200);
+      }
+    }
+    void detect();
+    return () => { cancelled = true; if (timer) window.clearTimeout(timer); };
+  }, []);
 
   useEffect(() => {
     const handler = (event: Event) => {
       const detail = (event as CustomEvent<{ mode?: StaffViewMode }>).detail;
-      const next = detail?.mode === "teacher" ? "teacher" : "primary";
-      setStaffMode(next);
+      setStaffMode(detail?.mode === "teacher" ? "teacher" : "primary");
       setOpen(false);
     };
     window.addEventListener(STAFF_VIEW_MODE_EVENT, handler);
     return () => window.removeEventListener(STAFF_VIEW_MODE_EVENT, handler);
   }, []);
 
+  // Старые плавающие кнопки оставлены внутри менеджеров как резервный вход.
+  // Навигация больше не зависит от них: меню открывает разделы через события.
   useEffect(() => {
     let raf = 0;
-
-    const sync = () => {
+    const hideLegacyLaunchers = () => {
       window.cancelAnimationFrame(raf);
       raf = window.requestAnimationFrame(() => {
-        const next = new Set<MenuLabel>();
-        for (const item of items) {
-          const button = findLegacyButton(item.label);
-          if (!button) continue;
-          next.add(item.label);
+        document.querySelectorAll<HTMLButtonElement>("button").forEach((button) => {
+          if (button.dataset.adminTopMenu === "true" || button.dataset.staffModeSwitch === "true") return;
+          const className = typeof button.className === "string" ? button.className : "";
+          if (!className.includes("fixed")) return;
+          if (!legacyLabels.has(normalize(button.textContent))) return;
           button.dataset.adminLegacyMenuButton = "true";
           button.style.setProperty("display", "none", "important");
-        }
-        setAvailable(next);
+        });
       });
     };
-
-    sync();
-    const observer = new MutationObserver(sync);
+    hideLegacyLaunchers();
+    const observer = new MutationObserver(hideLegacyLaunchers);
     observer.observe(document.body, { childList: true, subtree: true });
-
     return () => {
       observer.disconnect();
       window.cancelAnimationFrame(raf);
-      document
-        .querySelectorAll<HTMLButtonElement>('button[data-admin-legacy-menu-button="true"]')
-        .forEach((button) => {
-          button.style.removeProperty("display");
-          delete button.dataset.adminLegacyMenuButton;
-        });
+      document.querySelectorAll<HTMLElement>('[data-admin-legacy-menu-button="true"]').forEach((element) => {
+        element.style.removeProperty("display");
+        delete element.dataset.adminLegacyMenuButton;
+      });
     };
   }, []);
 
-  const visibleItems = useMemo(
-    () => items.filter((item) => available.has(item.label) && (staffMode !== "teacher" || teacherMenuLabels.has(item.label))),
-    [available, staffMode],
-  );
+  const teacherView = role === "teacher" || staffMode === "teacher";
+  const visibleItems = useMemo(() => items.filter((item) => {
+    if (!role || !item.roles.includes(role)) return false;
+    if (teacherView) return Boolean(item.teacherVisible);
+    return true;
+  }), [role, teacherView]);
 
-  if (visibleItems.length === 0) return null;
+  if (!role || visibleItems.length === 0) return null;
 
-  const openSection = (label: MenuLabel) => {
+  function openSection(section: AdminSection) {
     setOpen(false);
-    window.setTimeout(() => findLegacyButton(label)?.click(), 0);
-  };
+    openAdminSection(section);
+  }
 
   return (
     <>
-      {open && (
-        <button
-          type="button"
-          aria-label="Закрыть меню разделов"
-          data-admin-top-menu="true"
-          className="fixed inset-0 z-[64] cursor-default bg-black/10 backdrop-blur-[1px]"
-          onClick={() => setOpen(false)}
-        />
-      )}
+      {open && <button type="button" aria-label="Закрыть меню разделов" data-admin-top-menu="true" className="fixed inset-0 z-[64] cursor-default bg-black/10 backdrop-blur-[1px]" onClick={() => setOpen(false)} />}
 
-      <div
-        className="fixed right-4 z-[66] sm:right-6"
-        style={{ top: "calc(env(safe-area-inset-top, 0px) + 5.6rem)" }}
-      >
-        <button
-          type="button"
-          data-admin-top-menu="true"
-          aria-expanded={open}
-          onClick={() => setOpen((value) => !value)}
-          className="flex h-12 items-center gap-2 rounded-full border border-black/[0.06] bg-[#171717] px-4 text-sm font-semibold text-white shadow-[0_10px_30px_rgba(0,0,0,0.18)] active:scale-[0.98]"
-        >
-          {open ? <X size={18} /> : <Menu size={18} />}
-          {open ? "Закрыть" : "Разделы"}
+      <div className="fixed right-4 z-[66] sm:right-6" style={{ top: "calc(env(safe-area-inset-top, 0px) + 5.6rem)" }}>
+        <button type="button" data-admin-top-menu="true" aria-expanded={open} onClick={() => setOpen((value) => !value)} className="flex h-12 items-center gap-2 rounded-full border border-black/[0.06] bg-[#171717] px-4 text-sm font-semibold text-white shadow-[0_10px_30px_rgba(0,0,0,0.18)] active:scale-[0.98]">
+          {open ? <X size={18} /> : <Menu size={18} />}{open ? "Закрыть" : "Разделы"}
         </button>
       </div>
 
       {open && (
-        <div
-          className="fixed left-4 right-4 z-[66] mx-auto max-w-xl rounded-[24px] border border-black/[0.07] bg-white p-3 shadow-[0_22px_60px_rgba(0,0,0,0.20)] sm:left-auto sm:right-6 sm:w-[520px]"
-          style={{ top: "calc(env(safe-area-inset-top, 0px) + 9.25rem)" }}
-        >
-          <div className="px-2 pb-2 pt-1">
-            <p className="text-[10px] font-bold uppercase tracking-[0.19em] text-[#D96A24]">
-              {staffMode === "teacher" ? "OPEN STARS · ПЕДАГОГ" : "OPEN STARS ADMIN"}
-            </p>
-            <p className="mt-1 text-lg font-semibold tracking-[-0.02em] text-[#171717]">
-              {staffMode === "teacher" ? "Рабочие разделы педагога" : "Разделы управления"}
-            </p>
-          </div>
-
+        <div className="fixed left-4 right-4 z-[66] mx-auto max-w-xl rounded-[24px] border border-black/[0.07] bg-white p-3 shadow-[0_22px_60px_rgba(0,0,0,0.20)] sm:left-auto sm:right-6 sm:w-[520px]" style={{ top: "calc(env(safe-area-inset-top, 0px) + 9.25rem)" }}>
+          <div className="px-2 pb-2 pt-1"><p className="text-[10px] font-bold uppercase tracking-[0.19em] text-[#D96A24]">{teacherView ? "OPEN STARS · ПЕДАГОГ" : "OPEN STARS ADMIN"}</p><p className="mt-1 text-lg font-semibold tracking-[-0.02em] text-[#171717]">{teacherView ? "Рабочие разделы педагога" : "Быстрые действия"}</p></div>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             {visibleItems.map((item) => {
               const Icon = item.icon;
-              return (
-                <button
-                  key={item.label}
-                  type="button"
-                  data-admin-top-menu="true"
-                  onClick={() => openSection(item.label)}
-                  className="flex min-h-[76px] items-center gap-3 rounded-[18px] border border-black/[0.05] bg-[#FAF9F5] p-3 text-left transition hover:bg-white active:scale-[0.99]"
-                >
-                  <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-[13px] ${accentClass[item.accent]}`}>
-                    <Icon size={19} strokeWidth={2.15} />
-                  </span>
-                  <span className="text-[12px] font-semibold leading-tight text-[#171717]">
-                    {item.label}
-                  </span>
-                </button>
-              );
+              return <button key={item.section} type="button" data-admin-top-menu="true" onClick={() => openSection(item.section)} className="flex min-h-[76px] items-center gap-3 rounded-[18px] border border-black/[0.05] bg-[#FAF9F5] p-3 text-left transition hover:bg-white active:scale-[0.99]"><span className={`grid h-10 w-10 shrink-0 place-items-center rounded-[13px] ${accentClass[item.accent]}`}><Icon size={19} strokeWidth={2.15} /></span><span className="text-[12px] font-semibold leading-tight text-[#171717]">{item.label}</span></button>;
             })}
           </div>
         </div>
