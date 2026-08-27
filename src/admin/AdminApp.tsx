@@ -45,6 +45,7 @@ type SectionId = "students" | "schedule" | "study" | "coins" | "news" | "payment
 
 const roleLabels: Record<StaffRole, string> = {
   owner: "Директор",
+  project_director: "Директор по проекту",
   admin: "Администратор",
   manager: "Управляющий",
   teacher: "Преподаватель",
@@ -66,14 +67,14 @@ const branchOptions = ["Свердловский", "НЛО", "Октябрьск
 const groupOptions = ["Базовый", "Продвинутый", "PRO"] as const;
 
 const navItems = [
-  { id: "students" as SectionId, label: "Ученики", icon: UsersRound, roles: ["owner", "admin", "manager", "teacher"] },
-  { id: "schedule" as SectionId, label: "Расписание", icon: CalendarDays, roles: ["owner", "admin", "manager", "teacher"] },
-  { id: "study" as SectionId, label: "Учебная часть", icon: BookOpenCheck, roles: ["owner", "admin", "manager", "teacher"] },
-  { id: "coins" as SectionId, label: "Star Coin", icon: Coins, roles: ["owner", "admin", "manager"] },
-  { id: "news" as SectionId, label: "Новости", icon: Newspaper, roles: ["owner", "admin", "manager"] },
-  { id: "payments" as SectionId, label: "Оплата", icon: CreditCard, roles: ["owner", "admin", "manager"] },
-  { id: "photos" as SectionId, label: "Фотосессии", icon: Camera, roles: ["owner", "admin", "manager"] },
-  { id: "team" as SectionId, label: "Сотрудники", icon: ShieldCheck, roles: ["owner"] },
+  { id: "students" as SectionId, label: "Ученики", icon: UsersRound, roles: ["owner", "project_director", "admin", "manager", "teacher"] },
+  { id: "schedule" as SectionId, label: "Расписание", icon: CalendarDays, roles: ["owner", "project_director", "admin", "manager", "teacher"] },
+  { id: "study" as SectionId, label: "Учебная часть", icon: BookOpenCheck, roles: ["owner", "project_director", "admin", "manager", "teacher"] },
+  { id: "coins" as SectionId, label: "Star Coin", icon: Coins, roles: ["owner", "project_director", "admin", "manager"] },
+  { id: "news" as SectionId, label: "Новости", icon: Newspaper, roles: ["owner", "project_director", "admin", "manager"] },
+  { id: "payments" as SectionId, label: "Оплата", icon: CreditCard, roles: ["owner", "project_director", "admin", "manager"] },
+  { id: "photos" as SectionId, label: "Фотосессии", icon: Camera, roles: ["owner", "project_director", "admin", "manager"] },
+  { id: "team" as SectionId, label: "Сотрудники", icon: ShieldCheck, roles: ["owner", "project_director"] },
 ];
 
 const inputClass = "mt-1.5 w-full rounded-[13px] border border-black/[0.08] bg-[#FAF9F5] px-3.5 py-3 text-sm text-[#171717] outline-none placeholder:text-black/25 focus:border-[#D96A24]/45 focus:ring-4 focus:ring-[#D96A24]/[0.06]";
