@@ -7,6 +7,7 @@ import {
   ChevronRight,
   Coins,
   CreditCard,
+  ImagePlus,
   LayoutDashboard,
   LoaderCircle,
   LogOut,
@@ -22,6 +23,7 @@ import {
 } from "lucide-react";
 
 import { AdminFeedbackInbox } from "@/admin/AdminFeedbackInbox";
+import { CHILD_PHOTO_UPDATED_EVENT, OPEN_CHILD_PHOTO_UPLOAD_EVENT } from "@/admin/ChildPhotoUpload";
 import {
   AdminChild,
   ChildUpdateInput,
@@ -120,12 +122,26 @@ function StudentDetails({ child, role, onClose, onSaved }: { child: AdminChild; 
     });
   }, [child]);
 
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<{ childId?: string; photoUrl?: string }>).detail;
+      if (detail?.childId !== child.id || !detail?.photoUrl) return;
+      setForm((current) => ({ ...current, photoUrl: detail.photoUrl || current.photoUrl }));
+    };
+    window.addEventListener(CHILD_PHOTO_UPDATED_EVENT, handler);
+    return () => window.removeEventListener(CHILD_PHOTO_UPDATED_EVENT, handler);
+  }, [child.id]);
+
   function field<K extends keyof ChildUpdateInput>(key: K, value: ChildUpdateInput[K]) {
     setForm((current) => ({ ...current, [key]: value }));
   }
 
   function chooseBranch(branch: string) {
     setForm((current) => ({ ...current, branch, administratorName: administratorForBranch(branch) }));
+  }
+
+  function openPhotoUpload() {
+    window.dispatchEvent(new CustomEvent(OPEN_CHILD_PHOTO_UPLOAD_EVENT, { detail: { childId: child.id } }));
   }
 
   async function saveChanges() {
@@ -165,7 +181,14 @@ function StudentDetails({ child, role, onClose, onSaved }: { child: AdminChild; 
                 <label className="text-xs font-semibold text-black/55">Фамилия<input className={inputClass} value={form.lastName} onChange={(e) => field("lastName", e.target.value)} /></label>
               </div>
               <label className="mt-3 block text-xs font-semibold text-black/55">Дата рождения<input type="date" className={inputClass} value={form.birthDate} onChange={(e) => field("birthDate", e.target.value)} /></label>
-              <label className="mt-3 block text-xs font-semibold text-black/55">Фото — ссылка<input className={inputClass} value={form.photoUrl} onChange={(e) => field("photoUrl", e.target.value)} placeholder="https://..." /></label>
+              <div className="mt-4 rounded-[16px] bg-[#FAF9F5] p-4">
+                <p className="text-xs font-semibold text-black/55">Фото ребёнка</p>
+                <div className="mt-3 flex items-center gap-3">
+                  {form.photoUrl ? <img src={form.photoUrl} alt={child.fullName} className="h-16 w-14 rounded-[13px] object-cover" /> : <div className="grid h-16 w-14 place-items-center rounded-[13px] bg-white text-sm font-bold text-[#5F6338]">{initials(child)}</div>}
+                  <button type="button" onClick={openPhotoUpload} className="flex flex-1 items-center justify-center gap-2 rounded-[13px] bg-white px-4 py-3 text-sm font-semibold text-[#171717] shadow-sm"><ImagePlus size={17} />{form.photoUrl ? "Изменить фото" : "Загрузить фото"}</button>
+                </div>
+                <p className="mt-2 text-[11px] leading-5 text-black/35">Выберите фотографию из галереи. Система сохранит вертикальный кадр 4:5.</p>
+              </div>
             </div>
 
             <div className="rounded-[24px] border border-black/[0.06] bg-white p-5">
@@ -200,8 +223,9 @@ function StudentDetails({ child, role, onClose, onSaved }: { child: AdminChild; 
             <div className="mt-6 rounded-[26px] border border-black/[0.06] bg-white p-5 shadow-[0_12px_35px_rgba(0,0,0,0.05)]">
               <div className="flex items-center gap-4">
                 {child.photoUrl ? <img src={child.photoUrl} alt={child.fullName} className="h-20 w-20 rounded-[22px] object-cover" /> : <div className="grid h-20 w-20 place-items-center rounded-[22px] bg-[#F0EEE5] text-xl font-bold text-[#5F6338]">{initials(child)}</div>}
-                <div><p className="text-lg font-semibold text-[#171717]">{child.groupName || "Группа не указана"}</p><p className="mt-1 text-sm text-black/45">{child.branch || "Филиал не указан"}</p><p className="mt-1 text-sm text-black/45">{[child.lessonDay, child.lessonTime].filter(Boolean).join(" · ") || "Время занятий не указано"}</p>{child.birthDate && <p className="mt-1 text-sm text-black/45">Дата рождения: {child.birthDate}</p>}</div>
+                <div className="min-w-0 flex-1"><p className="text-lg font-semibold text-[#171717]">{child.groupName || "Группа не указана"}</p><p className="mt-1 text-sm text-black/45">{child.branch || "Филиал не указан"}</p><p className="mt-1 text-sm text-black/45">{[child.lessonDay, child.lessonTime].filter(Boolean).join(" · ") || "Время занятий не указано"}</p>{child.birthDate && <p className="mt-1 text-sm text-black/45">Дата рождения: {child.birthDate}</p>}</div>
               </div>
+              {role !== "teacher" && <button type="button" onClick={openPhotoUpload} className="mt-4 flex w-full items-center justify-center gap-2 rounded-[14px] bg-[#F6F5F1] px-4 py-3 text-sm font-semibold text-[#171717]"><ImagePlus size={17} />{child.photoUrl ? "Изменить фото" : "Загрузить фото"}</button>}
             </div>
             <div className="mt-4 grid grid-cols-2 gap-3">
               <div className="rounded-[20px] border border-black/[0.06] bg-white p-4"><p className="text-xs text-black/40">Star Coin</p><p className="mt-1 text-2xl font-semibold text-[#171717]">{child.coins}</p></div>
@@ -243,6 +267,17 @@ export default function AdminApp() {
   }
 
   useEffect(() => { load(); }, []);
+
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<{ childId?: string; photoUrl?: string }>).detail;
+      if (!detail?.childId || !detail?.photoUrl) return;
+      setChildren((current) => current.map((child) => child.id === detail.childId ? { ...child, photoUrl: detail.photoUrl || child.photoUrl } : child));
+      setSelectedChild((current) => current?.id === detail.childId ? { ...current, photoUrl: detail.photoUrl || current.photoUrl } : current);
+    };
+    window.addEventListener(CHILD_PHOTO_UPDATED_EVENT, handler);
+    return () => window.removeEventListener(CHILD_PHOTO_UPDATED_EVENT, handler);
+  }, []);
 
   const filteredChildren = useMemo(() => {
     const normalized = query.trim().toLowerCase();
