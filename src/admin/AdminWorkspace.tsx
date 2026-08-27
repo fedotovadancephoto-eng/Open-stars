@@ -1,6 +1,8 @@
 import AdminApp from "@/admin/AdminApp";
 import { AdminCoinManager } from "@/admin/AdminCoinManager";
+import { AdminFeedbackManager } from "@/admin/AdminFeedbackManager";
 import { AdminNewsManager } from "@/admin/AdminNewsManager";
+import { AdminParentActivationManager } from "@/admin/AdminParentActivationManager";
 import { AdminPaymentManager } from "@/admin/AdminPaymentManager";
 import { AdminPhotoSessionManager } from "@/admin/AdminPhotoSessionManager";
 import { AdminScheduleManager } from "@/admin/AdminScheduleManager";
@@ -15,6 +17,8 @@ export default function AdminWorkspace() {
       <AdminTopMenu />
       <AdminApp />
       <AdminStudentOperations />
+      <AdminParentActivationManager />
+      <AdminFeedbackManager />
       <ChildPhotoUpload />
       <AdminScheduleManager />
       <AdminStudyManager />
