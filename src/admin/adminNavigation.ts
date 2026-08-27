@@ -16,8 +16,17 @@ export type AdminSection =
 export const ADMIN_SECTION_EVENT = "openstars:admin-section";
 export const ADMIN_DATA_UPDATED_EVENT = "openstars:admin-data-updated";
 
+const legacyEventBySection: Partial<Record<AdminSection, string>> = {
+  "child-photo": "openstars:open-child-photo-upload",
+  study: "openstars:open-study",
+  coins: "openstars:open-coins",
+  news: "openstars:open-news",
+};
+
 export function openAdminSection(section: AdminSection, detail: Record<string, unknown> = {}) {
   window.dispatchEvent(new CustomEvent(ADMIN_SECTION_EVENT, { detail: { section, ...detail } }));
+  const legacyEvent = legacyEventBySection[section];
+  if (legacyEvent) window.dispatchEvent(new CustomEvent(legacyEvent, { detail }));
 }
 
 export function onAdminSection(section: AdminSection, handler: (detail: Record<string, unknown>) => void) {
