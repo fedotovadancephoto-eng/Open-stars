@@ -44,6 +44,8 @@ export type AdminChild = {
   parentName: string;
   parentPhone: string;
   activationStatus: "active" | "invited" | "not_invited";
+  archivedAt: string;
+  archiveReason: string;
 };
 
 export type ChildUpdateInput = {
@@ -58,13 +60,26 @@ export type ChildUpdateInput = {
   photoUrl: string;
 };
 
+export type QuickStudentInput = {
+  firstName: string;
+  lastName: string;
+  parentName: string;
+  parentPhone: string;
+  branch: BranchName | "";
+  groupName: GroupName | "";
+  birthDate?: string;
+  lessonDay?: string;
+  lessonTime?: string;
+  photoUrl?: string;
+};
+
 type LoginResponse = StaffIdentity & {
   ok: true;
   phone: string;
   session: StaffSession;
 };
 
-type ApiError = { message?: string; error?: string };
+type ApiError = { message?: string; error?: string; details?: string };
 
 function saveStaffSession(session: StaffSession) {
   localStorage.setItem(STAFF_SESSION_KEY, JSON.stringify(session));
@@ -192,6 +207,49 @@ async function restPatch<T>(table: string, query: string, body: unknown, token: 
   return response.json();
 }
 
+function friendlyRpcError(message: string) {
+  if (message.includes("invalid phone")) return "Проверьте номер телефона родителя.";
+  if (message.includes("student already exists")) return "Такой ребёнок уже есть у этого родителя.";
+  if (message.includes("archive reason")) return "Укажите причину выбытия.";
+  if (message.includes("invalid branch")) return "Выберите филиал.";
+  if (message.includes("invalid group")) return "Выберите группу.";
+  if (message.includes("not authorized")) return "Недостаточно прав для этого действия.";
+  return message || "Не удалось выполнить действие.";
+}
+
+async function rpc<T>(functionName: string, body: Record<string, unknown>): Promise<T> {
+  const session = await getValidStaffSession();
+  if (!session) throw new Error("Сессия сотрудника не найдена.");
+
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${functionName}`, {
+    method: "POST",
+    headers: {
+      apikey: SUPABASE_PUBLISHABLE_KEY,
+      Authorization: `Bearer ${session.access_token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      clearStaffSession();
+      throw new Error("Сессия сотрудника истекла. Войдите снова.");
+    }
+    let message = "";
+    try {
+      const payload = (await response.json()) as ApiError;
+      message = payload.message || payload.details || "";
+    } catch {
+      // ignore non-json response
+    }
+    throw new Error(friendlyRpcError(message));
+  }
+
+  if (response.status === 204) return undefined as T;
+  return response.json();
+}
+
 function roleFromRow(row: any): StaffRole | null {
   const raw = Array.isArray(row?.roles) ? row.roles[0]?.name : row?.roles?.name;
   return ["owner", "admin", "manager", "teacher"].includes(raw) ? raw : null;
@@ -228,6 +286,41 @@ export async function fetchStaffIdentity(): Promise<StaffIdentity> {
 
 function shortTime(value?: string | null) {
   return value ? value.slice(0, 5) : "";
+}
+
+export async function quickCreateStudent(input: QuickStudentInput) {
+  if (!input.firstName.trim() || !input.lastName.trim()) throw new Error("Введите имя и фамилию ребёнка.");
+  if (!input.parentName.trim()) throw new Error("Введите имя родителя.");
+  if (!input.parentPhone.trim()) throw new Error("Введите телефон родителя.");
+  if (!input.branch) throw new Error("Выберите филиал.");
+  if (!input.groupName) throw new Error("Выберите группу.");
+
+  return rpc<Array<{ child_id: string; family_id: string; parent_profile_id: string }>>(
+    "staff_quick_create_student",
+    {
+      p_first_name: input.firstName.trim(),
+      p_last_name: input.lastName.trim(),
+      p_parent_name: input.parentName.trim(),
+      p_parent_phone: input.parentPhone.trim(),
+      p_branch: input.branch,
+      p_group_name: input.groupName,
+      p_birth_date: input.birthDate || null,
+      p_lesson_day: input.lessonDay?.trim() || null,
+      p_lesson_time: input.lessonTime || null,
+      p_photo_url: input.photoUrl?.trim() || null,
+    }
+  );
+}
+
+export async function archiveStudent(childId: string, reason: string) {
+  await rpc<string>("staff_archive_student", {
+    p_child_id: childId,
+    p_reason: reason.trim(),
+  });
+}
+
+export async function restoreStudent(childId: string) {
+  await rpc<string>("staff_restore_student", { p_child_id: childId });
 }
 
 export async function updateAdminChild(childId: string, input: ChildUpdateInput) {
@@ -277,7 +370,7 @@ export async function fetchAdminChildren(role: StaffRole): Promise<AdminChild[]>
 
   const children = await restSelect<any>(
     "children",
-    "select=id,family_id,first_name,last_name,birth_date,group_name,branch,lesson_day,lesson_time,mentor_name,photo_url,coins,payment_status&order=last_name.asc,first_name.asc",
+    "select=id,family_id,first_name,last_name,birth_date,group_name,branch,lesson_day,lesson_time,mentor_name,photo_url,coins,payment_status,archived_at,archive_reason&order=last_name.asc,first_name.asc",
     token
   );
 
@@ -296,6 +389,8 @@ export async function fetchAdminChildren(role: StaffRole): Promise<AdminChild[]>
     photoUrl: child.photo_url || "",
     coins: Number(child.coins || 0),
     paymentStatus: child.payment_status || "",
+    archivedAt: child.archived_at || "",
+    archiveReason: child.archive_reason || "",
   });
 
   if (role === "teacher") {
