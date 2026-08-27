@@ -1,4 +1,5 @@
 import AdminApp from "@/admin/AdminApp";
+import { AdminScheduleManager } from "@/admin/AdminScheduleManager";
 import { AdminStudentOperations } from "@/admin/AdminStudentOperations";
 import { ChildPhotoUpload } from "@/admin/ChildPhotoUpload";
 
@@ -8,6 +9,7 @@ export default function AdminWorkspace() {
       <AdminApp />
       <AdminStudentOperations />
       <ChildPhotoUpload />
+      <AdminScheduleManager />
     </>
   );
 }
