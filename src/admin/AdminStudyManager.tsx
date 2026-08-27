@@ -13,6 +13,7 @@ import {
   publishGroupHomework,
   saveAcademicGroup,
 } from "@/admin/academicApi";
+import { AcademicHistoryManager } from "@/admin/AcademicHistoryManager";
 
 const branches: AcademicBranch[] = ["Свердловский", "НЛО", "Октябрьский"];
 const groups: AcademicGroup[] = ["Базовый", "Продвинутый", "PRO"];
@@ -43,6 +44,7 @@ export function AdminStudyManager() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [historyVersion, setHistoryVersion] = useState(0);
 
   const [homeworkTitle, setHomeworkTitle] = useState("");
   const [homeworkDescription, setHomeworkDescription] = useState("");
@@ -131,6 +133,7 @@ export function AdminStudyManager() {
         entries: roster.map((row) => ({ childId: row.childId, present: row.present, grade: row.grade })),
       });
       setSuccess(`Сохранено: ${count} ученик(ов). Родители увидят данные после обновления кабинета.`);
+      setHistoryVersion((value) => value + 1);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Не удалось сохранить оценки и посещаемость.");
     } finally {
@@ -149,6 +152,7 @@ export function AdminStudyManager() {
       setHomeworkTitle("");
       setHomeworkDescription("");
       setHomeworkDue("");
+      setHistoryVersion((value) => value + 1);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Не удалось опубликовать домашнее задание.");
     } finally {
@@ -164,6 +168,7 @@ export function AdminStudyManager() {
       await addTeacherComment({ childId: personalChild, subject, title: commentTitle, text: commentText, date: lessonDate, teacherName });
       setSuccess(`Комментарий для ${selectedStudent?.childName || "ученика"} опубликован.`);
       setCommentTitle(""); setCommentText("");
+      setHistoryVersion((value) => value + 1);
     } catch (err) { setError(err instanceof Error ? err.message : "Не удалось добавить комментарий."); }
     finally { setSaving(false); }
   }
@@ -232,6 +237,13 @@ export function AdminStudyManager() {
                   <div className="mt-4 border-t border-black/[0.06] pt-4"><div className="flex items-center gap-2"><MessageCircle size={18} className="text-[#5F6338]"/><h4 className="text-sm font-semibold">Комментарий педагога</h4></div><input className={inputClass} value={commentTitle} onChange={(e)=>setCommentTitle(e.target.value)} placeholder="Заголовок — необязательно"/><textarea className={`${inputClass} min-h-[85px] resize-y`} value={commentText} onChange={(e)=>setCommentText(e.target.value)} placeholder="Что получилось, над чем поработать..."/><button type="button" onClick={saveComment} disabled={saving || !personalChild} className="mt-3 w-full rounded-[12px] bg-[#5F6338] px-4 py-3 text-sm font-semibold text-white disabled:opacity-40">Добавить комментарий</button></div>
                   <div className="mt-4 border-t border-black/[0.06] pt-4"><div className="flex items-center gap-2"><Award size={18} className="text-[#D96A24]"/><h4 className="text-sm font-semibold">Достижение</h4></div><input className={inputClass} value={achievementTitle} onChange={(e)=>setAchievementTitle(e.target.value)} placeholder="Например: Лучший результат месяца"/><textarea className={`${inputClass} min-h-[70px] resize-y`} value={achievementDescription} onChange={(e)=>setAchievementDescription(e.target.value)} placeholder="Описание — необязательно"/><button type="button" onClick={saveAchievement} disabled={saving || !personalChild} className="mt-3 w-full rounded-[12px] bg-[#D96A24] px-4 py-3 text-sm font-semibold text-white disabled:opacity-40">Добавить достижение</button></div>
                 </section>
+
+                <AcademicHistoryManager
+                  childId={personalChild}
+                  childName={selectedStudent?.childName || ""}
+                  subject={subject}
+                  refreshKey={historyVersion}
+                />
               </div>
             </div>
           </div>
