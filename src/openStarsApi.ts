@@ -215,11 +215,6 @@ function jwtSubject(accessToken: string) {
   }
 }
 
-function roleFromProfile(row: any) {
-  const raw = Array.isArray(row?.roles) ? row.roles[0]?.name : row?.roles?.name;
-  return typeof raw === "string" ? raw : "";
-}
-
 function formatDate(value?: string | null) {
   if (!value) return "";
   const date = new Date(`${value}T12:00:00`);
@@ -285,14 +280,14 @@ export async function fetchParentDashboard() {
 
   const profiles = await restSelect<any>(
     "users_profile",
-    `select=id,full_name,auth_user_id,roles(name)&auth_user_id=eq.${encodeURIComponent(authUserId)}&limit=1`,
+    `select=id,full_name,auth_user_id&auth_user_id=eq.${encodeURIComponent(authUserId)}&limit=1`,
     token
   );
   const profile = profiles[0];
 
-  if (!profile || roleFromProfile(profile) !== "parent") {
+  if (!profile) {
     clearParentSession();
-    throw new Error("Эта сессия не относится к родительскому кабинету. Войдите снова.");
+    throw new Error("Не удалось определить профиль аккаунта. Войдите снова.");
   }
 
   const memberships = await restSelect<any>(
