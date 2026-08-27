@@ -12,6 +12,8 @@ import {
   TrendingUp,
 } from "lucide-react";
 
+import { claimBirthdayReward, BirthdayReward } from "@/birthdayApi";
+import { BirthdayBanner } from "@/components/BirthdayBanner";
 import { FeedbackCard } from "@/components/FeedbackCard";
 import { Header } from "@/components/Header";
 import { OverviewCards } from "@/components/OverviewCards";
@@ -116,6 +118,7 @@ function App() {
   const [authStatus, setAuthStatus] = useState<AuthStatus>("checking");
   const [dataStatus, setDataStatus] = useState<DataStatus>("idle");
   const [dataError, setDataError] = useState("");
+  const [birthdayReward, setBirthdayReward] = useState<BirthdayReward | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const tabContentRef = useRef<HTMLElement | null>(null);
 
@@ -132,10 +135,30 @@ function App() {
     let mounted = true;
     setDataStatus("loading");
     setDataError("");
+    setBirthdayReward(null);
+
     fetchParentDashboard()
-      .then((data) => {
+      .then(async (data) => {
         if (!mounted) return;
-        applyDashboardData(data);
+
+        let dashboardData = data;
+        let reward: BirthdayReward | null = null;
+
+        try {
+          const childId = data?.child?.id;
+          if (childId) {
+            reward = await claimBirthdayReward(childId);
+            if (reward.awardedNow) {
+              dashboardData = await fetchParentDashboard();
+            }
+          }
+        } catch {
+          // Поздравление не должно мешать загрузке основного кабинета.
+        }
+
+        if (!mounted) return;
+        applyDashboardData(dashboardData);
+        setBirthdayReward(reward?.isBirthday ? reward : null);
         setDataStatus("ready");
       })
       .catch((error) => {
@@ -156,6 +179,7 @@ function App() {
     setActiveTab("coins");
     setDataStatus("idle");
     setDataError("");
+    setBirthdayReward(null);
     setAuthStatus("guest");
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -190,6 +214,8 @@ function App() {
             <h1 className="mt-5 text-3xl font-semibold tracking-[-0.035em] text-[#171717] sm:text-4xl">С возвращением!</h1>
             <p className="mt-2 text-[15px] text-black/50 sm:text-base">Всё важное об {nameInAboutCase(childFirstName)} в OPEN STARS — на этой неделе.</p>
           </section>
+
+          {birthdayReward && <BirthdayBanner firstName={childFirstName || "звезда"} amount={birthdayReward.amount || 10} />}
 
           <ProfileCard />
           <section className="mt-6"><OverviewCards onTabSelect={handleTabSelect} /></section>
