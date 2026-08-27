@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   Coins,
@@ -40,6 +40,7 @@ import {
 import {
   fetchParentDashboard,
   getValidParentSession,
+  logoutParent,
 } from "@/openStarsApi";
 
 type TabId =
@@ -171,6 +172,7 @@ function App() {
   const [dataStatus, setDataStatus] = useState<DataStatus>("idle");
   const [dataError, setDataError] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
+  const tabContentRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -225,6 +227,21 @@ function App() {
 
   const handleTabSelect = (tab: string) => {
     setActiveTab(tab as TabId);
+    window.setTimeout(() => {
+      tabContentRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 40);
+  };
+
+  const handleLogout = () => {
+    logoutParent();
+    setActiveTab("coins");
+    setDataStatus("idle");
+    setDataError("");
+    setAuthStatus("guest");
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   if (authStatus === "checking") {
@@ -273,7 +290,7 @@ function App() {
   return (
     <div className="flex min-h-screen bg-[#faf9f5]">
       <div className="min-w-0 flex-1">
-        <Header />
+        <Header onNavigate={handleTabSelect} onLogout={handleLogout} />
 
         <main className="mx-auto w-full max-w-7xl px-5 py-7 sm:px-6 lg:px-8">
           <section className="mb-6">
@@ -313,8 +330,8 @@ function App() {
                   <button
                     key={tab.id}
                     type="button"
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`group flex min-h-[64px] items-center gap-3 rounded-[18px] px-3 py-2.5 text-left transition-all duration-200 ${
+                    onClick={() => handleTabSelect(tab.id)}
+                    className={`group flex min-h-[64px] items-center gap-3 rounded-[18px] px-3 py-2.5 text-left transition-all duration-200 active:scale-[0.99] ${
                       isActive
                         ? "bg-[#171717] text-white shadow-[0_8px_18px_rgba(0,0,0,0.14)]"
                         : `text-[#171717] ${tab.hoverBg}`
@@ -357,8 +374,8 @@ function App() {
                   <button
                     key={tab.id}
                     type="button"
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`group flex min-h-[64px] items-center gap-3 rounded-[18px] px-3 py-2.5 text-left transition-all duration-200 ${
+                    onClick={() => handleTabSelect(tab.id)}
+                    className={`group flex min-h-[64px] items-center gap-3 rounded-[18px] px-3 py-2.5 text-left transition-all duration-200 active:scale-[0.99] ${
                       isActive
                         ? "bg-[#171717] text-white shadow-[0_8px_18px_rgba(0,0,0,0.14)]"
                         : `text-[#171717] ${tab.hoverBg}`
@@ -384,7 +401,7 @@ function App() {
             </nav>
           </section>
 
-          <section className="mt-6 pb-12">
+          <section ref={tabContentRef} className="mt-6 scroll-mt-24 pb-12">
             {activeTab === "coins" && <CoinsTab />}
             {activeTab === "progress" && <ProgressTab />}
             {activeTab === "homework" && <HomeworkTab />}
