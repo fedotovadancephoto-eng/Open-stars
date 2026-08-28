@@ -36,6 +36,9 @@ function friendly(message: string) {
   if (message.includes("full name required")) return "Введите имя и фамилию сотрудника.";
   if (message.includes("branch required")) return "Выберите филиал.";
   if (message.includes("teaching subject required")) return "Для педагога укажите предмет.";
+  if (message.includes("invite already claimed")) return "Сотрудник уже активировал доступ. Новый код ему не нужен.";
+  if (message.includes("invite revoked")) return "Это приглашение уже отозвано.";
+  if (message.includes("invite not found")) return "Приглашение не найдено. Обновите список сотрудников.";
   if (message.includes("not authorized")) return "У вас нет доступа к управлению сотрудниками.";
   return message;
 }
@@ -66,6 +69,21 @@ async function rpc<T>(name: string, body: Record<string, unknown> = {}) {
   return response.json() as Promise<T>;
 }
 
+function mapInvite(row: any, fallback?: Partial<StaffInviteRow>): StaffInviteRow {
+  return {
+    inviteId: row.invite_id || fallback?.inviteId || "",
+    fullName: row.full_name || fallback?.fullName || "Сотрудник",
+    phone: row.phone || fallback?.phone || "",
+    roleName: row.role_name || fallback?.roleName || "",
+    branch: row.branch || fallback?.branch || "",
+    teachingSubject: row.teaching_subject || fallback?.teachingSubject || "",
+    expiresAt: row.expires_at || fallback?.expiresAt || "",
+    claimedAt: row.claimed_at || fallback?.claimedAt || "",
+    revokedAt: row.revoked_at || fallback?.revokedAt || "",
+    createdAt: row.created_at || fallback?.createdAt || "",
+  };
+}
+
 export async function fetchStaffDirectory() {
   const rows: any[] = await rpc("staff_list_staff_directory");
   return (rows || []).map((row) => ({
@@ -81,18 +99,7 @@ export async function fetchStaffDirectory() {
 
 export async function fetchStaffInvites() {
   const rows: any[] = await rpc("staff_list_staff_invites");
-  return (rows || []).map((row) => ({
-    inviteId: row.invite_id,
-    fullName: row.full_name || "Сотрудник",
-    phone: row.phone || "",
-    roleName: row.role_name || "",
-    branch: row.branch || "",
-    teachingSubject: row.teaching_subject || "",
-    expiresAt: row.expires_at || "",
-    claimedAt: row.claimed_at || "",
-    revokedAt: row.revoked_at || "",
-    createdAt: row.created_at || "",
-  })) as StaffInviteRow[];
+  return (rows || []).map((row) => mapInvite(row)) as StaffInviteRow[];
 }
 
 export async function createStaffInvite(input: {
@@ -113,17 +120,28 @@ export async function createStaffInvite(input: {
   const row = rows?.[0];
   if (!row) throw new Error("Не удалось создать приглашение.");
   return {
-    inviteId: row.invite_id,
-    fullName: row.full_name || input.fullName,
-    phone: row.phone || input.phone,
-    roleName: row.role_name || input.roleName,
-    branch: row.branch || "",
-    teachingSubject: row.teaching_subject || "",
+    ...mapInvite(row, {
+      fullName: input.fullName,
+      phone: input.phone,
+      roleName: input.roleName,
+      branch: input.branch,
+      teachingSubject: input.teachingSubject,
+      createdAt: new Date().toISOString(),
+    }),
     activationCode: row.activation_code || "",
-    expiresAt: row.expires_at || "",
-    claimedAt: "",
-    revokedAt: "",
-    createdAt: new Date().toISOString(),
+  } as CreatedStaffInvite;
+}
+
+export async function reissueStaffInvite(invite: StaffInviteRow) {
+  const rows: any[] = await rpc("staff_reissue_staff_invite", {
+    p_invite_id: invite.inviteId,
+    p_valid_hours: 168,
+  });
+  const row = rows?.[0];
+  if (!row?.activation_code) throw new Error("Не удалось выпустить новый код.");
+  return {
+    ...mapInvite(row, invite),
+    activationCode: row.activation_code,
   } as CreatedStaffInvite;
 }
 
