@@ -6,6 +6,7 @@ import {
   Camera,
   Coins,
   CreditCard,
+  FileSpreadsheet,
   ImagePlus,
   KeyRound,
   Menu,
@@ -34,6 +35,7 @@ const items: Array<{
   { section: "child-photo", label: "Фото ребёнка", icon: ImagePlus, accent: "olive", roles: ["owner", "project_director", "admin", "manager"] },
   { section: "schedule", label: "Расписание", icon: CalendarDays, accent: "neutral", roles: ["owner", "project_director", "admin", "manager", "teacher"], teacherVisible: true },
   { section: "study", label: "Учебная часть", icon: BookOpenCheck, accent: "orange", roles: ["owner", "project_director", "admin", "manager", "teacher"], teacherVisible: true },
+  { section: "reports", label: "Excel-отчёты", icon: FileSpreadsheet, accent: "olive", roles: ["owner", "project_director", "admin", "manager", "teacher"], teacherVisible: true },
   { section: "coins", label: "Star Coin", icon: Coins, accent: "olive", roles: ["owner", "project_director", "admin", "manager"] },
   { section: "news", label: "Новости", icon: Newspaper, accent: "neutral", roles: ["owner", "project_director", "admin", "manager"] },
   { section: "payments", label: "Оплата", icon: CreditCard, accent: "olive", roles: ["owner", "project_director", "admin", "manager"] },
@@ -48,7 +50,7 @@ const accentClass = {
   neutral: "bg-black/[0.055] text-[#171717]",
 };
 
-const legacyLabels = new Set(items.filter((item) => item.section !== "team").map((item) => item.label));
+const legacyLabels = new Set(items.filter((item) => item.section !== "team" && item.section !== "reports").map((item) => item.label));
 
 function normalize(value: string | null | undefined) {
   return (value || "").replace(/\s+/g, " ").trim();
@@ -84,8 +86,6 @@ export function AdminTopMenu() {
     return () => window.removeEventListener(STAFF_VIEW_MODE_EVENT, handler);
   }, []);
 
-  // Старые плавающие кнопки оставлены внутри менеджеров как резервный вход.
-  // Навигация больше не зависит от них: меню открывает разделы через события.
   useEffect(() => {
     let raf = 0;
     const hideLegacyLaunchers = () => {
