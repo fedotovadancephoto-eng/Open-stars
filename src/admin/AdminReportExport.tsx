@@ -22,6 +22,10 @@ function filePart(value: string) {
   return value.replace(/[^a-zA-Zа-яА-ЯёЁ0-9_-]+/g, "_").replace(/^_+|_+$/g, "");
 }
 
+function isText(value: string | undefined): value is string {
+  return Boolean(value);
+}
+
 export function AdminReportExport() {
   const [open, setOpen] = useState(false);
   const [context, setContext] = useState<ReportContext | null>(null);
@@ -76,7 +80,8 @@ export function AdminReportExport() {
       const admin = await buildAdminSheets(filters, context);
       const sheets = [...academic, ...admin];
       const selected = context.children.find((child) => child.id === filters.childId);
-      const scope = [filters.branch, filters.groupName, selected?.fullName].filter(Boolean).map(filePart).join("_") || "all";
+      const scopeParts: Array<string | undefined> = [filters.branch || undefined, filters.groupName || undefined, selected?.fullName];
+      const scope = scopeParts.filter(isText).map(filePart).join("_") || "all";
       downloadXlsx(sheets, `OPEN_STARS_${scope}_${localDate()}.xlsx`);
       const rows = sheets.reduce((sum, sheet) => sum + sheet.rows.length, 0);
       setSuccess(`Готово: ${sheets.length} лист(ов), ${rows} строк данных. Файл .xlsx сохранён на устройство.`);
