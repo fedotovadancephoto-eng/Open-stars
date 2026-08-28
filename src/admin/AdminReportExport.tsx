@@ -2,10 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Download, FileSpreadsheet, LoaderCircle, ShieldCheck, X } from "lucide-react";
 
 import { onAdminSection } from "@/admin/adminNavigation";
-import { buildAdminSheets } from "@/admin/reportAdminSheets";
-import { buildAcademicSheets } from "@/admin/reportAcademicSheets";
-import { ReportContext, ReportFilters, fetchReportContext } from "@/admin/reportExportShared";
-import { downloadXlsx } from "@/admin/xlsxExport";
+import { fetchReportContext } from "@/admin/reportExportShared";
+import type { ReportContext, ReportFilters } from "@/admin/reportExportShared";
 
 const branches = ["Свердловский", "НЛО", "Октябрьский"];
 const groups = ["Базовый", "Продвинутый", "PRO"];
@@ -76,13 +74,20 @@ export function AdminReportExport() {
     setError("");
     setSuccess("");
     try {
-      const academic = await buildAcademicSheets(filters, context);
-      const admin = await buildAdminSheets(filters, context);
+      const [academicModule, adminModule, xlsxModule] = await Promise.all([
+        import("@/admin/reportAcademicSheets"),
+        import("@/admin/reportAdminSheets"),
+        import("@/admin/xlsxExport"),
+      ]);
+      const [academic, admin] = await Promise.all([
+        academicModule.buildAcademicSheets(filters, context),
+        adminModule.buildAdminSheets(filters, context),
+      ]);
       const sheets = [...academic, ...admin];
       const selected = context.children.find((child) => child.id === filters.childId);
       const scopeParts: Array<string | undefined> = [filters.branch || undefined, filters.groupName || undefined, selected?.fullName];
       const scope = scopeParts.filter(isText).map(filePart).join("_") || "all";
-      downloadXlsx(sheets, `OPEN_STARS_${scope}_${localDate()}.xlsx`);
+      xlsxModule.downloadXlsx(sheets, `OPEN_STARS_${scope}_${localDate()}.xlsx`);
       const rows = sheets.reduce((sum, sheet) => sum + sheet.rows.length, 0);
       setSuccess(`Готово: ${sheets.length} лист(ов), ${rows} строк данных. Файл .xlsx сохранён на устройство.`);
     } catch (err) {
