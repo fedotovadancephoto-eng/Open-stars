@@ -4,6 +4,8 @@ import { STAFF_VIEW_MODE_KEY } from "@/admin/StaffModeSwitch";
 
 const SUPABASE_URL = "https://yiwiykbuaggyslfyhlfo.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_1MORh5rY7uMDVYLYVX5VAA_cyoph4-7";
+const REPORT_PAGE_SIZE = 1000;
+const REPORT_MAX_PAGES = 100;
 
 export type ReportFilters = { branch: string; groupName: string; childId: string; fromDate: string; toDate: string };
 export type ReportContext = { role: StaffRole; teacherView: boolean; staffBranch: string; children: AdminChild[] };
@@ -13,11 +15,29 @@ type Assignment = { branch?: string | null; groupName: string; subject: string }
 export async function reportRestSelect(table: string, select = "*", order = "") {
   const session = await getValidStaffSession();
   if (!session) throw new Error("Сессия сотрудника истекла. Войдите снова.");
-  const params = new URLSearchParams({ select, limit: "10000" });
+  const params = new URLSearchParams({ select });
   if (order) params.set("order", order);
-  const response = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${params.toString()}`, { headers: { apikey: SUPABASE_PUBLISHABLE_KEY, Authorization: `Bearer ${session.access_token}` } });
-  if (!response.ok) throw new Error(`Не удалось подготовить лист «${table}».`);
-  return (await response.json()) as RestRow[];
+  const url = `${SUPABASE_URL}/rest/v1/${table}?${params.toString()}`;
+  const rows: RestRow[] = [];
+
+  for (let page = 0; page < REPORT_MAX_PAGES; page += 1) {
+    const start = page * REPORT_PAGE_SIZE;
+    const end = start + REPORT_PAGE_SIZE - 1;
+    const response = await fetch(url, {
+      headers: {
+        apikey: SUPABASE_PUBLISHABLE_KEY,
+        Authorization: `Bearer ${session.access_token}`,
+        Range: `${start}-${end}`,
+        "Range-Unit": "items",
+      },
+    });
+    if (!response.ok) throw new Error(`Не удалось подготовить лист «${table}».`);
+    const pageRows = (await response.json()) as RestRow[];
+    rows.push(...pageRows);
+    if (pageRows.length < REPORT_PAGE_SIZE) return rows;
+  }
+
+  throw new Error(`В таблице «${table}» слишком много строк для одной выгрузки. Уточните период или группу.`);
 }
 
 function assignmentAllowsChild(child: AdminChild, assignments: Assignment[]) {
