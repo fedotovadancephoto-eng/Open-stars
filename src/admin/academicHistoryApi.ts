@@ -42,6 +42,8 @@ export type AcademicCommentHistoryRecord = {
   date: string;
   teacherName: string;
   createdAt: string;
+  publicationId: string;
+  audienceScope: "individual" | "group";
 };
 
 export type AcademicAchievementHistoryRecord = {
@@ -108,6 +110,12 @@ function createdByFilter(createdBy: string) {
   return createdBy ? `eq.${createdBy}` : "is.null";
 }
 
+function commentPath(record: AcademicCommentHistoryRecord) {
+  return record.audienceScope === "group" && record.publicationId
+    ? tablePath("teacher_comments", { publication_id: `eq.${record.publicationId}` })
+    : tablePath("teacher_comments", { id: `eq.${record.id}` });
+}
+
 export async function searchAcademicStudents(query: string): Promise<AcademicStudentOption[]> {
   const terms = query.trim().toLocaleLowerCase("ru-RU").split(/\s+/).filter(Boolean);
   if (!terms.length) return [];
@@ -153,7 +161,7 @@ export async function fetchAcademicFullHistory(childId: string): Promise<Academi
       limit: "250",
     })),
     tableRequest<any[]>(tablePath("teacher_comments", {
-      select: "id,subject,title,comment_text,comment_date,teacher_name,created_at",
+      select: "id,subject,title,comment_text,comment_date,teacher_name,created_at,publication_id,audience_scope",
       ...childFilter,
       order: "comment_date.desc,created_at.desc",
       limit: "250",
@@ -194,6 +202,8 @@ export async function fetchAcademicFullHistory(childId: string): Promise<Academi
       date: row.comment_date || "",
       teacherName: row.teacher_name || "",
       createdAt: row.created_at || "",
+      publicationId: row.publication_id || "",
+      audienceScope: row.audience_scope === "group" ? "group" : "individual",
     })),
     achievements: (achievementRows || []).map((row) => ({
       id: row.id,
@@ -263,14 +273,14 @@ export async function deleteHistoryHomework(record: AcademicHomeworkHistoryRecor
 }
 
 export async function updateHistoryComment(input: {
-  id: string;
+  record: AcademicCommentHistoryRecord;
   title: string;
   text: string;
   date: string;
 }) {
   if (!input.text.trim()) throw new Error("Введите текст комментария.");
   if (!input.date) throw new Error("Укажите дату комментария.");
-  const rows = await tableRequest<any[]>(tablePath("teacher_comments", { id: `eq.${input.id}` }), {
+  const rows = await tableRequest<any[]>(commentPath(input.record), {
     method: "PATCH",
     headers: { Prefer: "return=representation" },
     body: JSON.stringify({
@@ -280,14 +290,16 @@ export async function updateHistoryComment(input: {
     }),
   });
   ensureChanged(rows, "Комментарий не найден или у вас нет доступа к нему.");
+  return rows.length;
 }
 
-export async function deleteHistoryComment(id: string) {
-  const rows = await tableRequest<any[]>(tablePath("teacher_comments", { id: `eq.${id}` }), {
+export async function deleteHistoryComment(record: AcademicCommentHistoryRecord) {
+  const rows = await tableRequest<any[]>(commentPath(record), {
     method: "DELETE",
     headers: { Prefer: "return=representation" },
   });
   ensureChanged(rows, "Комментарий уже удалён или у вас нет доступа к нему.");
+  return rows.length;
 }
 
 export async function updateHistoryAchievement(input: {

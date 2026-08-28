@@ -14,12 +14,15 @@ import {
   saveAcademicGroup,
 } from "@/admin/academicApi";
 import { AcademicHistoryManager } from "@/admin/AcademicHistoryManager";
+import { publishGroupComment } from "@/admin/groupCommentApi";
 
 const branches: AcademicBranch[] = ["Свердловский", "НЛО", "Октябрьский"];
 const groups: AcademicGroup[] = ["Базовый", "Продвинутый", "PRO"];
 const streams: AcademicStream[] = ["11:00", "13:00", "16:00"];
 const commonSubjects = ["Дефиле", "Хореография", "Актёрское мастерство", "Фотопозирование"];
 const inputClass = "mt-1.5 w-full rounded-[13px] border border-black/[0.08] bg-white px-3.5 py-3 text-sm text-[#171717] outline-none focus:border-[#D96A24]/45 focus:ring-4 focus:ring-[#D96A24]/[0.06]";
+
+type CommentAudience = "individual" | "group";
 
 function localDate() {
   const d = new Date();
@@ -50,6 +53,7 @@ export function AdminStudyManager() {
   const [homeworkDescription, setHomeworkDescription] = useState("");
   const [homeworkDue, setHomeworkDue] = useState("");
   const [personalChild, setPersonalChild] = useState("");
+  const [commentAudience, setCommentAudience] = useState<CommentAudience>("individual");
   const [commentTitle, setCommentTitle] = useState("");
   const [commentText, setCommentText] = useState("");
   const [achievementTitle, setAchievementTitle] = useState("");
@@ -161,16 +165,38 @@ export function AdminStudyManager() {
   }
 
   async function saveComment() {
-    if (!personalChild) return setError("Выберите ребёнка.");
     if (!commentText.trim()) return setError("Введите комментарий.");
-    setSaving(true); setError(""); setSuccess("");
+    if (commentAudience === "individual" && !personalChild) return setError("Выберите ребёнка.");
+    if (commentAudience === "group" && !roster.length) return setError("Сначала загрузите группу.");
+
+    setSaving(true);
+    setError("");
+    setSuccess("");
     try {
-      await addTeacherComment({ childId: personalChild, subject, title: commentTitle, text: commentText, date: lessonDate, teacherName });
-      setSuccess(`Комментарий для ${selectedStudent?.childName || "ученика"} опубликован.`);
-      setCommentTitle(""); setCommentText("");
+      if (commentAudience === "group") {
+        const result = await publishGroupComment({
+          branch,
+          groupName,
+          stream,
+          subject,
+          title: commentTitle,
+          text: commentText,
+          date: lessonDate,
+          teacherName,
+        });
+        setSuccess(`Комментарий опубликован для всей группы: ${result.count} ученик(ов).`);
+      } else {
+        await addTeacherComment({ childId: personalChild, subject, title: commentTitle, text: commentText, date: lessonDate, teacherName });
+        setSuccess(`Личный комментарий для ${selectedStudent?.childName || "ученика"} опубликован.`);
+      }
+      setCommentTitle("");
+      setCommentText("");
       setHistoryVersion((value) => value + 1);
-    } catch (err) { setError(err instanceof Error ? err.message : "Не удалось добавить комментарий."); }
-    finally { setSaving(false); }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Не удалось добавить комментарий.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function saveAchievement() {
@@ -181,6 +207,7 @@ export function AdminStudyManager() {
       await addAchievement({ childId: personalChild, title: achievementTitle, description: achievementDescription, date: lessonDate });
       setSuccess(`Достижение для ${selectedStudent?.childName || "ученика"} добавлено.`);
       setAchievementTitle(""); setAchievementDescription("");
+      setHistoryVersion((value) => value + 1);
     } catch (err) { setError(err instanceof Error ? err.message : "Не удалось добавить достижение."); }
     finally { setSaving(false); }
   }
@@ -197,7 +224,7 @@ export function AdminStudyManager() {
         <div className="fixed inset-0 z-[78] flex items-end justify-center bg-black/30 p-0 backdrop-blur-[2px] sm:items-center sm:p-5" onClick={() => !saving && setOpen(false)}>
           <div className="max-h-[96vh] w-full max-w-6xl overflow-y-auto rounded-t-[28px] bg-[#FAF9F5] p-5 shadow-2xl sm:rounded-[28px] sm:p-7" onClick={(event) => event.stopPropagation()}>
             <div className="flex items-start justify-between gap-4">
-              <div><p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#D96A24]">OPEN STARS ADMIN</p><h2 className="mt-1 text-2xl font-semibold tracking-[-0.03em]">Учебная часть</h2><p className="mt-2 text-sm leading-6 text-black/45">Посещаемость, оценки, домашние задания и персональная обратная связь.</p></div>
+              <div><p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#D96A24]">OPEN STARS ADMIN</p><h2 className="mt-1 text-2xl font-semibold tracking-[-0.03em]">Учебная часть</h2><p className="mt-2 text-sm leading-6 text-black/45">Посещаемость, оценки, домашние задания, личная и групповая обратная связь.</p></div>
               <button type="button" onClick={() => setOpen(false)} disabled={saving} className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white text-black/55 shadow-sm"><X size={20} /></button>
             </div>
 
@@ -232,10 +259,22 @@ export function AdminStudyManager() {
                 </section>
 
                 <section className="rounded-[24px] border border-black/[0.06] bg-white p-5">
-                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-black/35">Персонально</p>
-                  <label className="mt-3 block text-xs font-semibold text-black/55">Ребёнок<select className={inputClass} value={personalChild} onChange={(e)=>setPersonalChild(e.target.value)}><option value="">Выберите ребёнка</option>{roster.map((r)=><option key={r.childId} value={r.childId}>{r.childName}</option>)}</select></label>
-                  <div className="mt-4 border-t border-black/[0.06] pt-4"><div className="flex items-center gap-2"><MessageCircle size={18} className="text-[#5F6338]"/><h4 className="text-sm font-semibold">Комментарий педагога</h4></div><input className={inputClass} value={commentTitle} onChange={(e)=>setCommentTitle(e.target.value)} placeholder="Заголовок — необязательно"/><textarea className={`${inputClass} min-h-[85px] resize-y`} value={commentText} onChange={(e)=>setCommentText(e.target.value)} placeholder="Что получилось, над чем поработать..."/><button type="button" onClick={saveComment} disabled={saving || !personalChild} className="mt-3 w-full rounded-[12px] bg-[#5F6338] px-4 py-3 text-sm font-semibold text-white disabled:opacity-40">Добавить комментарий</button></div>
-                  <div className="mt-4 border-t border-black/[0.06] pt-4"><div className="flex items-center gap-2"><Award size={18} className="text-[#D96A24]"/><h4 className="text-sm font-semibold">Достижение</h4></div><input className={inputClass} value={achievementTitle} onChange={(e)=>setAchievementTitle(e.target.value)} placeholder="Например: Лучший результат месяца"/><textarea className={`${inputClass} min-h-[70px] resize-y`} value={achievementDescription} onChange={(e)=>setAchievementDescription(e.target.value)} placeholder="Описание — необязательно"/><button type="button" onClick={saveAchievement} disabled={saving || !personalChild} className="mt-3 w-full rounded-[12px] bg-[#D96A24] px-4 py-3 text-sm font-semibold text-white disabled:opacity-40">Добавить достижение</button></div>
+                  <div className="flex items-center gap-2"><MessageCircle size={18} className="text-[#5F6338]"/><h3 className="font-semibold">Комментарий педагога</h3></div>
+                  <div className="mt-4 grid grid-cols-2 gap-2 rounded-[14px] bg-[#F2F0E8] p-1.5">
+                    <button type="button" onClick={() => setCommentAudience("individual")} className={`rounded-[11px] px-3 py-2.5 text-xs font-semibold ${commentAudience === "individual" ? "bg-white text-[#171717] shadow-sm" : "text-black/45"}`}>Лично ребёнку</button>
+                    <button type="button" onClick={() => setCommentAudience("group")} className={`rounded-[11px] px-3 py-2.5 text-xs font-semibold ${commentAudience === "group" ? "bg-[#5F6338] text-white shadow-sm" : "text-black/45"}`}>Всей группе</button>
+                  </div>
+                  {commentAudience === "individual" ? (
+                    <label className="mt-3 block text-xs font-semibold text-black/55">Ребёнок<select className={inputClass} value={personalChild} onChange={(e)=>setPersonalChild(e.target.value)}><option value="">Выберите ребёнка</option>{roster.map((r)=><option key={r.childId} value={r.childId}>{r.childName}</option>)}</select></label>
+                  ) : (
+                    <div className="mt-3 rounded-[13px] bg-[#5F6338]/[0.07] px-3.5 py-3 text-xs leading-5 text-[#4D512E]">Получатели: <strong>{branch} · {groupName} · {stream}</strong>. После загрузки группы комментарий получат все {roster.length || 0} ученик(ов) этого потока.</div>
+                  )}
+                  <input className={inputClass} value={commentTitle} onChange={(e)=>setCommentTitle(e.target.value)} placeholder="Заголовок — необязательно"/>
+                  <textarea className={`${inputClass} min-h-[95px] resize-y`} value={commentText} onChange={(e)=>setCommentText(e.target.value)} placeholder={commentAudience === "group" ? "Например: Сегодня отлично отработали проходку и повороты..." : "Что получилось, над чем поработать..."}/>
+                  <button type="button" onClick={saveComment} disabled={saving || (commentAudience === "individual" ? !personalChild : !roster.length)} className="mt-3 w-full rounded-[12px] bg-[#5F6338] px-4 py-3 text-sm font-semibold text-white disabled:opacity-40">{commentAudience === "group" ? "Опубликовать всей группе" : "Добавить личный комментарий"}</button>
+                  <p className="mt-2 text-[11px] leading-5 text-black/35">Групповая публикация сохраняется как единое сообщение: её можно будет исправить или удалить сразу у всех родителей.</p>
+
+                  <div className="mt-5 border-t border-black/[0.06] pt-4"><div className="flex items-center gap-2"><Award size={18} className="text-[#D96A24]"/><h4 className="text-sm font-semibold">Личное достижение</h4></div><label className="mt-3 block text-xs font-semibold text-black/55">Ребёнок<select className={inputClass} value={personalChild} onChange={(e)=>setPersonalChild(e.target.value)}><option value="">Выберите ребёнка</option>{roster.map((r)=><option key={r.childId} value={r.childId}>{r.childName}</option>)}</select></label><input className={inputClass} value={achievementTitle} onChange={(e)=>setAchievementTitle(e.target.value)} placeholder="Например: Лучший результат месяца"/><textarea className={`${inputClass} min-h-[70px] resize-y`} value={achievementDescription} onChange={(e)=>setAchievementDescription(e.target.value)} placeholder="Описание — необязательно"/><button type="button" onClick={saveAchievement} disabled={saving || !personalChild} className="mt-3 w-full rounded-[12px] bg-[#D96A24] px-4 py-3 text-sm font-semibold text-white disabled:opacity-40">Добавить достижение</button></div>
                 </section>
 
                 <AcademicHistoryManager
