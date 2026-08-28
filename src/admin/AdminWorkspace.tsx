@@ -5,6 +5,7 @@ import { AdminNewsManager } from "@/admin/AdminNewsManager";
 import { AdminParentActivationManager } from "@/admin/AdminParentActivationManager";
 import { AdminPaymentManager } from "@/admin/AdminPaymentManager";
 import { AdminPhotoSessionManager } from "@/admin/AdminPhotoSessionManager";
+import { AdminReportExport } from "@/admin/AdminReportExport";
 import { AdminScheduleManager } from "@/admin/AdminScheduleManager";
 import { AdminStaffManager } from "@/admin/AdminStaffManager";
 import { AdminStudentOperations } from "@/admin/AdminStudentOperations";
@@ -30,6 +31,7 @@ export default function AdminWorkspace() {
       <AdminPaymentManager />
       <AdminPhotoSessionManager />
       <AdminStaffManager />
+      <AdminReportExport />
     </>
   );
 }
