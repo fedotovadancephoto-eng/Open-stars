@@ -10,6 +10,10 @@ export async function buildAdminSheets(filters: ReportFilters, context: ReportCo
   const children = filterChildren(context, filters);
   const childMap = new Map(children.map((child) => [child.id, child]));
   const ids = new Set(children.map((child) => child.id));
+  const selectedChild = filters.childId ? childMap.get(filters.childId) : undefined;
+  const effectiveBranch = filters.branch || selectedChild?.branch || "";
+  const effectiveGroup = filters.groupName || selectedChild?.groupName || "";
+
   const [coins, payments, feedback, news, photos] = await Promise.all([
     reportRestSelect("coin_transactions", "child_id,amount,transaction_type,reason,source,created_at", "created_at.asc"),
     reportRestSelect("payments", "child_id,month,due_date,status,amount,created_at", "month.asc"),
@@ -37,17 +41,17 @@ export async function buildAdminSheets(filters: ReportFilters, context: ReportCo
     {
       name: "Обратная связь",
       columns: [{ key: "date", label: "Дата", width: 20 }, { key: "branch", label: "Филиал", width: 18 }, { key: "child", label: "Ученик", width: 28 }, { key: "parent", label: "Родитель", width: 28 }, { key: "category", label: "Категория", width: 18 }, { key: "status", label: "Статус", width: 18 }, { key: "message", label: "Сообщение", width: 65 }],
-      rows: feedback.filter((row) => inPeriod(row.created_at, filters) && (!filters.branch || row.branch_snapshot === filters.branch) && (!filters.childId || row.child_id === filters.childId) && (!row.child_id || ids.has(row.child_id))).map((row) => ({ date: row.created_at, branch: row.branch_snapshot || "", child: row.child_name_snapshot || (row.child_id ? childName(childMap, row.child_id) : ""), parent: row.parent_name_snapshot || "", category: row.category === "education" ? "Об обучении" : "О приложении", status: feedbackStatus(row.status), message: row.message || "" })),
+      rows: feedback.filter((row) => inPeriod(row.created_at, filters) && (!effectiveBranch || row.branch_snapshot === effectiveBranch) && (!filters.childId || row.child_id === filters.childId) && (!row.child_id || ids.has(row.child_id))).map((row) => ({ date: row.created_at, branch: row.branch_snapshot || "", child: row.child_name_snapshot || (row.child_id ? childName(childMap, row.child_id) : ""), parent: row.parent_name_snapshot || "", category: row.category === "education" ? "Об обучении" : "О приложении", status: feedbackStatus(row.status), message: row.message || "" })),
     },
     {
       name: "Новости",
       columns: [{ key: "date", label: "Дата", width: 20 }, { key: "audience", label: "Аудитория", width: 20 }, { key: "branch", label: "Филиал", width: 18 }, { key: "group", label: "Группа", width: 18 }, { key: "title", label: "Заголовок", width: 36 }, { key: "body", label: "Текст", width: 65 }, { key: "active", label: "Активна", width: 12 }],
-      rows: news.filter((row) => inPeriod(row.published_at || row.created_at, filters) && (!filters.branch || !row.branch || row.branch === filters.branch) && (!filters.groupName || !row.group_name || row.group_name === filters.groupName)).map((row) => ({ date: row.published_at || row.created_at, audience: row.audience_scope === "all_school" ? "Вся школа" : row.audience_scope === "branch" ? "Филиал" : "Группа", branch: row.branch || "", group: row.group_name || "", title: row.title, body: row.body || "", active: Boolean(row.active) })),
+      rows: news.filter((row) => inPeriod(row.published_at || row.created_at, filters) && (!effectiveBranch || !row.branch || row.branch === effectiveBranch) && (!effectiveGroup || !row.group_name || row.group_name === effectiveGroup)).map((row) => ({ date: row.published_at || row.created_at, audience: row.audience_scope === "all_school" ? "Вся школа" : row.audience_scope === "branch" ? "Филиал" : "Группа", branch: row.branch || "", group: row.group_name || "", title: row.title, body: row.body || "", active: Boolean(row.active) })),
     },
     {
       name: "Фотосессии",
       columns: [{ key: "date", label: "Дата публикации", width: 20 }, { key: "branch", label: "Филиал", width: 18 }, { key: "group", label: "Группа", width: 18 }, { key: "stream", label: "Поток", width: 12 }, { key: "title", label: "Название", width: 34 }, { key: "description", label: "Описание", width: 55 }, { key: "url", label: "Ссылка", width: 55 }, { key: "published", label: "Опубликована", width: 14 }],
-      rows: photos.filter((row) => inPeriod(row.published_at || row.created_at, filters) && (!filters.branch || !row.branch || row.branch === filters.branch) && (!filters.groupName || !row.group_name || row.group_name === filters.groupName)).map((row) => ({ date: row.published_at || row.created_at, branch: row.branch || "", group: row.group_name || "", stream: String(row.lesson_time || "").slice(0, 5), title: row.title, description: row.description || "", url: row.gallery_url || "", published: Boolean(row.is_published) })),
+      rows: photos.filter((row) => inPeriod(row.published_at || row.created_at, filters) && (!effectiveBranch || !row.branch || row.branch === effectiveBranch) && (!effectiveGroup || !row.group_name || row.group_name === effectiveGroup)).map((row) => ({ date: row.published_at || row.created_at, branch: row.branch || "", group: row.group_name || "", stream: String(row.lesson_time || "").slice(0, 5), title: row.title, description: row.description || "", url: row.gallery_url || "", published: Boolean(row.is_published) })),
     },
   ];
 
