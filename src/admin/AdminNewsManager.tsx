@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { Bell, CheckCircle2, LoaderCircle, Newspaper, Send, X } from "lucide-react";
+import { Bell, CheckCircle2, LoaderCircle, Newspaper, Send, Trash2, X } from "lucide-react";
 
-import { NewsItem, NewsScope, fetchNewsContext, publishNews, setNewsActive } from "@/admin/newsApi";
+import { NewsItem, NewsScope, deleteNews, fetchNewsContext, publishNews, setNewsActive } from "@/admin/newsApi";
 
 const branches = ["Свердловский", "НЛО", "Октябрьский"];
 const groups = ["Базовый", "Продвинутый", "PRO"];
@@ -63,9 +63,29 @@ export function AdminNewsManager() {
   }
 
   async function toggle(item: NewsItem) {
-    setSaving(true); setError("");
-    try { await setNewsActive(item.id,!item.active); await refresh(); }
+    setSaving(true); setError(""); setSuccess("");
+    try {
+      await setNewsActive(item.id,!item.active);
+      await refresh();
+      setSuccess(item.active
+        ? "Новость скрыта у родителей, связанные уведомления убраны."
+        : "Новость снова опубликована, уведомления для актуальных получателей созданы заново.");
+    }
     catch(e){setError(e instanceof Error?e.message:"Не удалось изменить новость.")} finally {setSaving(false)}
+  }
+
+  async function remove(item: NewsItem) {
+    if (!window.confirm(`Удалить новость «${item.title}» окончательно? Она исчезнет у родителей, связанные уведомления тоже будут удалены.`)) return;
+    setSaving(true); setError(""); setSuccess("");
+    try {
+      await deleteNews(item.id);
+      await refresh();
+      setSuccess("Новость и связанные уведомления удалены.");
+    } catch(e) {
+      setError(e instanceof Error ? e.message : "Не удалось удалить новость.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   if (!enabled) return null;
@@ -75,7 +95,7 @@ export function AdminNewsManager() {
     <button type="button" onClick={openManager} className="fixed bottom-[24.7rem] right-4 z-40 flex items-center gap-2 rounded-full bg-[#171717] px-4 py-3 text-sm font-semibold text-white shadow-[0_10px_30px_rgba(0,0,0,0.18)] sm:right-6"><Newspaper size={17}/> Новости</button>
     {open && <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/30 backdrop-blur-[2px] sm:items-center sm:p-5" onClick={()=>!saving&&setOpen(false)}>
       <div className="max-h-[96vh] w-full max-w-5xl overflow-y-auto rounded-t-[28px] bg-[#FAF9F5] p-5 shadow-2xl sm:rounded-[28px] sm:p-7" onClick={e=>e.stopPropagation()}>
-        <div className="flex items-start justify-between gap-4"><div><p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#D96A24]">OPEN STARS ADMIN</p><h2 className="mt-1 text-2xl font-semibold">Новости и уведомления</h2><p className="mt-2 text-sm text-black/45">Публикация для всей школы, филиала или группы.</p></div><button onClick={()=>setOpen(false)} className="grid h-10 w-10 place-items-center rounded-full bg-white text-black/55"><X size={20}/></button></div>
+        <div className="flex items-start justify-between gap-4"><div><p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#D96A24]">OPEN STARS ADMIN</p><h2 className="mt-1 text-2xl font-semibold">Новости и уведомления</h2><p className="mt-2 text-sm text-black/45">Публикация для всей школы, филиала или группы. Новость можно временно скрыть или удалить окончательно.</p></div><button onClick={()=>setOpen(false)} className="grid h-10 w-10 place-items-center rounded-full bg-white text-black/55"><X size={20}/></button></div>
 
         <div className="mt-6 grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
           <section className="rounded-[24px] border border-black/[0.06] bg-white p-5">
@@ -92,7 +112,7 @@ export function AdminNewsManager() {
 
           <section className="rounded-[24px] border border-black/[0.06] bg-white p-5">
             <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-black/35">Опубликовано</p><h3 className="mt-1 text-lg font-semibold">Последние новости</h3>
-            {loading?<div className="grid min-h-[180px] place-items-center"><LoaderCircle className="animate-spin text-black/25"/></div>:items.length===0?<div className="mt-4 rounded-[18px] bg-[#FAF9F5] px-5 py-9 text-center text-sm text-black/40">Новостей пока нет.</div>:<div className="mt-4 space-y-3">{items.slice(0,30).map(item=><div key={item.id} className={`rounded-[17px] border p-4 ${item.active?"border-black/[0.06]":"border-black/[0.04] bg-black/[0.025] opacity-65"}`}><div className="flex items-start justify-between gap-3"><div><p className="font-semibold">{item.title}</p><p className="mt-1 text-[11px] text-black/35">{audience(item)} · {fmt(item.publishedAt||item.createdAt)}</p></div><button onClick={()=>toggle(item)} disabled={saving} className="shrink-0 rounded-[10px] bg-[#FAF9F5] px-2.5 py-2 text-[11px] font-semibold text-black/50">{item.active?"Скрыть":"Вернуть"}</button></div>{item.body&&<p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-black/55">{item.body}</p>}</div>)}</div>}
+            {loading?<div className="grid min-h-[180px] place-items-center"><LoaderCircle className="animate-spin text-black/25"/></div>:items.length===0?<div className="mt-4 rounded-[18px] bg-[#FAF9F5] px-5 py-9 text-center text-sm text-black/40">Новостей пока нет.</div>:<div className="mt-4 space-y-3">{items.slice(0,30).map(item=><div key={item.id} className={`rounded-[17px] border p-4 ${item.active?"border-black/[0.06]":"border-black/[0.04] bg-black/[0.025] opacity-65"}`}><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="font-semibold">{item.title}</p><p className="mt-1 text-[11px] text-black/35">{audience(item)} · {fmt(item.publishedAt||item.createdAt)}</p>{!item.active && <span className="mt-2 inline-flex rounded-full bg-black/[0.05] px-2.5 py-1 text-[10px] font-bold text-black/40">Скрыта у родителей</span>}</div><div className="flex shrink-0 flex-wrap justify-end gap-2"><button onClick={()=>toggle(item)} disabled={saving} className="rounded-[10px] bg-[#FAF9F5] px-2.5 py-2 text-[11px] font-semibold text-black/50 disabled:opacity-40">{item.active?"Скрыть":"Вернуть"}</button><button onClick={()=>remove(item)} disabled={saving} className="grid h-9 w-9 place-items-center rounded-[10px] bg-red-50 text-red-600 disabled:opacity-40" aria-label={`Удалить новость ${item.title}`} title="Удалить окончательно"><Trash2 size={15}/></button></div></div>{item.body&&<p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-black/55">{item.body}</p>}</div>)}</div>}
           </section>
         </div>
         {error&&<div className="mt-5 rounded-[15px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
