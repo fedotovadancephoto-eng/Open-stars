@@ -90,3 +90,7 @@ export async function publishNews(input: {
 export async function setNewsActive(newsId: string, active: boolean) {
   await rpc<void>("staff_set_news_active", { p_news_id: newsId, p_active: active });
 }
+
+export async function deleteNews(newsId: string) {
+  await rpc<void>("staff_delete_news", { p_news_id: newsId });
+}
