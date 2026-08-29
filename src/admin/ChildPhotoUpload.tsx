@@ -1,5 +1,5 @@
-import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
-import { Camera, CheckCircle2, ImagePlus, LoaderCircle, RefreshCw, Search, Upload, X } from "lucide-react";
+import { ChangeEvent, PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, useState } from "react";
+import { Camera, CheckCircle2, ImagePlus, LoaderCircle, Move, RefreshCw, Search, Upload, X, ZoomIn, ZoomOut } from "lucide-react";
 
 import {
   PhotoStudent,
@@ -16,7 +16,19 @@ function initials(name: string) {
   return parts.slice(0, 2).map((part) => part.charAt(0)).join("").toUpperCase() || "OS";
 }
 
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
 const centerCrop = { zoom: 1, positionX: 50, positionY: 50 };
+
+type DragState = {
+  pointerId: number;
+  startX: number;
+  startY: number;
+  positionX: number;
+  positionY: number;
+};
 
 export function ChildPhotoUpload() {
   const [enabled, setEnabled] = useState(false);
@@ -33,6 +45,7 @@ export function ChildPhotoUpload() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const dragRef = useRef<DragState | null>(null);
 
   async function loadContext(selectChildId?: string) {
     const context = await fetchPhotoUploadContext();
@@ -76,6 +89,7 @@ export function ChildPhotoUpload() {
       setQuery("");
       setFile(null);
       setCrop(centerCrop);
+      dragRef.current = null;
       loadContext(detail?.childId)
         .catch((err) => setError(err instanceof Error ? err.message : "Не удалось загрузить список учеников."))
         .finally(() => setLoading(false));
@@ -121,6 +135,7 @@ export function ChildPhotoUpload() {
     setFile(null);
     setPreview("");
     setCrop(centerCrop);
+    dragRef.current = null;
     setError("");
     setSuccess("");
   }
@@ -131,6 +146,7 @@ export function ChildPhotoUpload() {
     setFile(null);
     setPreview(student.photoUrl || "");
     setCrop(centerCrop);
+    dragRef.current = null;
     setError("");
     setSuccess("");
   }
@@ -145,8 +161,10 @@ export function ChildPhotoUpload() {
     setFile(next);
     setPreview(URL.createObjectURL(next));
     setCrop(centerCrop);
+    dragRef.current = null;
     setError("");
     setSuccess("");
+    event.target.value = "";
   }
 
   async function editCurrentPhoto() {
@@ -159,6 +177,7 @@ export function ChildPhotoUpload() {
       setFile(current);
       setPreview(URL.createObjectURL(current));
       setCrop(centerCrop);
+      dragRef.current = null;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Не удалось открыть текущее фото.");
     } finally {
@@ -166,9 +185,47 @@ export function ChildPhotoUpload() {
     }
   }
 
+  function changeZoom(delta: number) {
+    setCrop((current) => ({ ...current, zoom: clamp(Number((current.zoom + delta).toFixed(2)), 1, 3) }));
+  }
+
+  function startDrag(event: ReactPointerEvent<HTMLDivElement>) {
+    if (!file) return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    dragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      positionX: crop.positionX,
+      positionY: crop.positionY,
+    };
+  }
+
+  function moveDrag(event: ReactPointerEvent<HTMLDivElement>) {
+    const drag = dragRef.current;
+    if (!file || !drag || drag.pointerId !== event.pointerId) return;
+    event.preventDefault();
+    const rect = event.currentTarget.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    const dx = ((event.clientX - drag.startX) / rect.width) * 100;
+    const dy = ((event.clientY - drag.startY) / rect.height) * 100;
+    setCrop((current) => ({
+      ...current,
+      positionX: clamp(drag.positionX - dx, 0, 100),
+      positionY: clamp(drag.positionY - dy, 0, 100),
+    }));
+  }
+
+  function endDrag(event: ReactPointerEvent<HTMLDivElement>) {
+    if (dragRef.current?.pointerId !== event.pointerId) return;
+    try { event.currentTarget.releasePointerCapture?.(event.pointerId); } catch { /* already released */ }
+    dragRef.current = null;
+  }
+
   async function upload() {
     if (!selected) return setError("Сначала выберите ребёнка.");
-    if (!file) return setError("Выберите фотографию или нажмите «Изменить текущий кадр».");
+    if (!file) return setError("Выберите фотографию или нажмите «Изменить текущий кадр». ");
 
     setSaving(true);
     setError("");
@@ -184,6 +241,7 @@ export function ChildPhotoUpload() {
       setPreview(url);
       setFile(null);
       setCrop(centerCrop);
+      dragRef.current = null;
       setStudents((current) => current.map((student) => student.id === selected.id ? { ...student, photoUrl: url } : student));
       setSuccess("Фото сохранено в вертикальном формате 4:5 и уже обновлено в карточке ребёнка.");
       window.dispatchEvent(new CustomEvent(CHILD_PHOTO_UPDATED_EVENT, { detail: { childId: selected.id, photoUrl: url } }));
@@ -206,7 +264,7 @@ export function ChildPhotoUpload() {
         <div className="fixed inset-0 z-[75] flex items-end justify-center bg-black/30 p-0 backdrop-blur-[2px] sm:items-center sm:p-5" onClick={closeModal}>
           <div className="max-h-[95vh] w-full max-w-4xl overflow-y-auto rounded-t-[28px] bg-[#FAF9F5] p-5 shadow-2xl sm:rounded-[28px] sm:p-7" onClick={(event) => event.stopPropagation()}>
             <div className="flex items-start justify-between gap-4">
-              <div><p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#D96A24]">Карточка ученика</p><h2 className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-[#171717]">Фото ребёнка</h2><p className="mt-2 text-sm leading-6 text-black/45">Фото сохраняется вертикально 4:5. Перед сохранением можно увеличить кадр и выбрать, какая часть фотографии останется видимой.</p></div>
+              <div><p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#D96A24]">Карточка ученика</p><h2 className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-[#171717]">Фото ребёнка</h2><p className="mt-2 text-sm leading-6 text-black/45">Фото сохраняется вертикально 4:5. После выбора перетащите изображение пальцем внутри рамки и увеличьте его до нужного кадра.</p></div>
               <button type="button" onClick={closeModal} disabled={saving} className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white text-black/55 shadow-sm disabled:opacity-50" aria-label="Закрыть"><X size={20} /></button>
             </div>
 
@@ -230,8 +288,15 @@ export function ChildPhotoUpload() {
               <div>
                 <p className="text-xs font-semibold text-black/55">2. Подгоните кадр</p>
                 <div className="mt-2 rounded-[22px] border border-black/[0.06] bg-white p-4">
-                  <div className="mx-auto aspect-[4/5] w-full max-w-[330px] overflow-hidden rounded-[20px] bg-[#F0EEE5] shadow-inner">
-                    {preview ? <img src={preview} alt="Предпросмотр" className="h-full w-full object-cover transition-transform" style={{ objectPosition: `${crop.positionX}% ${crop.positionY}%`, transform: `scale(${crop.zoom})`, transformOrigin: `${crop.positionX}% ${crop.positionY}%` }} /> : selected ? <div className="grid h-full place-items-center text-center"><div><div className="mx-auto grid h-20 w-20 place-items-center rounded-[22px] bg-white text-xl font-bold text-[#5F6338]">{initials(selected.fullName)}</div><p className="mt-3 text-sm font-semibold text-[#171717]">{selected.fullName}</p></div></div> : <div className="grid h-full place-items-center px-6 text-center text-sm leading-6 text-black/35"><div><ImagePlus className="mx-auto mb-3" size={34} />Сначала выберите ребёнка.</div></div>}
+                  <div
+                    className={`relative mx-auto aspect-[4/5] w-full max-w-[330px] overflow-hidden rounded-[20px] bg-[#F0EEE5] shadow-inner ${file ? "touch-none cursor-grab active:cursor-grabbing" : ""}`}
+                    onPointerDown={startDrag}
+                    onPointerMove={moveDrag}
+                    onPointerUp={endDrag}
+                    onPointerCancel={endDrag}
+                  >
+                    {preview ? <img src={preview} alt="Предпросмотр" draggable={false} className="pointer-events-none h-full w-full select-none object-cover" style={{ objectPosition: `${crop.positionX}% ${crop.positionY}%`, transform: `scale(${crop.zoom})`, transformOrigin: `${crop.positionX}% ${crop.positionY}%` }} /> : selected ? <div className="grid h-full place-items-center text-center"><div><div className="mx-auto grid h-20 w-20 place-items-center rounded-[22px] bg-white text-xl font-bold text-[#5F6338]">{initials(selected.fullName)}</div><p className="mt-3 text-sm font-semibold text-[#171717]">{selected.fullName}</p></div></div> : <div className="grid h-full place-items-center px-6 text-center text-sm leading-6 text-black/35"><div><ImagePlus className="mx-auto mb-3" size={34} />Сначала выберите ребёнка.</div></div>}
+                    {file && <div className="pointer-events-none absolute inset-x-3 bottom-3 flex items-center justify-center gap-1.5 rounded-full bg-black/55 px-3 py-2 text-[11px] font-semibold text-white backdrop-blur-sm"><Move size={13} /> Перетащите фото пальцем</div>}
                   </div>
 
                   <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif" onChange={chooseFile} className="hidden" />
@@ -241,9 +306,17 @@ export function ChildPhotoUpload() {
                   </div>
 
                   {file && <div className="mt-5 space-y-4 rounded-[17px] bg-[#FAF9F5] p-4">
-                    <label className="block text-xs font-semibold text-black/55">Увеличение · {crop.zoom.toFixed(2)}×<input type="range" min="1" max="3" step="0.05" value={crop.zoom} onChange={(event) => setCrop((current) => ({ ...current, zoom: Number(event.target.value) }))} className="mt-2 w-full accent-[#D96A24]" /></label>
-                    <label className="block text-xs font-semibold text-black/55">Кадр по горизонтали<input type="range" min="0" max="100" value={crop.positionX} onChange={(event) => setCrop((current) => ({ ...current, positionX: Number(event.target.value) }))} className="mt-2 w-full accent-[#5F6338]" /></label>
-                    <label className="block text-xs font-semibold text-black/55">Кадр по вертикали<input type="range" min="0" max="100" value={crop.positionY} onChange={(event) => setCrop((current) => ({ ...current, positionY: Number(event.target.value) }))} className="mt-2 w-full accent-[#5F6338]" /></label>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-xs font-semibold text-black/55">Масштаб · {crop.zoom.toFixed(2)}×</span>
+                      <div className="flex gap-2">
+                        <button type="button" onClick={() => changeZoom(-0.15)} disabled={crop.zoom <= 1} className="grid h-10 w-10 place-items-center rounded-xl bg-white text-black/55 shadow-sm disabled:opacity-30" aria-label="Уменьшить"><ZoomOut size={18} /></button>
+                        <button type="button" onClick={() => changeZoom(0.15)} disabled={crop.zoom >= 3} className="grid h-10 w-10 place-items-center rounded-xl bg-white text-black/55 shadow-sm disabled:opacity-30" aria-label="Увеличить"><ZoomIn size={18} /></button>
+                      </div>
+                    </div>
+                    <input aria-label="Масштаб фотографии" type="range" min="1" max="3" step="0.05" value={crop.zoom} onChange={(event) => setCrop((current) => ({ ...current, zoom: Number(event.target.value) }))} className="w-full accent-[#D96A24]" />
+                    <div className="rounded-[13px] bg-white px-3 py-2.5 text-[11px] leading-5 text-black/45">На телефоне удобнее просто перетаскивать фото внутри рамки. Ползунки ниже оставлены для точной подгонки.</div>
+                    <label className="block text-xs font-semibold text-black/55">По горизонтали<input type="range" min="0" max="100" value={crop.positionX} onChange={(event) => setCrop((current) => ({ ...current, positionX: Number(event.target.value) }))} className="mt-2 w-full accent-[#5F6338]" /></label>
+                    <label className="block text-xs font-semibold text-black/55">По вертикали<input type="range" min="0" max="100" value={crop.positionY} onChange={(event) => setCrop((current) => ({ ...current, positionY: Number(event.target.value) }))} className="mt-2 w-full accent-[#5F6338]" /></label>
                     <button type="button" onClick={() => setCrop(centerCrop)} className="text-xs font-semibold text-[#D96A24]">Вернуть по центру</button>
                   </div>}
                 </div>
