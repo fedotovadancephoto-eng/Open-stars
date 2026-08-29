@@ -15,7 +15,8 @@ import {
 } from "@/admin/staffManagementApi";
 
 const branches = ["Свердловский", "НЛО", "Октябрьский"];
-const subjects = ["Актёрское мастерство", "Дефиле и подиумный шаг", "Дефиле", "Мастер-класс", "Фотопозирование", "Хореография"];
+const standardSubjects = ["Актёрское мастерство", "Дефиле и подиумный шаг", "Фотопозирование", "Хореография"];
+const CUSTOM_SUBJECT = "__custom__";
 const roleLabels: Record<string, string> = {
   owner: "Директор",
   project_director: "Директор по проекту",
@@ -53,7 +54,8 @@ export function AdminStaffManager() {
   const [phone, setPhone] = useState("");
   const [roleName, setRoleName] = useState("teacher");
   const [branch, setBranch] = useState("НЛО");
-  const [teachingSubject, setTeachingSubject] = useState("Дефиле и подиумный шаг");
+  const [subjectChoice, setSubjectChoice] = useState(standardSubjects[1]);
+  const [teachingSubject, setTeachingSubject] = useState(standardSubjects[1]);
   const [created, setCreated] = useState<CreatedStaffInvite | null>(null);
   const [reissuedCodes, setReissuedCodes] = useState<CreatedStaffInvite[]>([]);
   const [loading, setLoading] = useState(false);
@@ -96,11 +98,14 @@ export function AdminStaffManager() {
   }), []);
 
   useEffect(() => {
-    if (roleName === "project_director") {
-      setTeachingSubject("");
+    if (roleName === "teacher") {
+      const defaultSubject = standardSubjects[1];
+      setSubjectChoice(defaultSubject);
+      setTeachingSubject(defaultSubject);
       return;
     }
-    if (roleName === "teacher" && !teachingSubject) setTeachingSubject("Дефиле и подиумный шаг");
+    setSubjectChoice("");
+    setTeachingSubject("");
   }, [roleName]);
 
   const pendingInvites = useMemo(() => invites.filter((item) => !item.claimedAt && !item.revokedAt), [invites]);
@@ -109,10 +114,19 @@ export function AdminStaffManager() {
     [pendingInvites, actorRole],
   );
 
+  function changeSubjectChoice(value: string) {
+    setSubjectChoice(value);
+    if (value === CUSTOM_SUBJECT) {
+      setTeachingSubject("");
+      return;
+    }
+    setTeachingSubject(value);
+  }
+
   async function create() {
     if (!fullName.trim()) return setError("Введите имя и фамилию сотрудника.");
     if (!phone.trim()) return setError("Введите рабочий телефон.");
-    if (roleName === "teacher" && !teachingSubject.trim()) return setError("Для педагога выберите предмет.");
+    if (roleName === "teacher" && !teachingSubject.trim()) return setError("Для педагога выберите предмет или введите название мастер-класса.");
     setSaving(true);
     setError("");
     setSuccess("");
@@ -269,8 +283,17 @@ export function AdminStaffManager() {
               <label className="mt-3 block text-xs font-semibold text-black/55">Рабочий телефон<input className={inputClass} value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+7 999 123-45-67" inputMode="tel" /></label>
               <label className="mt-3 block text-xs font-semibold text-black/55">Основная роль<select className={inputClass} value={roleName} onChange={(e) => setRoleName(e.target.value)}><option value="teacher">Педагог</option><option value="admin">Администратор филиала</option><option value="manager">Управляющий</option>{canChooseProjectDirector && <option value="project_director">Директор по проекту</option>}</select></label>
               {needsBranch && <label className="mt-3 block text-xs font-semibold text-black/55">Филиал<select className={inputClass} value={branch} onChange={(e) => setBranch(e.target.value)}>{branches.map((item) => <option key={item}>{item}</option>)}</select></label>}
-              {roleName !== "project_director" && <label className="mt-3 block text-xs font-semibold text-black/55">Педагогический предмет {roleName === "teacher" ? "· обязательно" : "· необязательно"}<input className={inputClass} list="staff-subjects" value={teachingSubject} onChange={(e) => setTeachingSubject(e.target.value)} placeholder={roleName === "teacher" ? "Выберите предмет" : "Оставьте пустым, если не педагог"} /><datalist id="staff-subjects">{subjects.map((item) => <option key={item} value={item} />)}</datalist></label>}
-              <p className="mt-3 rounded-[14px] bg-[#FAF9F5] px-3.5 py-3 text-xs leading-5 text-black/45">Если предмет указан у администратора или управляющего, после активации появится переключатель в режим педагога. Второй логин не создаётся.</p>
+              {roleName !== "project_director" && <div className="mt-3">
+                <label className="block text-xs font-semibold text-black/55">Педагогический предмет {roleName === "teacher" ? "· обязательно" : "· необязательно"}
+                  <select className={inputClass} value={subjectChoice} onChange={(e) => changeSubjectChoice(e.target.value)}>
+                    {roleName !== "teacher" && <option value="">Без педагогического предмета</option>}
+                    {standardSubjects.map((item) => <option key={item} value={item}>{item}</option>)}
+                    <option value={CUSTOM_SUBJECT}>Мастер-класс / другой предмет…</option>
+                  </select>
+                </label>
+                {subjectChoice === CUSTOM_SUBJECT && <label className="mt-2 block text-xs font-semibold text-black/55">Название мастер-класса / предмета<input autoFocus className={inputClass} value={teachingSubject} onChange={(e) => setTeachingSubject(e.target.value)} placeholder="Например: Мастер-класс по визажу" /></label>}
+              </div>}
+              <p className="mt-3 rounded-[14px] bg-[#FAF9F5] px-3.5 py-3 text-xs leading-5 text-black/45">Для администратора или управляющего педагогический предмет добавляется только если вы выбрали его явно. Для разового мастер-класса выберите «Мастер-класс / другой предмет» и впишите название вручную.</p>
               <button type="button" onClick={() => void create()} disabled={saving || bulkBusy} className="mt-5 flex w-full items-center justify-center gap-2 rounded-[14px] bg-[#171717] px-5 py-3.5 text-sm font-semibold text-white disabled:opacity-50">{saving ? <LoaderCircle className="animate-spin" size={17} /> : <KeyRound size={17} />} Создать код на 7 дней</button>
 
               {created && <div className="mt-5 rounded-[20px] border border-[#D96A24]/20 bg-[#FFF8F1] p-4"><p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#C95320]">Код активации</p><div className="mt-2 flex items-center gap-3"><span className="font-mono text-3xl font-bold tracking-[0.18em] text-[#171717]">{created.activationCode}</span><button type="button" onClick={() => void copyCode()} className="grid h-10 w-10 place-items-center rounded-xl bg-white text-black/50 shadow-sm" aria-label="Скопировать код"><Copy size={17} /></button></div><p className="mt-2 text-xs leading-5 text-black/45">{created.fullName} · {created.phone}<br />Действует до {fmt(created.expiresAt)}.</p></div>}
