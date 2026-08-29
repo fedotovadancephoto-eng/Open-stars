@@ -19,6 +19,7 @@ import {
   updateHistoryGrade,
   updateHistoryHomework,
 } from "@/admin/academicHistoryApi";
+import { AttendanceHistorySection } from "@/admin/AttendanceHistorySection";
 
 const emptyHistory: AcademicFullHistory = { grades: [], homework: [], comments: [], achievements: [] };
 const fieldClass = "w-full rounded-[11px] border border-black/[0.08] bg-white px-3 py-2.5 text-sm outline-none focus:border-[#D96A24]/45 focus:ring-4 focus:ring-[#D96A24]/[0.06]";
@@ -127,14 +128,12 @@ export function AcademicHistoryManager({ childId, childName, refreshKey }: Props
     }
   }
 
-  const total = history.grades.length + history.homework.length + history.comments.length + history.achievements.length;
-
   return (
     <section className="rounded-[24px] border border-black/[0.06] bg-white p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="flex items-center gap-2"><History size={18} className="text-[#D96A24]"/><h3 className="font-semibold">История ученика</h3></div>
-          <p className="mt-1 text-xs leading-5 text-black/40">Найдите ученика и управляйте всей доступной истории: оценки, ДЗ, личные и групповые комментарии, достижения.</p>
+          <p className="mt-1 text-xs leading-5 text-black/40">Найдите ученика и управляйте всей доступной историей: посещаемость, оценки, ДЗ, личные и групповые комментарии, достижения.</p>
         </div>
         <button type="button" onClick={() => student && void load(student.id)} disabled={!student || loading || saving} className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#FAF9F5] text-black/45 disabled:opacity-40"><RefreshCw size={16} className={loading ? "animate-spin" : ""}/></button>
       </div>
@@ -152,13 +151,15 @@ export function AcademicHistoryManager({ childId, childName, refreshKey }: Props
         <div className="mt-4 rounded-[14px] bg-[#FAF9F5] px-4 py-5 text-sm text-black/40">Найдите ученика или выберите ребёнка выше.</div>
       ) : (
         <>
-          <div className="mt-4 flex items-center justify-between gap-3 rounded-[13px] bg-[#FAF9F5] px-3 py-2.5"><div><p className="text-sm font-semibold">{student.name}</p><p className="mt-0.5 text-[11px] text-black/40">{meta(student) || "Выбран из текущего журнала"}</p></div><span className="text-xs font-semibold text-black/35">{total} запис.</span></div>
+          <div className="mt-4 flex items-center justify-between gap-3 rounded-[13px] bg-[#FAF9F5] px-3 py-2.5"><div><p className="text-sm font-semibold">{student.name}</p><p className="mt-0.5 text-[11px] text-black/40">{meta(student) || "Выбран из текущего журнала"}</p></div><span className="text-xs font-semibold text-black/35">Учебная история</span></div>
 
           {loading ? (
             <div className="flex items-center justify-center gap-2 py-7 text-sm text-black/40"><LoaderCircle size={17} className="animate-spin"/> Загрузка...</div>
           ) : (
             <div className="mt-5 space-y-6">
-              <div>
+              <AttendanceHistorySection childId={student.id} refreshKey={refreshKey} />
+
+              <div className="border-t border-black/[0.06] pt-5">
                 <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-black/35">Оценки · {history.grades.length}</p>
                 {history.grades.length === 0 ? <p className="mt-2 text-sm text-black/35">Нет оценок.</p> : <div className="mt-2 space-y-2">{history.grades.map((record) => {
                   const draft = gradeDraft?.record.id === record.id ? gradeDraft : null;
