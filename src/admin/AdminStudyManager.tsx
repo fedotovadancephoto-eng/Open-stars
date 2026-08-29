@@ -19,7 +19,8 @@ import { publishGroupComment } from "@/admin/groupCommentApi";
 const branches: AcademicBranch[] = ["Свердловский", "НЛО", "Октябрьский"];
 const groups: AcademicGroup[] = ["Базовый", "Продвинутый", "PRO"];
 const streams: AcademicStream[] = ["11:00", "13:00", "16:00"];
-const commonSubjects = ["Дефиле", "Хореография", "Актёрское мастерство", "Фотопозирование"];
+const commonSubjects = ["Дефиле", "Дефиле и подиумный шаг", "Хореография", "Актёрское мастерство", "Фотопозирование"];
+const CUSTOM_SUBJECT = "__custom__";
 const inputClass = "mt-1.5 w-full rounded-[13px] border border-black/[0.08] bg-white px-3.5 py-3 text-sm text-[#171717] outline-none focus:border-[#D96A24]/45 focus:ring-4 focus:ring-[#D96A24]/[0.06]";
 
 type CommentAudience = "individual" | "group";
@@ -37,10 +38,12 @@ export function AdminStudyManager() {
   const [role, setRole] = useState("");
   const [staffBranch, setStaffBranch] = useState("");
   const [teacherName, setTeacherName] = useState("");
+  const [assignedSubjects, setAssignedSubjects] = useState<string[]>([]);
   const [branch, setBranch] = useState<AcademicBranch>("Октябрьский");
   const [groupName, setGroupName] = useState<AcademicGroup>("PRO");
   const [stream, setStream] = useState<AcademicStream>("16:00");
   const [lessonDate, setLessonDate] = useState(localDate());
+  const [subjectChoice, setSubjectChoice] = useState("Дефиле");
   const [subject, setSubject] = useState("Дефиле");
   const [roster, setRoster] = useState<AcademicRosterRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -70,6 +73,8 @@ export function AdminStudyManager() {
         setRole(context.role);
         setStaffBranch(context.staffBranch);
         setTeacherName(context.staffName);
+        const uniqueSubjects = Array.from(new Set((context.assignments || []).map((item) => item.subject).filter(Boolean)));
+        setAssignedSubjects(uniqueSubjects);
         if (context.role === "admin" && branches.includes(context.staffBranch as AcademicBranch)) {
           setBranch(context.staffBranch as AcademicBranch);
         }
@@ -77,7 +82,10 @@ export function AdminStudyManager() {
           const first = context.assignments[0];
           if (first.branch && branches.includes(first.branch as AcademicBranch)) setBranch(first.branch as AcademicBranch);
           if (groups.includes(first.groupName as AcademicGroup)) setGroupName(first.groupName as AcademicGroup);
-          if (first.subject) setSubject(first.subject);
+          if (first.subject) {
+            setSubjectChoice(first.subject);
+            setSubject(first.subject);
+          }
         }
       } catch {
         if (!cancelled) timer = window.setTimeout(detect, 1200);
@@ -97,7 +105,20 @@ export function AdminStudyManager() {
   }, []);
 
   const branchLocked = role === "admin" || role === "teacher";
+  const subjectOptions = role === "teacher" ? assignedSubjects : commonSubjects;
   const selectedStudent = useMemo(() => roster.find((row) => row.childId === personalChild) || null, [roster, personalChild]);
+
+  function clearLoadedRoster() {
+    setRoster([]);
+    setPersonalChild("");
+    setSuccess("");
+  }
+
+  function changeSubjectChoice(value: string) {
+    setSubjectChoice(value);
+    setSubject(value === CUSTOM_SUBJECT ? "" : value);
+    clearLoadedRoster();
+  }
 
   async function loadRoster() {
     if (!subject.trim()) return setError("Укажите предмет.");
@@ -230,13 +251,17 @@ export function AdminStudyManager() {
 
             <div className="mt-6 rounded-[24px] border border-black/[0.06] bg-white p-5 sm:p-6">
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-                <label className="text-xs font-semibold text-black/55">Филиал<select className={inputClass} value={branch} disabled={branchLocked && Boolean(staffBranch)} onChange={(e) => setBranch(e.target.value as AcademicBranch)}>{branches.map((v) => <option key={v}>{v}</option>)}</select></label>
-                <label className="text-xs font-semibold text-black/55">Группа<select className={inputClass} value={groupName} onChange={(e) => setGroupName(e.target.value as AcademicGroup)}>{groups.map((v) => <option key={v}>{v}</option>)}</select></label>
-                <label className="text-xs font-semibold text-black/55">Поток<select className={inputClass} value={stream} onChange={(e) => setStream(e.target.value as AcademicStream)}>{streams.map((v) => <option key={v}>{v}</option>)}</select></label>
-                <label className="text-xs font-semibold text-black/55">Дата<input type="date" className={inputClass} value={lessonDate} onChange={(e) => setLessonDate(e.target.value)} /></label>
-                <label className="text-xs font-semibold text-black/55">Предмет<input className={inputClass} list="academic-subjects" value={subject} onChange={(e) => setSubject(e.target.value)} /><datalist id="academic-subjects">{commonSubjects.map((v) => <option key={v} value={v} />)}</datalist></label>
+                <label className="text-xs font-semibold text-black/55">Филиал<select className={inputClass} value={branch} disabled={branchLocked && Boolean(staffBranch)} onChange={(e) => { setBranch(e.target.value as AcademicBranch); clearLoadedRoster(); }}>{branches.map((v) => <option key={v}>{v}</option>)}</select></label>
+                <label className="text-xs font-semibold text-black/55">Группа<select className={inputClass} value={groupName} onChange={(e) => { setGroupName(e.target.value as AcademicGroup); clearLoadedRoster(); }}>{groups.map((v) => <option key={v}>{v}</option>)}</select></label>
+                <label className="text-xs font-semibold text-black/55">Поток<select className={inputClass} value={stream} onChange={(e) => { setStream(e.target.value as AcademicStream); clearLoadedRoster(); }}>{streams.map((v) => <option key={v}>{v}</option>)}</select></label>
+                <label className="text-xs font-semibold text-black/55">Дата<input type="date" className={inputClass} value={lessonDate} onChange={(e) => { setLessonDate(e.target.value); clearLoadedRoster(); }} /></label>
+                <div>
+                  <label className="text-xs font-semibold text-black/55">Предмет<select className={inputClass} value={subjectChoice} onChange={(e) => changeSubjectChoice(e.target.value)}>{subjectOptions.length === 0 && <option value="">Нет назначенных предметов</option>}{subjectOptions.map((v) => <option key={v} value={v}>{v}</option>)}{role !== "teacher" && <option value={CUSTOM_SUBJECT}>Мастер-класс / другой предмет…</option>}</select></label>
+                  {role !== "teacher" && subjectChoice === CUSTOM_SUBJECT && <input autoFocus className={inputClass} value={subject} onChange={(e) => { setSubject(e.target.value); clearLoadedRoster(); }} placeholder="Например: Мастер-класс по визажу" />}
+                </div>
               </div>
-              <button type="button" onClick={loadRoster} disabled={loading} className="mt-4 flex items-center gap-2 rounded-[14px] bg-[#171717] px-4 py-3 text-sm font-semibold text-white disabled:opacity-50">{loading ? <LoaderCircle className="animate-spin" size={17} /> : <UsersRound size={17} />} Загрузить группу</button>
+              {role === "teacher" && assignedSubjects.length > 0 && <p className="mt-3 text-xs leading-5 text-black/40">Показаны только предметы, назначенные этому педагогу. Разовый мастер-класс появится здесь после добавления его точного названия в карточке сотрудника.</p>}
+              <button type="button" onClick={loadRoster} disabled={loading || !subject.trim()} className="mt-4 flex items-center gap-2 rounded-[14px] bg-[#171717] px-4 py-3 text-sm font-semibold text-white disabled:opacity-50">{loading ? <LoaderCircle className="animate-spin" size={17} /> : <UsersRound size={17} />} Загрузить группу</button>
             </div>
 
             {error && <div className="mt-4 rounded-[15px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
