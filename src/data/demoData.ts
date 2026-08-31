@@ -28,6 +28,8 @@ export const child = {
   paymentStatus: "",
 };
 
+export const familyChildren: any[] = [];
+
 export const quickStats = {
   coins: 0,
   progress: 0,
@@ -106,6 +108,7 @@ export function applyDashboardData(data: any) {
   if (data.coins) Object.assign(coins, data.coins);
   if (data.progress) Object.assign(progress, data.progress);
 
+  replaceArray(familyChildren, data.familyChildren);
   replaceArray(starCoinRules, data.starCoinRules);
   replaceArray(coinHistory, data.coinHistory);
   replaceArray(grades, data.grades);
