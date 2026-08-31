@@ -1,0 +1,68 @@
+name: Patch pending parent phone UI
+
+on:
+  push:
+    branches:
+      - fix/pending-parent-phone-edit
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: ${{ !contains(github.event.head_commit.message, '[phone-patch]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/pending-parent-phone-edit
+          fetch-depth: 0
+      - name: Patch AdminApp
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('src/admin/AdminApp.tsx')
+          text = path.read_text()
+
+          replacements = [
+              (
+                  'import { fetchAcademicContext } from "@/admin/academicApi";\n',
+                  'import { fetchAcademicContext } from "@/admin/academicApi";\nimport { updatePendingParentPhone } from "@/admin/parentPhoneApi";\n',
+              ),
+              (
+                  '  const [parentName, setParentName] = useState(child.parentName);\n',
+                  '  const [parentName, setParentName] = useState(child.parentName);\n  const [parentPhone, setParentPhone] = useState(child.parentPhone);\n',
+              ),
+              (
+                  '  useEffect(() => {\n    setParentName(child.parentName);\n    setForm({',
+                  '  useEffect(() => {\n    setParentName(child.parentName);\n    setParentPhone(child.parentPhone);\n    setForm({',
+              ),
+              (
+                  '      if (child.parentProfileId && parentName.trim() !== child.parentName.trim()) {\n        await updateParentDisplayName(child.parentProfileId, parentName);\n      }\n      await onSaved(child.id);',
+                  '      if (child.parentProfileId && parentName.trim() !== child.parentName.trim()) {\n        await updateParentDisplayName(child.parentProfileId, parentName);\n      }\n      if (child.activationStatus !== "active" && parentPhone.trim() !== child.parentPhone.trim()) {\n        await updatePendingParentPhone(child.id, parentPhone);\n      }\n      await onSaved(child.id);',
+              ),
+              (
+                  '              <label className="mt-3 block text-xs font-semibold text-black/55">Телефон<input className={`${inputClass} cursor-not-allowed opacity-60`} value={child.parentPhone} readOnly /></label>\n',
+                  '              <label className="mt-3 block text-xs font-semibold text-black/55">Телефон<input inputMode="tel" className={child.activationStatus === "active" ? `${inputClass} cursor-not-allowed opacity-60` : inputClass} value={parentPhone} readOnly={child.activationStatus === "active"} onChange={(event) => setParentPhone(event.target.value)} /></label>\n              {child.activationStatus === "active" ? <p className="mt-2 text-[11px] leading-5 text-black/35">Кабинет уже активирован. Смена номера логина выполняется отдельной безопасной процедурой.</p> : <p className="mt-2 text-[11px] leading-5 text-[#C95320]">Если изменить номер, ранее выданный код активации будет отозван. После сохранения выдайте новый код на новый телефон.</p>}\n',
+              ),
+          ]
+
+          for old, new in replacements:
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'Expected exactly one match, found {count}: {old[:80]!r}')
+              text = text.replace(old, new, 1)
+
+          path.write_text(text)
+          PY
+      - name: Commit patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/admin/AdminApp.tsx
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "Enable pending parent phone editing [phone-patch]"
+          git push origin HEAD:fix/pending-parent-phone-edit
