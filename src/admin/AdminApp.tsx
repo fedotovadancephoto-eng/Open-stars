@@ -37,6 +37,7 @@ import {
   updateParentDisplayName,
 } from "@/admin/adminApi";
 import { fetchAcademicContext } from "@/admin/academicApi";
+import { updatePendingParentPhone } from "@/admin/parentPhoneApi";
 import { ADMIN_DATA_UPDATED_EVENT, openAdminSection } from "@/admin/adminNavigation";
 import { administratorForBranch } from "@/admin/branchAdministrators";
 import { STAFF_VIEW_MODE_EVENT, STAFF_VIEW_MODE_KEY } from "@/admin/StaffModeSwitch";
@@ -126,6 +127,7 @@ function StudentDetails({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [parentName, setParentName] = useState(child.parentName);
+  const [parentPhone, setParentPhone] = useState(child.parentPhone);
   const [form, setForm] = useState<ChildUpdateInput>({
     firstName: child.firstName,
     lastName: child.lastName,
@@ -140,6 +142,7 @@ function StudentDetails({
 
   useEffect(() => {
     setParentName(child.parentName);
+    setParentPhone(child.parentPhone);
     setForm({
       firstName: child.firstName,
       lastName: child.lastName,
@@ -183,6 +186,9 @@ function StudentDetails({
       await updateAdminChild(child.id, { ...form, administratorName: administratorForBranch(form.branch) });
       if (child.parentProfileId && parentName.trim() !== child.parentName.trim()) {
         await updateParentDisplayName(child.parentProfileId, parentName);
+      }
+      if (child.activationStatus !== "active" && parentPhone.trim() !== child.parentPhone.trim()) {
+        await updatePendingParentPhone(child.id, parentPhone);
       }
       await onSaved(child.id);
       setEditing(false);
@@ -236,7 +242,8 @@ function StudentDetails({
             <div className="rounded-[24px] border border-black/[0.06] bg-white p-5">
               <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-black/35">Родитель</p>
               <label className="mt-4 block text-xs font-semibold text-black/55">Как отображать имя<input className={inputClass} value={parentName} onChange={(e) => setParentName(e.target.value)} /></label>
-              <label className="mt-3 block text-xs font-semibold text-black/55">Телефон<input className={`${inputClass} cursor-not-allowed opacity-60`} value={child.parentPhone} readOnly /></label>
+              <label className="mt-3 block text-xs font-semibold text-black/55">Телефон<input inputMode="tel" className={child.activationStatus === "active" ? `${inputClass} cursor-not-allowed opacity-60` : inputClass} value={parentPhone} readOnly={child.activationStatus === "active"} onChange={(event) => setParentPhone(event.target.value)} /></label>
+              {child.activationStatus === "active" ? <p className="mt-2 text-[11px] leading-5 text-black/35">Кабинет уже активирован. Смена номера логина выполняется отдельной безопасной процедурой.</p> : <p className="mt-2 text-[11px] leading-5 text-[#C95320]">Если изменить номер, ранее выданный код активации будет отозван. После сохранения выдайте новый код на новый телефон.</p>}
             </div>
 
             {error && <div className="rounded-[16px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
