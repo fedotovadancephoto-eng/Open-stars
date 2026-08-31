@@ -1,6 +1,7 @@
 const SUPABASE_URL = "https://yiwiykbuaggyslfyhlfo.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_1MORh5rY7uMDVYLYVX5VAA_cyoph4-7";
 const SESSION_STORAGE_KEY = "openstars_parent_session";
+const SELECTED_CHILD_STORAGE_KEY = "openstars_parent_selected_child";
 const SCHOOL_TIME_ZONE = "Asia/Irkutsk";
 
 export type ParentSession = {
@@ -22,6 +23,20 @@ export type ParentRegistrationResult = {
   ok: true;
   phone: string;
   message: string;
+};
+
+export type ParentFamilyChild = {
+  id: string;
+  name: string;
+  firstName: string;
+  lastName: string;
+  branch: string;
+  groupName: string;
+  lessonDay: string;
+  lessonTime: string;
+  photo: string;
+  coins: number;
+  paymentStatus: string;
 };
 
 type ApiErrorResponse = { error?: string; message?: string };
@@ -79,6 +94,17 @@ export function clearParentSession() {
   window.localStorage.removeItem(SESSION_STORAGE_KEY);
 }
 
+function getSelectedParentChildId() {
+  if (typeof window === "undefined") return "";
+  return window.localStorage.getItem(SELECTED_CHILD_STORAGE_KEY) || "";
+}
+
+export function selectParentChild(childId: string) {
+  if (typeof window === "undefined") return;
+  if (childId) window.localStorage.setItem(SELECTED_CHILD_STORAGE_KEY, childId);
+  else window.localStorage.removeItem(SELECTED_CHILD_STORAGE_KEY);
+}
+
 export function isParentSessionExpired(session: ParentSession) {
   return session.expires_at <= Math.floor(Date.now() / 1000) + 30;
 }
@@ -119,6 +145,7 @@ export async function getValidParentSession() {
 
 export function logoutParent() {
   clearParentSession();
+  selectParentChild("");
 }
 
 async function restSelect<T>(table: string, query: string, accessToken: string): Promise<T[]> {
@@ -238,11 +265,28 @@ export async function fetchParentDashboard() {
 
   const children = await restSelect<any>(
     "children",
-    `select=id,first_name,last_name,group_name,photo_url,coins,payment_status,branch,level,lesson_day,lesson_time,mentor_name,birth_date,family_id&family_id=eq.${encodeURIComponent(familyId)}&archived_at=is.null&order=last_name.asc,first_name.asc&limit=1`,
+    `select=id,first_name,last_name,group_name,photo_url,coins,payment_status,branch,level,lesson_day,lesson_time,mentor_name,birth_date,family_id&family_id=eq.${encodeURIComponent(familyId)}&archived_at=is.null&order=last_name.asc,first_name.asc&limit=100`,
     token,
   );
-  const dbChild = children[0];
-  if (!dbChild) throw new Error("К аккаунту родителя не привязан ребёнок.");
+  if (!children.length) throw new Error("К аккаунту родителя не привязан ребёнок.");
+
+  const requestedChildId = getSelectedParentChildId();
+  const dbChild = children.find((item) => item.id === requestedChildId) || children[0];
+  selectParentChild(dbChild.id);
+
+  const familyChildren: ParentFamilyChild[] = children.map((item) => ({
+    id: item.id,
+    name: [item.first_name, item.last_name].filter(Boolean).join(" "),
+    firstName: item.first_name || "",
+    lastName: item.last_name || "",
+    branch: item.branch || "",
+    groupName: item.group_name || "",
+    lessonDay: item.lesson_day || "",
+    lessonTime: timeShort(item.lesson_time),
+    photo: item.photo_url || "",
+    coins: Number(item.coins || 0),
+    paymentStatus: item.payment_status || "",
+  }));
 
   const childId = encodeURIComponent(dbChild.id);
   const today = dateInSchoolTimeZone();
@@ -310,6 +354,7 @@ export async function fetchParentDashboard() {
     .reduce((sum, row) => sum + Number(row.amount || 0), 0);
 
   return {
+    familyChildren,
     parent: {
       firstName: firstNameFromFullName(profile?.full_name),
       name: profile?.full_name || "Родитель",

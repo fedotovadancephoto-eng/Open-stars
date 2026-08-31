@@ -28,8 +28,8 @@ import { PaymentsTab } from "@/components/tabs/PaymentsTab";
 import { PhotosTab } from "@/components/tabs/PhotosTab";
 import { ProgressTab } from "@/components/tabs/ProgressTab";
 import { ScheduleTab } from "@/components/tabs/ScheduleTab";
-import { applyDashboardData, child } from "@/data/demoData";
-import { fetchParentDashboard, getValidParentSession, logoutParent } from "@/openStarsApi";
+import { applyDashboardData, child, familyChildren } from "@/data/demoData";
+import { fetchParentDashboard, getValidParentSession, logoutParent, ParentFamilyChild, selectParentChild } from "@/openStarsApi";
 import { DEMO_USER_ROLE, ROLE_PORTAL_LABELS } from "@/types/role";
 
 type TabId =
@@ -113,6 +113,66 @@ function TabGrid({ tabs, activeTab, onSelect, columns }: { tabs: TabConfig[]; ac
   );
 }
 
+function ChildSwitcher({
+  children,
+  activeId,
+  switching,
+  onSelect,
+}: {
+  children: ParentFamilyChild[];
+  activeId: string;
+  switching: boolean;
+  onSelect: (childId: string) => void;
+}) {
+  if (children.length <= 1) return null;
+
+  return (
+    <section className="mb-6 rounded-[24px] border border-black/[0.055] bg-white p-4 shadow-[0_8px_28px_rgba(0,0,0,0.035)] sm:p-5">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-black/35">Дети в семье</p>
+          <p className="mt-1 text-sm text-black/50">Выберите ребёнка — весь кабинет переключится на его данные.</p>
+        </div>
+        {switching && <span className="shrink-0 text-xs font-medium text-[#D96A24]">Переключаем…</span>}
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+        {children.map((item) => {
+          const active = item.id === activeId;
+          const initials = (item.firstName || item.name || "Р").slice(0, 1).toUpperCase();
+          const meta = [item.groupName, item.lessonDay, item.lessonTime].filter(Boolean).join(" · ");
+          return (
+            <button
+              key={item.id}
+              type="button"
+              disabled={switching}
+              onClick={() => !active && onSelect(item.id)}
+              className={`min-w-0 rounded-[18px] border p-3 text-left transition active:scale-[0.99] disabled:opacity-60 ${active ? "border-[#D96A24]/35 bg-[#D96A24]/[0.07] shadow-[0_6px_18px_rgba(217,106,36,0.08)]" : "border-black/[0.06] bg-[#FAF9F5] hover:border-black/[0.12]"}`}
+            >
+              <div className="flex items-center gap-2.5">
+                {item.photo ? (
+                  <img src={item.photo} alt="" className="h-11 w-11 shrink-0 rounded-[14px] object-cover" />
+                ) : (
+                  <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-[14px] text-sm font-bold ${active ? "bg-[#D96A24] text-white" : "bg-white text-[#5F6338]"}`}>{initials}</span>
+                )}
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-[#171717]">{item.firstName || item.name}</p>
+                  <p className="mt-0.5 truncate text-[10px] text-black/40">{item.branch || "OPEN STARS"}</p>
+                </div>
+              </div>
+              {meta && <p className="mt-2 truncate text-[10px] text-black/40">{meta}</p>}
+              <div className="mt-2 flex items-center justify-between gap-2">
+                <span className="text-[10px] font-semibold text-[#5F6338]">★ {item.coins} Coin</span>
+                {active && <span className="rounded-full bg-[#171717] px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.08em] text-white">Открыт</span>}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 function App() {
   const [activeTab, setActiveTab] = useState<TabId>("coins");
   const [authStatus, setAuthStatus] = useState<AuthStatus>("checking");
@@ -120,6 +180,8 @@ function App() {
   const [dataError, setDataError] = useState("");
   const [birthdayReward, setBirthdayReward] = useState<BirthdayReward | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const [hasDashboard, setHasDashboard] = useState(false);
+  const [switchingChild, setSwitchingChild] = useState(false);
   const tabContentRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
@@ -133,7 +195,7 @@ function App() {
   useEffect(() => {
     if (authStatus !== "authenticated") return;
     let mounted = true;
-    setDataStatus("loading");
+    if (!hasDashboard) setDataStatus("loading");
     setDataError("");
     setBirthdayReward(null);
 
@@ -143,26 +205,40 @@ function App() {
 
         let dashboardData = data;
         let reward: BirthdayReward | null = null;
+        let selectedRewardAwardedNow = false;
 
-        try {
-          const childId = data?.child?.id;
-          if (childId) {
-            reward = await claimBirthdayReward(childId);
-            if (reward.awardedNow) {
-              dashboardData = await fetchParentDashboard();
+        const availableChildren = Array.isArray(data?.familyChildren) && data.familyChildren.length
+          ? data.familyChildren
+          : data?.child?.id
+            ? [data.child]
+            : [];
+
+        for (const familyChild of availableChildren) {
+          try {
+            const nextReward = await claimBirthdayReward(familyChild.id);
+            if (familyChild.id === data?.child?.id) {
+              reward = nextReward;
+              selectedRewardAwardedNow = Boolean(nextReward.awardedNow);
             }
+          } catch {
+            // Поздравление одного ребёнка не должно мешать кабинету всей семьи.
           }
-        } catch {
-          // Поздравление не должно мешать загрузке основного кабинета.
+        }
+
+        if (selectedRewardAwardedNow) {
+          dashboardData = await fetchParentDashboard();
         }
 
         if (!mounted) return;
         applyDashboardData(dashboardData);
         setBirthdayReward(reward?.isBirthday ? reward : null);
+        setHasDashboard(true);
+        setSwitchingChild(false);
         setDataStatus("ready");
       })
       .catch((error) => {
         if (!mounted) return;
+        setSwitchingChild(false);
         setDataError(error instanceof Error ? error.message : "Не удалось загрузить данные кабинета.");
         setDataStatus("error");
       });
@@ -174,19 +250,29 @@ function App() {
     window.setTimeout(() => tabContentRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 40);
   };
 
+  const handleChildSelect = (childId: string) => {
+    if (!childId || childId === child.id) return;
+    selectParentChild(childId);
+    setSwitchingChild(true);
+    setBirthdayReward(null);
+    setReloadKey((value) => value + 1);
+  };
+
   const handleLogout = () => {
     logoutParent();
     setActiveTab("coins");
     setDataStatus("idle");
     setDataError("");
     setBirthdayReward(null);
+    setHasDashboard(false);
+    setSwitchingChild(false);
     setAuthStatus("guest");
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   if (authStatus === "checking") return <LoadingScreen />;
   if (authStatus === "guest") {
-    return <ParentAuth onSuccess={() => { setDataStatus("idle"); setAuthStatus("authenticated"); }} />;
+    return <ParentAuth onSuccess={() => { setDataStatus("idle"); setHasDashboard(false); setAuthStatus("authenticated"); }} />;
   }
   if (dataStatus === "idle" || dataStatus === "loading") return <LoadingScreen text="Загружаем кабинет" />;
 
@@ -214,6 +300,8 @@ function App() {
             <h1 className="mt-5 text-3xl font-semibold tracking-[-0.035em] text-[#171717] sm:text-4xl">С возвращением!</h1>
             <p className="mt-2 text-[15px] text-black/50 sm:text-base">Всё важное об {nameInAboutCase(childFirstName)} в OPEN STARS — на этой неделе.</p>
           </section>
+
+          <ChildSwitcher children={familyChildren as ParentFamilyChild[]} activeId={child.id} switching={switchingChild} onSelect={handleChildSelect} />
 
           {birthdayReward && <BirthdayBanner firstName={childFirstName || "звезда"} amount={birthdayReward.amount || 10} />}
 
