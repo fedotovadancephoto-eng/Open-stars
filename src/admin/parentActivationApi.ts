@@ -51,6 +51,7 @@ async function rpc(functionName: string, body: Record<string, unknown>) {
     }
     if (message.includes("parent already active")) message = "Кабинет этого родителя уже активирован.";
     if (message.includes("parent phone missing")) message = "У родителя не указан телефон.";
+    if (message.includes("parent invite missing")) message = "У этого родителя ещё не было кода. Сначала сгенерируйте первый код.";
     if (message.includes("not authorized")) message = "Недостаточно прав для этого действия.";
     throw new Error(message);
   }
@@ -58,9 +59,7 @@ async function rpc(functionName: string, body: Record<string, unknown>) {
   return response.status === 204 ? [] : response.json();
 }
 
-export async function generateParentActivationCode(childId: string): Promise<ParentActivationCode> {
-  const rows = await rpc("staff_generate_parent_invite", { p_child_id: childId, p_valid_hours: 168 });
-  const row = rows?.[0];
+function mapActivationCode(row: any): ParentActivationCode {
   if (!row?.activation_code) throw new Error("Код не был создан.");
   return {
     childId: row.child_id,
@@ -71,6 +70,16 @@ export async function generateParentActivationCode(childId: string): Promise<Par
     activationCode: row.activation_code,
     expiresAt: row.expires_at || "",
   };
+}
+
+export async function generateParentActivationCode(childId: string): Promise<ParentActivationCode> {
+  const rows = await rpc("staff_generate_parent_invite", { p_child_id: childId, p_valid_hours: 168 });
+  return mapActivationCode(rows?.[0]);
+}
+
+export async function reissueParentActivationCode(childId: string): Promise<ParentActivationCode> {
+  const rows = await rpc("staff_reissue_parent_invite", { p_child_id: childId, p_valid_hours: 168 });
+  return mapActivationCode(rows?.[0]);
 }
 
 export async function generateBulkParentActivationCodes(branch?: string): Promise<BulkParentActivationCode[]> {
