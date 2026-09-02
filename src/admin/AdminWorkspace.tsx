@@ -3,6 +3,7 @@ import { AdminCoinManager } from "@/admin/AdminCoinManager";
 import { AdminFeedbackManager } from "@/admin/AdminFeedbackManager";
 import { AdminNewsManager } from "@/admin/AdminNewsManager";
 import { AdminParentActivationManager } from "@/admin/AdminParentActivationManager";
+import { AdminParentPasswordResetManager } from "@/admin/AdminParentPasswordResetManager";
 import { AdminPaymentManager } from "@/admin/AdminPaymentManager";
 import { AdminPhotoSessionManager } from "@/admin/AdminPhotoSessionManager";
 import { AdminReportExport } from "@/admin/AdminReportExport";
@@ -22,6 +23,7 @@ export default function AdminWorkspace() {
       <AdminApp />
       <AdminStudentOperations />
       <AdminParentActivationManager />
+      <AdminParentPasswordResetManager />
       <AdminFeedbackManager />
       <ChildPhotoUpload />
       <AdminScheduleManager />

@@ -3,6 +3,7 @@ export type AdminSection =
   | "add-student"
   | "archive"
   | "parent-activation"
+  | "parent-password-reset"
   | "child-photo"
   | "schedule"
   | "study"
