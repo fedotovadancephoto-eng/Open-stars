@@ -12,6 +12,7 @@ import {
   loginParent,
   registerParent,
 } from "@/openStarsApi";
+import { resetParentPassword } from "@/parentPasswordResetApi";
 
 type ParentAuthProps = {
   onSuccess: () => void;
@@ -21,13 +22,15 @@ export function ParentAuth({
   onSuccess,
 }: ParentAuthProps) {
   const [mode, setMode] = useState<
-    "login" | "register"
+    "login" | "register" | "reset"
   >("login");
 
   const [phone, setPhone] = useState("");
   const [password, setPassword] =
     useState("");
   const [activationCode, setActivationCode] =
+    useState("");
+  const [resetCode, setResetCode] =
     useState("");
 
   const [showPassword, setShowPassword] =
@@ -60,18 +63,33 @@ export function ParentAuth({
         return;
       }
 
-      await registerParent(
+      if (mode === "register") {
+        await registerParent(
+          phone,
+          activationCode,
+          password
+        );
+
+        setMessage(
+          "Аккаунт создан. Теперь войдите по номеру телефона и паролю."
+        );
+
+        setPassword("");
+        setActivationCode("");
+        setMode("login");
+        return;
+      }
+
+      const result = await resetParentPassword(
         phone,
-        activationCode,
+        resetCode,
         password
       );
 
-      setMessage(
-        "Аккаунт создан. Теперь войдите по номеру телефона и паролю."
-      );
-
+      setMessage(result.message);
       setPassword("");
-      setActivationCode("");
+      setResetCode("");
+      setShowPassword(false);
       setMode("login");
     } catch (err) {
       setError(
@@ -237,7 +255,9 @@ export function ParentAuth({
               >
                 {mode === "login"
                   ? "Вход для родителей"
-                  : "Первый вход"}
+                  : mode === "register"
+                    ? "Первый вход"
+                    : "Новый пароль"}
               </h2>
 
               <p
@@ -250,68 +270,86 @@ export function ParentAuth({
               >
                 {mode === "login"
                   ? "Введите номер телефона и пароль."
-                  : "Используйте номер телефона, который указан в карточке родителя."}
+                  : mode === "register"
+                    ? "Используйте номер телефона, который указан в карточке родителя."
+                    : "Введите номер телефона, код восстановления от администратора и придумайте новый пароль."}
               </p>
             </div>
 
-            <div
-              className="
-                mt-7
-                grid
-                grid-cols-2
-                rounded-[16px]
-                bg-black/[0.045]
-                p-1
-              "
-            >
+            {mode !== "reset" ? (
+              <div
+                className="
+                  mt-7
+                  grid
+                  grid-cols-2
+                  rounded-[16px]
+                  bg-black/[0.045]
+                  p-1
+                "
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode("login");
+                    setError("");
+                    setMessage("");
+                  }}
+                  className={`
+                    rounded-[13px]
+                    px-4
+                    py-2.5
+                    text-sm
+                    font-semibold
+                    transition
+                    ${
+                      mode === "login"
+                        ? "bg-white text-[#171717] shadow-sm"
+                        : "text-black/45"
+                    }
+                  `}
+                >
+                  Войти
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode("register");
+                    setError("");
+                    setMessage("");
+                  }}
+                  className={`
+                    rounded-[13px]
+                    px-4
+                    py-2.5
+                    text-sm
+                    font-semibold
+                    transition
+                    ${
+                      mode === "register"
+                        ? "bg-white text-[#171717] shadow-sm"
+                        : "text-black/45"
+                    }
+                  `}
+                >
+                  Первый вход
+                </button>
+              </div>
+            ) : (
               <button
                 type="button"
                 onClick={() => {
                   setMode("login");
                   setError("");
                   setMessage("");
+                  setPassword("");
+                  setResetCode("");
                 }}
-                className={`
-                  rounded-[13px]
-                  px-4
-                  py-2.5
-                  text-sm
-                  font-semibold
-                  transition
-                  ${
-                    mode === "login"
-                      ? "bg-white text-[#171717] shadow-sm"
-                      : "text-black/45"
-                  }
-                `}
+                className="mt-6 text-sm font-semibold text-[#5F6338]"
               >
-                Войти
+                ← Вернуться ко входу
               </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setMode("register");
-                  setError("");
-                  setMessage("");
-                }}
-                className={`
-                  rounded-[13px]
-                  px-4
-                  py-2.5
-                  text-sm
-                  font-semibold
-                  transition
-                  ${
-                    mode === "register"
-                      ? "bg-white text-[#171717] shadow-sm"
-                      : "text-black/45"
-                  }
-                `}
-              >
-                Первый вход
-              </button>
-            </div>
+            )}
 
             <form
               onSubmit={handleSubmit}
@@ -451,6 +489,80 @@ export function ParentAuth({
                 </div>
               )}
 
+              {/* Код восстановления */}
+              {mode === "reset" && (
+                <div>
+                  <label
+                    htmlFor="resetCode"
+                    className="
+                      mb-2
+                      block
+                      text-xs
+                      font-semibold
+                      text-[#171717]
+                    "
+                  >
+                    Код восстановления
+                  </label>
+
+                  <div className="relative">
+                    <ShieldCheck
+                      size={18}
+                      strokeWidth={1.9}
+                      className="
+                        absolute
+                        left-4
+                        top-1/2
+                        -translate-y-1/2
+                        text-[#D96A24]
+                      "
+                    />
+
+                    <input
+                      id="resetCode"
+                      type="text"
+                      value={resetCode}
+                      onChange={(e) =>
+                        setResetCode(
+                          e.target.value
+                            .toUpperCase()
+                            .slice(0, 6)
+                        )
+                      }
+                      placeholder="6 символов"
+                      required
+                      maxLength={6}
+                      autoComplete="one-time-code"
+                      className="
+                        h-13
+                        w-full
+                        rounded-[16px]
+                        border
+                        border-black/[0.08]
+                        bg-white
+                        py-3.5
+                        pl-12
+                        pr-4
+                        text-[15px]
+                        font-semibold
+                        uppercase
+                        tracking-[0.15em]
+                        text-[#171717]
+                        outline-none
+                        transition
+                        placeholder:font-normal
+                        placeholder:normal-case
+                        placeholder:tracking-normal
+                        placeholder:text-black/25
+                        focus:border-[#D96A24]/50
+                        focus:ring-4
+                        focus:ring-[#D96A24]/[0.07]
+                      "
+                    />
+                  </div>
+                </div>
+              )}
+
               {/* Пароль */}
               <div>
                 <label
@@ -465,7 +577,9 @@ export function ParentAuth({
                 >
                   {mode === "login"
                     ? "Пароль"
-                    : "Придумайте пароль"}
+                    : mode === "register"
+                      ? "Придумайте пароль"
+                      : "Новый пароль"}
                 </label>
 
                 <div className="relative">
@@ -560,6 +674,21 @@ export function ParentAuth({
                     )}
                   </button>
                 </div>
+
+                {mode === "login" && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMode("reset");
+                      setError("");
+                      setMessage("");
+                      setPassword("");
+                    }}
+                    className="mt-2 text-sm font-semibold text-[#D96A24]"
+                  >
+                    Забыли пароль?
+                  </button>
+                )}
               </div>
 
               {error && (
@@ -625,7 +754,9 @@ export function ParentAuth({
                   ? "Подождите..."
                   : mode === "login"
                     ? "Войти"
-                    : "Активировать доступ"}
+                    : mode === "register"
+                      ? "Активировать доступ"
+                      : "Сохранить новый пароль"}
               </button>
             </form>
 
@@ -643,6 +774,12 @@ export function ParentAuth({
                 администратор OPEN STARS.
                 Он используется только при
                 первом входе.
+              </p>
+            )}
+
+            {mode === "reset" && (
+              <p className="mt-5 text-center text-xs leading-relaxed text-black/40">
+                Код восстановления выдаёт администратор OPEN STARS. Код действует 60 минут и используется один раз.
               </p>
             )}
           </div>
