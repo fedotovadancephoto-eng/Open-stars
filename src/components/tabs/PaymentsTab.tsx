@@ -1,7 +1,9 @@
-import { AlertCircle, CheckCircle2, Clock3, CreditCard } from "lucide-react";
+import { useEffect, useState } from "react";
+import { AlertCircle, CheckCircle2, Clock3, CreditCard, ExternalLink } from "lucide-react";
 
 import { Card } from "@/components/Card";
-import { payments } from "@/data/demoData";
+import { child, payments } from "@/data/demoData";
+import { fetchParentPaymentLink } from "@/paymentLinkApi";
 
 function monthLabel(value: string) {
   if (!value) return "Период оплаты";
@@ -13,6 +15,20 @@ function monthLabel(value: string) {
 }
 
 export function PaymentsTab() {
+  const [paymentUrl, setPaymentUrl] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetchParentPaymentLink(child.branch).then((url) => {
+      if (!cancelled) setPaymentUrl(url);
+    }).catch(() => {
+      if (!cancelled) setPaymentUrl("");
+    });
+    return () => { cancelled = true; };
+  }, [child.id, child.branch]);
+
+  const canPay = Boolean(paymentUrl) && child.paymentStatus !== "paid";
+
   return (
     <div className="space-y-5">
       <Card className="p-5 sm:p-6">
@@ -20,10 +36,16 @@ export function PaymentsTab() {
           <div>
             <p className="text-[11px] font-bold uppercase tracking-[0.20em] text-black/40">Оплата обучения</p>
             <h2 className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-[#171717]">Статус абонемента</h2>
-            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-black/45">Здесь отображается только статус оплаты. Суммы в родительском кабинете не показываются.</p>
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-black/45">Оплата открывается на защищённой странице банка или платёжного сервиса. После оплаты администратор OPEN STARS вручную подтверждает статус в кабинете.</p>
           </div>
           <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[#5F6338]/10 text-[#4D512E]"><CreditCard className="h-5 w-5" /></div>
         </div>
+        {canPay && (
+          <a href={paymentUrl} target="_blank" rel="noreferrer" className="mt-5 flex w-full items-center justify-center gap-2 rounded-[15px] bg-[#171717] px-5 py-4 text-sm font-semibold text-white shadow-[0_10px_25px_rgba(0,0,0,0.10)] active:scale-[0.99]">
+            <CreditCard className="h-4 w-4" /> Оплатить обучение <ExternalLink className="h-4 w-4 opacity-60" />
+          </a>
+        )}
+        {paymentUrl && child.paymentStatus === "paid" && <div className="mt-5 flex items-center gap-2 rounded-[14px] bg-[#5F6338]/[0.08] px-4 py-3 text-sm font-medium text-[#4D512E]"><CheckCircle2 className="h-4 w-4" /> Оплата отмечена администрацией.</div>}
       </Card>
 
       {payments.length === 0 ? (
