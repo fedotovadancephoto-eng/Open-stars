@@ -120,6 +120,9 @@ export function AdminParentActivationManager() {
   }
 
   async function generateOne(child: AdminChild) {
+    const isReissue = child.activationStatus === "invited";
+    if (isReissue && !window.confirm("Перевыпустить код активации для этого родителя? Старый код сразу перестанет работать, а счётчик неверных попыток будет сброшен.")) return;
+
     setBusyId(child.id);
     setError("");
     try {
@@ -127,7 +130,7 @@ export function AdminParentActivationManager() {
       setCodes((current) => ({ ...current, [child.id]: result }));
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Не удалось создать код.");
+      setError(e instanceof Error ? e.message : isReissue ? "Не удалось перевыпустить код." : "Не удалось создать код.");
     } finally {
       setBusyId("");
     }
@@ -141,7 +144,7 @@ export function AdminParentActivationManager() {
       const result = await generateBulkParentActivationCodes(branch || undefined);
       setBulkRows(result);
       await load();
-      if (result.length === 0) setError("В выбранном филиале нет неактивированных родителей.");
+      if (result.length === 0) setError("В выбранном филиале нет родителей без действующего кода активации.");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Не удалось создать коды.");
     } finally {
@@ -176,7 +179,7 @@ export function AdminParentActivationManager() {
           <div>
             <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#D96A24]">OPEN STARS ADMIN</p>
             <h2 className="mt-1 text-2xl font-semibold">Активация родителей</h2>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-black/45">Код нужен только один раз. Родитель вводит номер + код, задаёт свой пароль и дальше входит по номеру и паролю без SMS.</p>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-black/45">Код нужен только один раз. Родитель вводит номер + код, задаёт свой пароль и дальше входит по номеру и паролю без SMS. Если код потерян или исчерпаны попытки, используйте «Перевыпустить код» — старый код сразу станет недействительным.</p>
           </div>
           <button type="button" onClick={() => setOpen(false)} className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white"><X size={20}/></button>
         </div>
@@ -189,9 +192,10 @@ export function AdminParentActivationManager() {
               </select>
             </label>
             <button type="button" onClick={generateBulk} disabled={bulkBusy} className="flex min-h-[46px] flex-1 items-center justify-center gap-2 rounded-[13px] bg-[#D96A24] px-4 py-3 text-sm font-semibold text-white disabled:opacity-50">
-              {bulkBusy ? <LoaderCircle className="animate-spin" size={17}/> : <UsersRound size={17}/>} Сгенерировать коды всем неактивированным
+              {bulkBusy ? <LoaderCircle className="animate-spin" size={17}/> : <UsersRound size={17}/>} Сгенерировать коды тем, у кого их ещё нет
             </button>
           </div>
+          <p className="mt-2 text-xs leading-5 text-black/35">Массовая выдача не меняет уже действующие коды. Перевыпуск выполняется только вручную для конкретного родителя.</p>
 
           {bulkRows.length > 0 && <div className="mt-4 rounded-[18px] bg-[#FAF9F5] p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -220,12 +224,13 @@ export function AdminParentActivationManager() {
             {visible.map((child) => {
               const result = codes[child.id];
               const active = child.activationStatus === "active";
+              const invited = child.activationStatus === "invited";
               return <div key={child.id} className="rounded-[16px] border border-black/[0.055] p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div><p className="font-semibold">{child.fullName}</p><p className="mt-1 text-xs text-black/40">{child.parentName || "Родитель"} · {child.parentPhone || "телефон не указан"} · {child.groupName}</p><p className={`mt-1 text-[11px] font-semibold ${active ? "text-[#4D512E]" : "text-[#C95320]"}`}>{active ? "Кабинет активирован" : child.activationStatus === "invited" ? "Код уже выдавался — можно создать новый" : "Кабинет не активирован"}</p></div>
-                  {active ? <span className="rounded-full bg-[#5F6338]/10 px-3 py-2 text-xs font-semibold text-[#4D512E]">Активирован</span> : <button type="button" disabled={busyId === child.id} onClick={() => generateOne(child)} className="flex shrink-0 items-center justify-center gap-1.5 rounded-[12px] bg-[#171717] px-3.5 py-2.5 text-xs font-semibold text-white disabled:opacity-50">{busyId === child.id ? <LoaderCircle className="animate-spin" size={14}/> : child.activationStatus === "invited" ? <RefreshCw size={14}/> : <KeyRound size={14}/>} {child.activationStatus === "invited" ? "Новый код" : "Сгенерировать код"}</button>}
+                  <div><p className="font-semibold">{child.fullName}</p><p className="mt-1 text-xs text-black/40">{child.parentName || "Родитель"} · {child.parentPhone || "телефон не указан"} · {child.groupName}</p><p className={`mt-1 text-[11px] font-semibold ${active ? "text-[#4D512E]" : "text-[#C95320]"}`}>{active ? "Кабинет активирован" : invited ? "Код уже выдавался — при необходимости его можно перевыпустить" : "Кабинет не активирован"}</p></div>
+                  {active ? <span className="rounded-full bg-[#5F6338]/10 px-3 py-2 text-xs font-semibold text-[#4D512E]">Активирован</span> : <button type="button" disabled={busyId === child.id} onClick={() => generateOne(child)} className="flex shrink-0 items-center justify-center gap-1.5 rounded-[12px] bg-[#171717] px-3.5 py-2.5 text-xs font-semibold text-white disabled:opacity-50">{busyId === child.id ? <LoaderCircle className="animate-spin" size={14}/> : invited ? <RefreshCw size={14}/> : <KeyRound size={14}/>} {invited ? "Перевыпустить код" : "Сгенерировать код"}</button>}
                 </div>
-                {result && <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-[13px] bg-[#F2F0E8] px-3.5 py-3"><div><p className="text-[10px] font-bold uppercase tracking-wide text-black/35">Код активации</p><p className="mt-0.5 text-xl font-bold tracking-[0.12em]">{result.activationCode}</p><p className="mt-1 text-[10px] text-black/35">Действует до {dateLabel(result.expiresAt)}</p></div><button type="button" onClick={() => copyCode(child.id, result.activationCode)} className="flex items-center gap-1.5 rounded-[11px] bg-white px-3 py-2 text-xs font-semibold">{copied === child.id ? <Check size={14}/> : <Clipboard size={14}/>} {copied === child.id ? "Скопировано" : "Копировать"}</button></div>}
+                {result && <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-[13px] bg-[#F2F0E8] px-3.5 py-3"><div><p className="text-[10px] font-bold uppercase tracking-wide text-black/35">{invited ? "Новый код активации" : "Код активации"}</p><p className="mt-0.5 text-xl font-bold tracking-[0.12em]">{result.activationCode}</p><p className="mt-1 text-[10px] text-black/35">Действует до {dateLabel(result.expiresAt)}</p></div><button type="button" onClick={() => copyCode(child.id, result.activationCode)} className="flex items-center gap-1.5 rounded-[11px] bg-white px-3 py-2 text-xs font-semibold">{copied === child.id ? <Check size={14}/> : <Clipboard size={14}/>} {copied === child.id ? "Скопировано" : "Копировать"}</button></div>}
               </div>;
             })}
           </div>}
