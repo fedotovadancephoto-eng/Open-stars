@@ -40,6 +40,12 @@ import { fetchAcademicContext } from "@/admin/academicApi";
 import { updatePendingParentPhone } from "@/admin/parentPhoneApi";
 import { ADMIN_DATA_UPDATED_EVENT, openAdminSection } from "@/admin/adminNavigation";
 import { administratorForBranch } from "@/admin/branchAdministrators";
+import {
+  ACQUISITION_SOURCES,
+  AcquisitionSource,
+  fetchChildInternalProfile,
+  saveChildInternalProfile,
+} from "@/admin/childInternalProfileApi";
 import { STAFF_VIEW_MODE_EVENT, STAFF_VIEW_MODE_KEY } from "@/admin/StaffModeSwitch";
 import { StaffAuth } from "@/admin/StaffAuth";
 import { Logo } from "@/components/Logo";
@@ -128,6 +134,10 @@ function StudentDetails({
   const [error, setError] = useState("");
   const [parentName, setParentName] = useState(child.parentName);
   const [parentPhone, setParentPhone] = useState(child.parentPhone);
+  const [heightCm, setHeightCm] = useState("");
+  const [acquisitionSource, setAcquisitionSource] = useState<AcquisitionSource | "">("");
+  const [acquisitionSourceNote, setAcquisitionSourceNote] = useState("");
+  const [internalLoading, setInternalLoading] = useState(!teacherView);
   const [form, setForm] = useState<ChildUpdateInput>({
     firstName: child.firstName,
     lastName: child.lastName,
@@ -157,6 +167,37 @@ function StudentDetails({
   }, [child]);
 
   useEffect(() => {
+    let active = true;
+    if (teacherView) {
+      setHeightCm("");
+      setAcquisitionSource("");
+      setAcquisitionSourceNote("");
+      setInternalLoading(false);
+      return () => { active = false; };
+    }
+
+    setInternalLoading(true);
+    fetchChildInternalProfile(child.id)
+      .then((profile) => {
+        if (!active) return;
+        setHeightCm(profile.heightCm ? String(profile.heightCm) : "");
+        setAcquisitionSource(profile.acquisitionSource);
+        setAcquisitionSourceNote(profile.acquisitionSourceNote);
+      })
+      .catch(() => {
+        if (!active) return;
+        setHeightCm("");
+        setAcquisitionSource("");
+        setAcquisitionSourceNote("");
+      })
+      .finally(() => {
+        if (active) setInternalLoading(false);
+      });
+
+    return () => { active = false; };
+  }, [child.id, teacherView]);
+
+  useEffect(() => {
     const handler = (event: Event) => {
       const detail = (event as CustomEvent<{ childId?: string; photoUrl?: string }>).detail;
       if (detail?.childId !== child.id || !detail?.photoUrl) return;
@@ -184,6 +225,11 @@ function StudentDetails({
     setError("");
     try {
       await updateAdminChild(child.id, { ...form, administratorName: administratorForBranch(form.branch) });
+      await saveChildInternalProfile(child.id, {
+        heightCm,
+        acquisitionSource,
+        acquisitionSourceNote,
+      });
       if (child.parentProfileId && parentName.trim() !== child.parentName.trim()) {
         await updateParentDisplayName(child.parentProfileId, parentName);
       }
@@ -219,6 +265,12 @@ function StudentDetails({
                 <label className="text-xs font-semibold text-black/55">Фамилия<input className={inputClass} value={form.lastName} onChange={(e) => field("lastName", e.target.value)} /></label>
               </div>
               <label className="mt-3 block text-xs font-semibold text-black/55">Дата рождения · нужна для поздравления +10 Star Coin<input type="date" className={inputClass} value={form.birthDate} onChange={(e) => field("birthDate", e.target.value)} /></label>
+              <div className="mt-3 grid grid-cols-2 gap-3">
+                <label className="text-xs font-semibold text-black/55">Рост, см<input inputMode="numeric" type="number" min={40} max={230} className={inputClass} value={heightCm} onChange={(e) => setHeightCm(e.target.value)} placeholder="Например, 146" /></label>
+                <label className="text-xs font-semibold text-black/55">Откуда пришёл<select className={inputClass} value={acquisitionSource} onChange={(e) => setAcquisitionSource(e.target.value as AcquisitionSource | "")}><option value="">Не указано</option>{ACQUISITION_SOURCES.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
+              </div>
+              {acquisitionSource === "Другое" && <label className="mt-3 block text-xs font-semibold text-black/55">Уточните источник *<input className={inputClass} value={acquisitionSourceNote} onChange={(e) => setAcquisitionSourceNote(e.target.value)} maxLength={500} placeholder="Например, увидели выступление в ТРЦ" /></label>}
+              <p className="mt-3 text-[11px] leading-5 text-[#4D512E]">Рост и источник клиента — внутренние данные команды. Родителю и в режиме педагога они не показываются.</p>
               <div className="mt-4 rounded-[16px] bg-[#FAF9F5] p-4">
                 <p className="text-xs font-semibold text-black/55">Фото ребёнка</p>
                 <div className="mt-3 flex items-center gap-3">
@@ -249,7 +301,7 @@ function StudentDetails({
             {error && <div className="rounded-[16px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
             <div className="flex gap-3 pb-6">
               <button type="button" onClick={() => setEditing(false)} disabled={saving} className="flex-1 rounded-[14px] border border-black/[0.08] bg-white px-4 py-3.5 text-sm font-semibold text-black/60">Отмена</button>
-              <button type="button" onClick={saveChanges} disabled={saving} className="flex flex-1 items-center justify-center gap-2 rounded-[14px] bg-[#171717] px-4 py-3.5 text-sm font-semibold text-white disabled:opacity-50">{saving ? <LoaderCircle className="animate-spin" size={17} /> : <Save size={17} />} Сохранить</button>
+              <button type="button" onClick={saveChanges} disabled={saving || internalLoading} className="flex flex-1 items-center justify-center gap-2 rounded-[14px] bg-[#171717] px-4 py-3.5 text-sm font-semibold text-white disabled:opacity-50">{saving ? <LoaderCircle className="animate-spin" size={17} /> : <Save size={17} />} Сохранить</button>
             </div>
           </div>
         ) : (
@@ -263,6 +315,8 @@ function StudentDetails({
             </div>
 
             {!teacherView && <div className="mt-4 grid grid-cols-2 gap-3"><div className="rounded-[20px] border border-black/[0.06] bg-white p-4"><p className="text-xs text-black/40">Star Coin</p><p className="mt-1 text-2xl font-semibold text-[#171717]">{child.coins}</p></div><div className="rounded-[20px] border border-black/[0.06] bg-white p-4"><p className="text-xs text-black/40">Оплата</p><p className="mt-1 text-sm font-semibold text-[#171717]">{paymentLabels[child.paymentStatus] || "Статус не указан"}</p></div></div>}
+
+            {!teacherView && <div className="mt-4 rounded-[24px] border border-black/[0.06] bg-white p-5"><p className="text-[11px] font-bold uppercase tracking-[0.18em] text-black/35">Внутренние данные</p>{internalLoading ? <div className="mt-4 flex items-center gap-2 text-sm text-black/35"><LoaderCircle className="animate-spin" size={16} /> Загрузка...</div> : <div className="mt-4 grid grid-cols-2 gap-3"><div className="rounded-[15px] bg-[#FAF9F5] p-3"><p className="text-[11px] text-black/35">Рост</p><p className="mt-1 text-sm font-semibold">{heightCm ? `${heightCm} см` : "Не указан"}</p></div><div className="rounded-[15px] bg-[#FAF9F5] p-3"><p className="text-[11px] text-black/35">Откуда пришёл</p><p className="mt-1 text-sm font-semibold">{acquisitionSource || "Не указано"}</p>{acquisitionSource === "Другое" && acquisitionSourceNote && <p className="mt-1 text-xs leading-5 text-black/45">{acquisitionSourceNote}</p>}</div></div>}</div>}
 
             {(child.administratorName || administratorForBranch(child.branch)) && <div className="mt-4 rounded-[24px] border border-black/[0.06] bg-white p-5"><p className="text-[11px] font-bold uppercase tracking-[0.18em] text-black/35">Администратор филиала</p><p className="mt-3 font-semibold text-[#171717]">{child.administratorName || administratorForBranch(child.branch)}</p></div>}
 
