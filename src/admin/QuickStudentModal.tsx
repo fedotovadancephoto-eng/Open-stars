@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
 import { LoaderCircle, Plus, Save, X } from "lucide-react";
 
-import {
-  BranchName,
-  GroupName,
-  QuickStudentInput,
-  quickCreateStudent,
-} from "@/admin/adminApi";
+import { BranchName, GroupName } from "@/admin/adminApi";
 import { administratorForBranch } from "@/admin/branchAdministrators";
+import {
+  ACQUISITION_SOURCES,
+  AcquisitionSource,
+  QuickStudentWithInternalInput,
+  quickCreateStudentWithInternalProfile,
+} from "@/admin/childInternalProfileApi";
 import { getCurrentStaffScope } from "@/admin/staffScopeApi";
 
 const branches: BranchName[] = ["Свердловский", "НЛО", "Октябрьский"];
@@ -17,7 +18,7 @@ const days = ["Суббота", "Воскресенье"];
 
 const inputClass = "mt-1.5 w-full rounded-[13px] border border-black/[0.08] bg-[#FAF9F5] px-3.5 py-3 text-sm text-[#171717] outline-none placeholder:text-black/25 focus:border-[#D96A24]/45 focus:ring-4 focus:ring-[#D96A24]/[0.06]";
 
-const emptyForm: QuickStudentInput = {
+const emptyForm: QuickStudentWithInternalInput = {
   firstName: "",
   lastName: "",
   parentName: "",
@@ -28,6 +29,9 @@ const emptyForm: QuickStudentInput = {
   lessonDay: "",
   lessonTime: "",
   photoUrl: "",
+  heightCm: "",
+  acquisitionSource: "",
+  acquisitionSourceNote: "",
 };
 
 export function QuickStudentModal({
@@ -37,7 +41,7 @@ export function QuickStudentModal({
   onClose: () => void;
   onCreated: (addNext: boolean) => Promise<void>;
 }) {
-  const [form, setForm] = useState<QuickStudentInput>(emptyForm);
+  const [form, setForm] = useState<QuickStudentWithInternalInput>(emptyForm);
   const [fixedBranch, setFixedBranch] = useState<BranchName | "">("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -55,7 +59,7 @@ export function QuickStudentModal({
     return () => { active = false; };
   }, []);
 
-  function field<K extends keyof QuickStudentInput>(key: K, value: QuickStudentInput[K]) {
+  function field<K extends keyof QuickStudentWithInternalInput>(key: K, value: QuickStudentWithInternalInput[K]) {
     setForm((current) => ({ ...current, [key]: value }));
     setError("");
     setSuccess("");
@@ -66,7 +70,7 @@ export function QuickStudentModal({
     setError("");
     setSuccess("");
     try {
-      await quickCreateStudent(form);
+      await quickCreateStudentWithInternalProfile(form);
 
       if (addNext) {
         setSuccess(`${form.firstName} ${form.lastName} добавлен(а). Можно вводить следующего.`);
@@ -98,7 +102,7 @@ export function QuickStudentModal({
           <div>
             <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#D96A24]">Быстрый ввод</p>
             <h2 className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-[#171717]">Добавить ученика</h2>
-            <p className="mt-2 text-sm leading-6 text-black/45">Обязательны только ребёнок, родитель, телефон, филиал и группа. Остальное можно заполнить позже.</p>
+            <p className="mt-2 text-sm leading-6 text-black/45">Обязательны только ребёнок, родитель, телефон, филиал и группа. Рост и источник — внутренние данные команды, их можно заполнить сразу или позже.</p>
           </div>
           <button type="button" onClick={onClose} className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white text-black/55 shadow-sm" aria-label="Закрыть"><X size={20} /></button>
         </div>
@@ -124,8 +128,18 @@ export function QuickStudentModal({
           <label className="text-xs font-semibold text-black/55">День занятий<select className={inputClass} value={form.lessonDay} onChange={(e) => field("lessonDay", e.target.value)}><option value="">Заполнить позже</option>{days.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
           <label className="text-xs font-semibold text-black/55">Время группы<select className={inputClass} value={form.lessonTime} onChange={(e) => field("lessonTime", e.target.value)}><option value="">Заполнить позже</option>{times.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
           <label className="text-xs font-semibold text-black/55">Дата рождения<input type="date" className={inputClass} value={form.birthDate} onChange={(e) => field("birthDate", e.target.value)} /></label>
+          <label className="text-xs font-semibold text-black/55">Рост, см<input inputMode="numeric" type="number" min={40} max={230} className={inputClass} value={form.heightCm || ""} onChange={(e) => field("heightCm", e.target.value)} placeholder="Например, 146" /></label>
+          <label className="text-xs font-semibold text-black/55">Откуда пришёл
+            <select className={inputClass} value={form.acquisitionSource || ""} onChange={(e) => field("acquisitionSource", e.target.value as AcquisitionSource | "")}>
+              <option value="">Заполнить позже</option>
+              {ACQUISITION_SOURCES.map((item) => <option key={item} value={item}>{item}</option>)}
+            </select>
+          </label>
           <label className="text-xs font-semibold text-black/55">Администратор<input className={`${inputClass} cursor-not-allowed bg-[#F0EEE5]`} value={administrator} readOnly placeholder="Подставится по филиалу" /></label>
+          {form.acquisitionSource === "Другое" && <label className="text-xs font-semibold text-black/55 sm:col-span-2">Уточните источник *<input className={inputClass} value={form.acquisitionSourceNote || ""} onChange={(e) => field("acquisitionSourceNote", e.target.value)} placeholder="Например, увидели выступление в ТРЦ" maxLength={500} /></label>}
         </div>
+
+        <div className="mt-4 rounded-[15px] bg-[#5F6338]/[0.06] px-4 py-3 text-xs leading-5 text-[#4D512E]">Рост и источник клиента — служебные поля. Родители и педагогический режим их не видят.</div>
 
         {error && <div className="mt-5 rounded-[15px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
         {success && <div className="mt-5 rounded-[15px] border border-[#5F6338]/15 bg-[#5F6338]/[0.07] px-4 py-3 text-sm font-medium text-[#4D512E]">{success}</div>}
