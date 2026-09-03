@@ -1,5 +1,6 @@
 import AdminApp from "@/admin/AdminApp";
 import { AdminCoinManager } from "@/admin/AdminCoinManager";
+import { AdminExpenseManager } from "@/admin/AdminExpenseManager";
 import { AdminFeedbackManager } from "@/admin/AdminFeedbackManager";
 import { AdminNewsManager } from "@/admin/AdminNewsManager";
 import { AdminParentActivationManager } from "@/admin/AdminParentActivationManager";
@@ -13,6 +14,7 @@ import { AdminStudentOperations } from "@/admin/AdminStudentOperations";
 import { AdminStudyManager } from "@/admin/AdminStudyManager";
 import { AdminTopMenu } from "@/admin/AdminTopMenu";
 import { ChildPhotoUpload } from "@/admin/ChildPhotoUpload";
+import { OwnerBusinessDashboard } from "@/admin/OwnerBusinessDashboard";
 import { StaffModeSwitch } from "@/admin/StaffModeSwitch";
 
 export default function AdminWorkspace() {
@@ -34,6 +36,8 @@ export default function AdminWorkspace() {
       <AdminPhotoSessionManager />
       <AdminStaffManager />
       <AdminReportExport />
+      <AdminExpenseManager />
+      <OwnerBusinessDashboard />
     </>
   );
 }
