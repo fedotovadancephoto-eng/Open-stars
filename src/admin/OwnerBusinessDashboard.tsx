@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Check, FileText, LoaderCircle, RefreshCw, WalletCards, X, XCircle } from "lucide-react";
+import { Check, FileText, LoaderCircle, Pencil, RefreshCw, Target, TrendingDown, TrendingUp, WalletCards, X, XCircle } from "lucide-react";
 
 import { onAdminSection } from "@/admin/adminNavigation";
 import {
@@ -10,6 +10,7 @@ import {
   openExpenseReceipt,
   rejectExpense,
 } from "@/admin/businessApi";
+import { BranchGoal, fetchOwnerBranchGoals, setOwnerBranchTarget } from "@/admin/businessGoalsApi";
 
 function money(value: number) {
   return new Intl.NumberFormat("ru-RU", { style: "currency", currency: "RUB", maximumFractionDigits: 0 }).format(value || 0);
@@ -88,42 +89,59 @@ function PendingExpenseCard({
   );
 }
 
+function GoalCard({ goal, busy, onEdit }: { goal: BranchGoal; busy: boolean; onEdit: (goal: BranchGoal) => void }) {
+  const width = Math.min(Math.max(goal.progress, 0), 100);
+  const complete = goal.activeStudents >= goal.target;
+  return (
+    <article className="rounded-[22px] border border-black/[0.05] bg-white p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div><p className="text-xs font-semibold text-black/40">{goal.branch}</p><p className="mt-2 text-3xl font-semibold tracking-[-0.05em]">{goal.activeStudents} <span className="text-lg text-black/25">/ {goal.target}</span></p></div>
+        <button type="button" disabled={busy} onClick={() => onEdit(goal)} className="grid h-9 w-9 place-items-center rounded-full bg-[#FAF9F5] text-black/45 disabled:opacity-50" title="Изменить цель"><Pencil size={15} /></button>
+      </div>
+      <div className="mt-4 h-2 overflow-hidden rounded-full bg-black/[0.06]"><div className="h-full rounded-full bg-[#5F6338] transition-all" style={{ width: `${width}%` }} /></div>
+      <div className="mt-3 flex items-center justify-between gap-3 text-xs">
+        <span className={complete ? "font-semibold text-[#4D512E]" : "text-[#C95320]"}>{complete ? (goal.overTarget > 0 ? `+${goal.overTarget} сверх цели` : "Цель выполнена ✓") : `Не хватает ${goal.missing}`}</span>
+        <span className="font-semibold text-black/35">{Math.round(goal.progress)}%</span>
+      </div>
+    </article>
+  );
+}
+
 export function OwnerBusinessDashboard() {
   const [open, setOpen] = useState(false);
   const [context, setContext] = useState<BusinessExpenseContext | null>(null);
+  const [goals, setGoals] = useState<BranchGoal[]>([]);
+  const [branchFilter, setBranchFilter] = useState("Все филиалы");
   const [loading, setLoading] = useState(false);
   const [busyId, setBusyId] = useState("");
+  const [goalBusy, setGoalBusy] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
   async function refresh() {
-    const next = await fetchBusinessExpenseContext();
+    const [next, nextGoals] = await Promise.all([fetchBusinessExpenseContext(), fetchOwnerBranchGoals()]);
     if (next.role !== "owner") throw new Error("Бизнес-финансы доступны только владельцу.");
     setContext(next);
+    setGoals(nextGoals);
     return next;
   }
 
-  useEffect(() =>
-    onAdminSection("business", () => {
-      setOpen(true);
-      setError("");
-      setSuccess("");
-      setLoading(true);
-      void refresh()
-        .catch((reason) => setError(reason instanceof Error ? reason.message : "Не удалось открыть бизнес-панель."))
-        .finally(() => setLoading(false));
-    }), []);
+  useEffect(() => onAdminSection("business", () => {
+    setOpen(true);
+    setError("");
+    setSuccess("");
+    setLoading(true);
+    void refresh().catch((reason) => setError(reason instanceof Error ? reason.message : "Не удалось открыть бизнес-панель.")).finally(() => setLoading(false));
+  }), []);
 
-  const pending = useMemo(() => (context?.requests || []).filter((item) => item.status === "submitted"), [context]);
+  const requests = useMemo(() => (context?.requests || []).filter((item) => branchFilter === "Все филиалы" || item.branchName === branchFilter), [context, branchFilter]);
+  const cashflow = useMemo(() => (context?.cashflow || []).filter((item) => branchFilter === "Все филиалы" || item.branchName === branchFilter), [context, branchFilter]);
+  const pending = useMemo(() => requests.filter((item) => item.status === "submitted"), [requests]);
   const pendingAmount = useMemo(() => pending.reduce((sum, item) => sum + item.amount, 0), [pending]);
-  const approvedThisMonth = useMemo(() => {
-    const start = monthStartIso();
-    return (context?.requests || []).filter((item) => item.status === "approved" && item.expenseDate >= start).reduce((sum, item) => sum + item.amount, 0);
-  }, [context]);
-  const cashflowExpenseThisMonth = useMemo(() => {
-    const start = monthStartIso();
-    return (context?.cashflow || []).filter((item) => item.direction === "expense" && item.transactionDate >= start).reduce((sum, item) => sum + item.amount, 0);
-  }, [context]);
+  const monthStart = monthStartIso();
+  const incomeThisMonth = useMemo(() => cashflow.filter((item) => item.direction === "income" && item.transactionDate >= monthStart).reduce((sum, item) => sum + item.amount, 0), [cashflow, monthStart]);
+  const expenseThisMonth = useMemo(() => cashflow.filter((item) => item.direction === "expense" && item.transactionDate >= monthStart).reduce((sum, item) => sum + item.amount, 0), [cashflow, monthStart]);
+  const netCashflow = incomeThisMonth - expenseThisMonth;
 
   async function processApprove(expense: ExpenseRequest, accountId: string, comment: string) {
     setBusyId(expense.id);
@@ -166,58 +184,78 @@ export function OwnerBusinessDashboard() {
     }
   }
 
+  async function editGoal(goal: BranchGoal) {
+    const raw = window.prompt(`Цель по ученикам · ${goal.branch}`, String(goal.target));
+    if (raw === null) return;
+    const target = Number(raw.replace(/\s/g, ""));
+    if (!Number.isInteger(target) || target <= 0) return setError("Цель должна быть целым числом больше нуля.");
+    setGoalBusy(true);
+    setError("");
+    setSuccess("");
+    try {
+      await setOwnerBranchTarget(goal.branchId, target);
+      await refresh();
+      setSuccess(`Цель ${goal.branch} обновлена: ${target} учеников.`);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Не удалось изменить цель.");
+    } finally {
+      setGoalBusy(false);
+    }
+  }
+
   if (!open) return null;
 
+  const branchOptions = ["Все филиалы", ...(context?.branches.map((item) => item.name) || [])];
+
   return (
-    <div className="fixed inset-0 z-[85] flex items-end justify-center bg-black/35 backdrop-blur-[2px] sm:items-center sm:p-5" onClick={() => !busyId && setOpen(false)}>
+    <div className="fixed inset-0 z-[85] flex items-end justify-center bg-black/35 backdrop-blur-[2px] sm:items-center sm:p-5" onClick={() => !busyId && !goalBusy && setOpen(false)}>
       <div className="max-h-[96vh] w-full max-w-7xl overflow-y-auto rounded-t-[30px] bg-[#F7F5EF] p-5 shadow-2xl sm:rounded-[30px] sm:p-7" onClick={(event) => event.stopPropagation()}>
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#D96A24]">OPEN STARS · OWNER</p>
             <h2 className="mt-1 text-2xl font-semibold tracking-[-0.03em]">Бизнес</h2>
-            <p className="mt-2 text-sm text-black/45">Первая версия кабинета владельца: расходы на подтверждение и автоматический ДДС.</p>
+            <p className="mt-2 text-sm text-black/45">Три филиала работают отдельно. Ваш ДДС — один общий, с разрезом по филиалам.</p>
           </div>
           <div className="flex gap-2">
-            <button type="button" disabled={loading || Boolean(busyId)} onClick={() => { setLoading(true); void refresh().catch((reason) => setError(reason instanceof Error ? reason.message : "Не удалось обновить данные.")).finally(() => setLoading(false)); }} className="grid h-10 w-10 place-items-center rounded-full bg-white shadow-sm disabled:opacity-50"><RefreshCw size={18} className={loading ? "animate-spin" : ""} /></button>
+            <button type="button" disabled={loading || Boolean(busyId) || goalBusy} onClick={() => { setLoading(true); void refresh().catch((reason) => setError(reason instanceof Error ? reason.message : "Не удалось обновить данные.")).finally(() => setLoading(false)); }} className="grid h-10 w-10 place-items-center rounded-full bg-white shadow-sm disabled:opacity-50"><RefreshCw size={18} className={loading ? "animate-spin" : ""} /></button>
             <button type="button" onClick={() => setOpen(false)} className="grid h-10 w-10 place-items-center rounded-full bg-white shadow-sm"><X size={20} /></button>
           </div>
         </div>
 
-        {loading && !context ? (
-          <div className="grid min-h-[420px] place-items-center"><LoaderCircle className="animate-spin text-black/25" size={30} /></div>
-        ) : (
+        {loading && !context ? <div className="grid min-h-[420px] place-items-center"><LoaderCircle className="animate-spin text-black/25" size={30} /></div> : (
           <>
-            <div className="mt-6 grid gap-3 sm:grid-cols-3">
-              <div className="rounded-[22px] border border-black/[0.05] bg-white p-5"><p className="text-xs font-semibold text-black/40">Ожидает подтверждения</p><p className="mt-2 text-3xl font-semibold tracking-[-0.05em]">{money(pendingAmount)}</p><p className="mt-2 text-xs text-[#C95320]">{pending.length} {pending.length === 1 ? "расход" : "расходов"}</p></div>
-              <div className="rounded-[22px] border border-black/[0.05] bg-white p-5"><p className="text-xs font-semibold text-black/40">Подтверждено за месяц</p><p className="mt-2 text-3xl font-semibold tracking-[-0.05em]">{money(approvedThisMonth)}</p><p className="mt-2 text-xs text-[#4D512E]">по заявкам сотрудников</p></div>
-              <div className="rounded-[22px] border border-black/[0.05] bg-[#171717] p-5 text-white"><div className="flex items-center gap-2 text-white/55"><WalletCards size={16} /><p className="text-xs font-semibold">Расходы ДДС за месяц</p></div><p className="mt-2 text-3xl font-semibold tracking-[-0.05em]">{money(cashflowExpenseThisMonth)}</p><p className="mt-2 text-xs text-white/40">owner-only данные</p></div>
+            <div className="mt-5 flex flex-wrap gap-2">
+              {branchOptions.map((branch) => <button key={branch} type="button" onClick={() => setBranchFilter(branch)} className={`rounded-full px-3.5 py-2 text-xs font-semibold transition ${branchFilter === branch ? "bg-[#171717] text-white" : "bg-white text-black/50"}`}>{branch}</button>)}
             </div>
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="rounded-[22px] border border-black/[0.05] bg-white p-5"><div className="flex items-center gap-2 text-[#4D512E]"><TrendingUp size={16} /><p className="text-xs font-semibold">Поступления за месяц</p></div><p className="mt-2 text-3xl font-semibold tracking-[-0.05em]">{money(incomeThisMonth)}</p><p className="mt-2 text-xs text-black/35">{branchFilter}</p></div>
+              <div className="rounded-[22px] border border-black/[0.05] bg-white p-5"><div className="flex items-center gap-2 text-red-600"><TrendingDown size={16} /><p className="text-xs font-semibold">Расходы за месяц</p></div><p className="mt-2 text-3xl font-semibold tracking-[-0.05em]">{money(expenseThisMonth)}</p><p className="mt-2 text-xs text-black/35">подтверждённые операции</p></div>
+              <div className="rounded-[22px] border border-black/[0.05] bg-[#171717] p-5 text-white"><div className="flex items-center gap-2 text-white/55"><WalletCards size={16} /><p className="text-xs font-semibold">Денежный поток месяца</p></div><p className="mt-2 text-3xl font-semibold tracking-[-0.05em]">{money(netCashflow)}</p><p className="mt-2 text-xs text-white/40">поступления − расходы, не бухгалтерская прибыль</p></div>
+              <div className="rounded-[22px] border border-black/[0.05] bg-white p-5"><p className="text-xs font-semibold text-black/40">Ожидает подтверждения</p><p className="mt-2 text-3xl font-semibold tracking-[-0.05em]">{money(pendingAmount)}</p><p className="mt-2 text-xs text-[#C95320]">{pending.length} {pending.length === 1 ? "расход" : "расходов"}</p></div>
+            </div>
+
+            <section className="mt-6">
+              <div className="flex items-center gap-2"><Target size={18} className="text-[#D96A24]" /><div><p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#D96A24]">Наполняемость</p><h3 className="mt-0.5 text-xl font-semibold">Цель по ученикам</h3></div></div>
+              <div className="mt-4 grid gap-3 md:grid-cols-3">{goals.map((goal) => <GoalCard key={goal.branchId} goal={goal} busy={goalBusy} onEdit={(item) => void editGoal(item)} />)}</div>
+            </section>
 
             <div className="mt-6 grid gap-5 lg:grid-cols-[1.05fr_0.95fr]">
               <section>
                 <div className="flex items-end justify-between"><div><p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#D96A24]">Требует внимания</p><h3 className="mt-1 text-xl font-semibold">На подтверждение</h3></div><span className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-black/45">{pending.length}</span></div>
-                {pending.length === 0 ? (
-                  <div className="mt-4 grid min-h-[260px] place-items-center rounded-[24px] border border-black/[0.05] bg-white text-center"><div><Check className="mx-auto text-[#5F6338]" size={28} /><p className="mt-3 font-semibold">Все расходы обработаны</p><p className="mt-1 text-sm text-black/40">Новых заявок от филиалов нет.</p></div></div>
-                ) : (
-                  <div className="mt-4 space-y-3">{pending.map((expense) => <PendingExpenseCard key={expense.id} expense={expense} accounts={context?.accounts || []} busy={busyId === expense.id} onApprove={(item, accountId, comment) => void processApprove(item, accountId, comment)} onReject={(item, comment) => void processReject(item, comment)} onOpenReceipt={(item) => void openReceipt(item)} />)}</div>
-                )}
+                {pending.length === 0 ? <div className="mt-4 grid min-h-[260px] place-items-center rounded-[24px] border border-black/[0.05] bg-white text-center"><div><Check className="mx-auto text-[#5F6338]" size={28} /><p className="mt-3 font-semibold">Все расходы обработаны</p><p className="mt-1 text-sm text-black/40">Новых заявок по выбранному фильтру нет.</p></div></div> : <div className="mt-4 space-y-3">{pending.map((expense) => <PendingExpenseCard key={expense.id} expense={expense} accounts={context?.accounts || []} busy={busyId === expense.id} onApprove={(item, accountId, comment) => void processApprove(item, accountId, comment)} onReject={(item, comment) => void processReject(item, comment)} onOpenReceipt={(item) => void openReceipt(item)} />)}</div>}
               </section>
 
               <section className="rounded-[26px] border border-black/[0.05] bg-white p-5 sm:p-6">
-                <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-black/35">ДДС</p>
+                <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-black/35">Единый ДДС</p>
                 <h3 className="mt-1 text-xl font-semibold">Последние операции</h3>
-                <p className="mt-2 text-sm leading-6 text-black/40">Сюда расход попадает только после вашего подтверждения. Сотрудники этот список не видят.</p>
-                {(context?.cashflow || []).length === 0 ? (
-                  <div className="grid min-h-[260px] place-items-center text-center text-sm text-black/35">Операций ДДС пока нет.</div>
-                ) : (
+                <p className="mt-2 text-sm leading-6 text-black/40">Оплаты детей и подтверждённые расходы всех филиалов сходятся сюда автоматически. Филиал сохраняется у каждой операции.</p>
+                {cashflow.length === 0 ? <div className="grid min-h-[260px] place-items-center text-center text-sm text-black/35">Операций по выбранному фильтру пока нет.</div> : (
                   <div className="mt-4 max-h-[620px] divide-y divide-black/[0.06] overflow-y-auto">
-                    {context?.cashflow.slice(0, 60).map((item) => (
-                      <div key={item.id} className="py-4">
-                        <div className="flex items-start justify-between gap-3"><div><p className="text-sm font-semibold">{item.categoryName || "Расход"}</p><p className="mt-1 text-xs text-black/40">{item.branchName} · {dateLabel(item.transactionDate)}</p></div><p className="shrink-0 font-semibold text-red-600">− {money(item.amount)}</p></div>
-                        {item.description && <p className="mt-2 text-xs leading-5 text-black/45">{item.description}</p>}
-                        {item.accountName && <p className="mt-1 text-[11px] text-black/30">{item.accountName}</p>}
-                      </div>
-                    ))}
+                    {cashflow.slice(0, 80).map((item) => {
+                      const income = item.direction === "income";
+                      return <div key={item.id} className="py-4"><div className="flex items-start justify-between gap-3"><div><p className="text-sm font-semibold">{income ? (item.description || "Поступление") : (item.categoryName || item.description || "Расход")}</p><p className="mt-1 text-xs text-black/40">{item.branchName || "Общий OPEN STARS"} · {dateLabel(item.transactionDate)}</p></div><p className={`shrink-0 font-semibold ${income ? "text-[#4D512E]" : "text-red-600"}`}>{income ? "+" : "−"} {money(item.amount)}</p></div>{!income && item.description && <p className="mt-2 text-xs leading-5 text-black/45">{item.description}</p>}{item.accountName && <p className="mt-1 text-[11px] text-black/30">{item.accountName}</p>}</div>;
+                    })}
                   </div>
                 )}
               </section>
