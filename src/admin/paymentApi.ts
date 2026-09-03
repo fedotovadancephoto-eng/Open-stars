@@ -51,6 +51,8 @@ async function rpc<T>(name: string, body: Record<string, unknown> = {}) {
     if (message.includes("invalid payment method")) message = "Выберите способ оплаты.";
     if (message.includes("void reason required")) message = "Укажите причину отмены оплаты.";
     if (message.includes("receipt not found")) message = "Эта оплата уже отменена или не найдена.";
+    if (message.includes("payment receipt required")) message = "Чтобы поставить «Оплачено», подтвердите фактическую сумму и способ оплаты.";
+    if (message.includes("void receipt first")) message = "Сначала отмените подтверждённое поступление в блоке «Фактические поступления». После этого можно изменить статус.";
     throw new Error(message);
   }
   if (response.status === 204) return undefined as T;
