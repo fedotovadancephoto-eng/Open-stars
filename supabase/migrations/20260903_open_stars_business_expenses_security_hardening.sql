@@ -108,8 +108,8 @@ with check (
     select 1
     from public.expense_requests er
     join public.branches b on b.id = er.branch_id
-    where er.id::text = (storage.foldername(name))[2]
-      and b.code = (storage.foldername(name))[1]
+    where er.id::text = (storage.foldername(storage.objects.name))[2]
+      and b.code = (storage.foldername(storage.objects.name))[1]
       and er.status = 'submitted'
       and private.business_can_access_branch(er.branch_id)
   )
