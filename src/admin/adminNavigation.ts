@@ -13,7 +13,9 @@ export type AdminSection =
   | "photos"
   | "feedback"
   | "team"
-  | "reports";
+  | "reports"
+  | "expenses"
+  | "business";
 
 export const ADMIN_SECTION_EVENT = "openstars:admin-section";
 export const ADMIN_DATA_UPDATED_EVENT = "openstars:admin-data-updated";

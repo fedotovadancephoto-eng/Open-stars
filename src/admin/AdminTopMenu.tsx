@@ -13,8 +13,10 @@ import {
   Menu,
   MessageSquareHeart,
   Newspaper,
+  ReceiptText,
   ShieldCheck,
   UserPlus,
+  WalletCards,
   X,
 } from "lucide-react";
 
@@ -30,6 +32,8 @@ const items: Array<{
   roles: StaffRole[];
   teacherVisible?: boolean;
 }> = [
+  { section: "business", label: "Бизнес", icon: WalletCards, accent: "orange", roles: ["owner"] },
+  { section: "expenses", label: "Расходы", icon: ReceiptText, accent: "olive", roles: ["owner", "project_director", "admin", "manager"] },
   { section: "add-student", label: "Добавить ученика", icon: UserPlus, accent: "orange", roles: ["owner", "project_director", "admin", "manager"] },
   { section: "archive", label: "Выбывшие", icon: Archive, accent: "neutral", roles: ["owner", "project_director", "admin", "manager"] },
   { section: "parent-activation", label: "Активация родителей", icon: KeyRound, accent: "orange", roles: ["owner", "project_director", "admin", "manager"] },
@@ -52,7 +56,7 @@ const accentClass = {
   neutral: "bg-black/[0.055] text-[#171717]",
 };
 
-const legacyLabels = new Set(items.filter((item) => item.section !== "team" && item.section !== "reports").map((item) => item.label));
+const legacyLabels = new Set(items.filter((item) => !["team", "reports", "expenses", "business"].includes(item.section)).map((item) => item.label));
 
 function normalize(value: string | null | undefined) {
   return (value || "").replace(/\s+/g, " ").trim();
