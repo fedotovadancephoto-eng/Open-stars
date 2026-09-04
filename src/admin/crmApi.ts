@@ -1,9 +1,9 @@
-import { fetchStaffIdentity, getValidStaffSession, StaffRole } from "@/admin/adminApi";
+import { getValidStaffSession } from "@/admin/adminApi";
 
 const SUPABASE_URL = "https://yiwiykbuaggyslfyhlfo.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_1MORh5rY7uMDVYLYVX5VAA_cyoph4-7";
 
-export type CrmRole = StaffRole | "sales" | "marketer";
+export type CrmRole = "owner" | "project_director" | "manager" | "admin" | "sales" | "marketer";
 export type CrmStage = "new" | "contacted" | "trial_booked" | "trial_attended" | "thinking" | "awaiting_payment" | "paid" | "student";
 export type CrmLostReason = "no_answer" | "not_responding" | "rescheduled" | "refusal" | "other_school" | "unqualified";
 
@@ -70,10 +70,35 @@ export type CrmStudentConversionResult = {
 
 type ApiError = { message?: string; details?: string };
 
+type CrmContextRow = {
+  id: string;
+  staff_branch: string | null;
+  roles: { name?: string } | Array<{ name?: string }> | null;
+};
+
 async function sessionToken() {
   const session = await getValidStaffSession();
   if (!session) throw new Error("Сессия сотрудника не найдена. Войдите снова.");
   return session.access_token;
+}
+
+function authUserIdFromAccessToken(token: string) {
+  try {
+    const encoded = token.split(".")[1];
+    if (!encoded) return "";
+    const normalized = encoded.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
+    const payload = JSON.parse(window.atob(padded));
+    return typeof payload?.sub === "string" ? payload.sub : "";
+  } catch {
+    return "";
+  }
+}
+
+function roleFromContextRow(row: CrmContextRow | undefined): CrmRole | null {
+  const raw = Array.isArray(row?.roles) ? row?.roles?.[0]?.name : row?.roles?.name;
+  const allowed: CrmRole[] = ["owner", "project_director", "manager", "admin", "sales", "marketer"];
+  return allowed.includes(raw as CrmRole) ? raw as CrmRole : null;
 }
 
 async function rest<T>(path: string) {
@@ -92,6 +117,7 @@ function friendly(message: string) {
   if (message.includes("source required")) return "Выберите источник клиента.";
   if (message.includes("lost reason required")) return "Укажите причину, почему лид потерян.";
   if (message.includes("lead must be paid")) return "Сначала сохраните этап «Оплатил», затем оформляйте ученика.";
+  if (message.includes("student conversion required")) return "Этап «Стал учеником» устанавливается автоматически после кнопки «Оформить ученика».";
   if (message.includes("student already exists")) return "Такой ребёнок уже есть у этого родителя. Откройте существующую карточку ученика.";
   if (message.includes("child full name required")) return "Укажите имя и фамилию ребёнка.";
   if (message.includes("invalid group")) return "Выберите группу ребёнка.";
@@ -125,12 +151,15 @@ async function rpc<T>(name: string, body: Record<string, unknown>) {
 }
 
 export async function fetchCrmContext(): Promise<{ role: CrmRole; staffBranch: string; profileId: string }> {
-  const identity = await fetchStaffIdentity();
-  const role = String(identity.role) as CrmRole;
-  const allowed = new Set<string>(["owner", "project_director", "manager", "admin", "sales", "marketer"]);
-  if (!allowed.has(role)) throw new Error("CRM недоступна для этой роли.");
-  const rows = await rest<any[]>(`users_profile?select=staff_branch&id=eq.${encodeURIComponent(identity.profile.id)}&limit=1`);
-  return { role, staffBranch: rows[0]?.staff_branch || "", profileId: identity.profile.id };
+  const session = await getValidStaffSession();
+  if (!session) throw new Error("Сессия сотрудника не найдена. Войдите снова.");
+  const authUserId = authUserIdFromAccessToken(session.access_token);
+  if (!authUserId) throw new Error("Не удалось определить аккаунт сотрудника. Войдите снова.");
+  const rows = await rest<CrmContextRow[]>(`users_profile?select=id,staff_branch,roles(name)&auth_user_id=eq.${encodeURIComponent(authUserId)}&limit=1`);
+  const row = rows[0];
+  const role = roleFromContextRow(row);
+  if (!row || !role) throw new Error("CRM недоступна для этой роли.");
+  return { role, staffBranch: row.staff_branch || "", profileId: row.id };
 }
 
 function mapLead(row: any): CrmLead {
