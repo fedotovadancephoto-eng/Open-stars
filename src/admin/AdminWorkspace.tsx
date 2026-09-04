@@ -15,6 +15,7 @@ import { AdminStudyManager } from "@/admin/AdminStudyManager";
 import { AdminTopMenu } from "@/admin/AdminTopMenu";
 import { ChildPhotoUpload } from "@/admin/ChildPhotoUpload";
 import { OwnerBusinessDashboard } from "@/admin/OwnerBusinessDashboard";
+import { OwnerHomeLanding } from "@/admin/OwnerHomeLanding";
 import { StaffModeSwitch } from "@/admin/StaffModeSwitch";
 
 export default function AdminWorkspace() {
@@ -38,6 +39,7 @@ export default function AdminWorkspace() {
       <AdminReportExport />
       <AdminExpenseManager />
       <OwnerBusinessDashboard />
+      <OwnerHomeLanding />
     </>
   );
 }
