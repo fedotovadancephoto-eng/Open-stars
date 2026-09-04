@@ -3,6 +3,7 @@ import { fetchStaffIdentity, getValidStaffSession, StaffRole } from "@/admin/adm
 const SUPABASE_URL = "https://yiwiykbuaggyslfyhlfo.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_1MORh5rY7uMDVYLYVX5VAA_cyoph4-7";
 
+export type CrmRole = StaffRole | "sales" | "marketer";
 export type CrmStage = "new" | "contacted" | "trial_booked" | "trial_attended" | "thinking" | "awaiting_payment" | "paid" | "student";
 export type CrmLostReason = "no_answer" | "not_responding" | "rescheduled" | "refusal" | "other_school" | "unqualified";
 
@@ -101,11 +102,13 @@ async function rpc<T>(name: string, body: Record<string, unknown>) {
   return response.json() as Promise<T>;
 }
 
-export async function fetchCrmContext() {
+export async function fetchCrmContext(): Promise<{ role: CrmRole; staffBranch: string; profileId: string }> {
   const identity = await fetchStaffIdentity();
-  const allowed: StaffRole[] = ["owner", "project_director", "manager", "admin", "sales", "marketer"];
-  if (!allowed.includes(identity.role)) throw new Error("CRM недоступна для этой роли.");
-  return identity;
+  const role = String(identity.role) as CrmRole;
+  const allowed = new Set<string>(["owner", "project_director", "manager", "admin", "sales", "marketer"]);
+  if (!allowed.has(role)) throw new Error("CRM недоступна для этой роли.");
+  const rows = await rest<any[]>(`users_profile?select=staff_branch&id=eq.${encodeURIComponent(identity.profile.id)}&limit=1`);
+  return { role, staffBranch: rows[0]?.staff_branch || "", profileId: identity.profile.id };
 }
 
 function mapLead(row: any): CrmLead {
