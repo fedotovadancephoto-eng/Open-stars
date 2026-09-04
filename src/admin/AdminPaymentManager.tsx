@@ -30,8 +30,7 @@ import {
   PaymentOverviewState,
   PaymentOverviewStudent,
   PaymentReceipt,
-  PaymentStatus,
-  setPaymentStatus,
+  setMonthlyCharge,
   voidPaymentReceipt,
 } from "@/admin/paymentApi";
 
@@ -39,13 +38,17 @@ const inputClass = "mt-1.5 w-full rounded-[13px] border border-black/[0.08] bg-w
 const labels: Record<string, string> = { paid: "Оплачено", pending: "Ожидает оплаты", overdue: "Просрочено", "": "Статус не указан" };
 const methodLabels: Record<PaymentMethod, string> = { online: "Онлайн · Точка", cash: "Наличные", bank_transfer: "Перевод на счёт", other: "Другое" };
 const overviewLabels: Record<PaymentOverviewState, string> = {
-  paid: "Оплатил",
+  paid: "Оплачено полностью",
+  partial: "Частично оплачено",
+  needs_charge: "Нужно начислить",
   needs_amount: "Нужно внести сумму",
   pending: "Ожидает оплаты",
   overdue: "Просрочено",
+  overpaid: "Переплата",
+  no_charge: "Без начисления",
 };
 
-type OverviewFilter = "all" | "paid" | "unpaid" | "needs_amount" | "overdue";
+type OverviewFilter = "all" | "received" | "paid" | "partial" | "debt" | "needs_charge" | "overdue" | "overpaid";
 
 function currentMonth() {
   const date = new Date();
@@ -70,10 +73,24 @@ function money(value: number) {
   return new Intl.NumberFormat("ru-RU", { style: "currency", currency: "RUB", maximumFractionDigits: 0 }).format(value || 0);
 }
 
+function numericInput(value: string) {
+  return Number(value.replace(/\s/g, "").replace(",", "."));
+}
+
+function effectiveState(student: PaymentOverviewStudent): PaymentOverviewState {
+  if (!student.chargeSet) {
+    if (student.state === "needs_amount") return "needs_amount";
+    return "needs_charge";
+  }
+  return student.state;
+}
+
 function stateStyle(state: PaymentOverviewState) {
   if (state === "paid") return "bg-[#5F6338]/10 text-[#4D512E]";
   if (state === "overdue") return "bg-red-50 text-red-600";
-  if (state === "needs_amount") return "bg-amber-50 text-amber-700";
+  if (state === "partial" || state === "needs_charge" || state === "needs_amount") return "bg-amber-50 text-amber-700";
+  if (state === "overpaid") return "bg-[#5F6338]/[0.07] text-[#4D512E]";
+  if (state === "no_charge") return "bg-black/[0.05] text-black/45";
   return "bg-[#D96A24]/10 text-[#C95320]";
 }
 
@@ -89,7 +106,9 @@ export function AdminPaymentManager() {
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState("");
   const [month, setMonth] = useState(currentMonth());
-  const [status, setStatus] = useState<PaymentStatus>("pending");
+  const [chargeAmount, setChargeAmount] = useState("");
+  const [chargeDueDate, setChargeDueDate] = useState("");
+  const [chargeNote, setChargeNote] = useState("");
   const [amount, setAmount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("online");
   const [note, setNote] = useState("");
@@ -135,13 +154,32 @@ export function AdminPaymentManager() {
     [overview, selectedId]
   );
 
+  const stateCounts = useMemo(() => {
+    const rows = overview?.students || [];
+    const count = (state: PaymentOverviewState) => rows.filter((student) => effectiveState(student) === state).length;
+    return {
+      paid: count("paid"),
+      partial: count("partial"),
+      needsCharge: count("needs_charge"),
+      overdue: count("overdue"),
+      overpaid: count("overpaid"),
+      debt: rows.filter((student) => ["partial", "pending", "overdue"].includes(effectiveState(student))).length,
+      received: rows.filter((student) => student.amountPaid > 0).length,
+      chargeSet: rows.filter((student) => student.chargeSet).length,
+    };
+  }, [overview]);
+
   const visibleStudents = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     return (overview?.students || []).filter((student) => {
-      if (overviewFilter === "paid" && student.state !== "paid") return false;
-      if (overviewFilter === "unpaid" && !["pending", "overdue"].includes(student.state)) return false;
-      if (overviewFilter === "needs_amount" && student.state !== "needs_amount") return false;
-      if (overviewFilter === "overdue" && student.state !== "overdue") return false;
+      const state = effectiveState(student);
+      if (overviewFilter === "received" && student.amountPaid <= 0) return false;
+      if (overviewFilter === "paid" && state !== "paid") return false;
+      if (overviewFilter === "partial" && state !== "partial") return false;
+      if (overviewFilter === "debt" && !["partial", "pending", "overdue"].includes(state)) return false;
+      if (overviewFilter === "needs_charge" && state !== "needs_charge") return false;
+      if (overviewFilter === "overdue" && state !== "overdue") return false;
+      if (overviewFilter === "overpaid" && state !== "overpaid") return false;
       if (!normalized) return true;
       return [student.name, student.branch, student.groupName].join(" ").toLowerCase().includes(normalized);
     });
@@ -184,11 +222,19 @@ export function AdminPaymentManager() {
     }
   }
 
-  async function changeMonth(nextMonth: string) {
-    setMonth(nextMonth);
+  function resetSelection() {
     setSelectedId("");
+    setChargeAmount("");
+    setChargeDueDate("");
+    setChargeNote("");
+    setAmount("");
     setReceipts([]);
     setHistory([]);
+  }
+
+  async function changeMonth(nextMonth: string) {
+    setMonth(nextMonth);
+    resetSelection();
     setLoading(true);
     setError("");
     try {
@@ -203,9 +249,7 @@ export function AdminPaymentManager() {
   async function changeBranch(nextBranch: string) {
     if (role === "admin") return;
     setBranchFilter(nextBranch);
-    setSelectedId("");
-    setReceipts([]);
-    setHistory([]);
+    resetSelection();
     setLoading(true);
     setError("");
     try {
@@ -219,8 +263,10 @@ export function AdminPaymentManager() {
 
   async function choose(student: PaymentOverviewStudent) {
     setSelectedId(student.childId);
-    setStatus(student.state === "paid" || student.state === "needs_amount" ? "paid" : student.state);
-    setAmount("");
+    setChargeAmount(student.chargeSet ? String(student.expectedAmount) : "");
+    setChargeDueDate(student.dueDate || "");
+    setChargeNote(student.chargeNote || "");
+    setAmount(student.chargeSet && student.remainingAmount > 0 ? String(student.remainingAmount) : "");
     setNote("");
     setEditingReceiptId("");
     setServiceHistoryOpen(false);
@@ -236,31 +282,53 @@ export function AdminPaymentManager() {
     }
   }
 
-  async function save() {
+  async function saveCharge() {
     if (!selected) return setError("Выберите ребёнка.");
+    const numericAmount = numericInput(chargeAmount);
+    if (!Number.isFinite(numericAmount) || numericAmount < 0) return setError("Введите корректную сумму начисления. Можно указать 0 ₽, если за месяц платить не нужно.");
     setSaving(true);
     setError("");
     setSuccess("");
     try {
-      if (status === "paid") {
-        const numericAmount = Number(amount.replace(/\s/g, "").replace(",", "."));
-        if (!Number.isFinite(numericAmount) || numericAmount <= 0) throw new Error("Введите сумму фактической оплаты.");
-        await confirmPaymentReceipt({
-          childId: selected.childId,
-          month,
-          amount: numericAmount,
-          paymentMethod,
-          note,
-        });
-        setSuccess(`${selected.name}: подтверждено ${money(numericAmount)} за ${monthLabel(month)}.`);
-        setAmount("");
-        setNote("");
-      } else {
-        await setPaymentStatus(selected.childId, month, status);
-        setSuccess(`Статус за ${monthLabel(month)}: ${labels[status]}.`);
-      }
-      await refreshOverview();
+      await setMonthlyCharge({
+        childId: selected.childId,
+        month,
+        expectedAmount: numericAmount,
+        dueDate: chargeDueDate,
+        note: chargeNote,
+      });
+      const next = await refreshOverview();
+      const updated = next.students.find((student) => student.childId === selected.childId);
+      if (updated && updated.remainingAmount > 0) setAmount(String(updated.remainingAmount));
+      setSuccess(`${selected.name}: начислено ${money(numericAmount)} за ${monthLabel(month)}.`);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Не удалось сохранить начисление.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function saveReceipt() {
+    if (!selected) return setError("Выберите ребёнка.");
+    const numericAmount = numericInput(amount);
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) return setError("Введите сумму фактической оплаты.");
+    setSaving(true);
+    setError("");
+    setSuccess("");
+    try {
+      await confirmPaymentReceipt({
+        childId: selected.childId,
+        month,
+        amount: numericAmount,
+        paymentMethod,
+        note,
+      });
+      const next = await refreshOverview();
       await refreshChild(selected.childId);
+      const updated = next.students.find((student) => student.childId === selected.childId);
+      setAmount(updated && updated.remainingAmount > 0 ? String(updated.remainingAmount) : "");
+      setNote("");
+      setSuccess(`${selected.name}: поступление ${money(numericAmount)} подтверждено.`);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Не удалось сохранить оплату.");
     } finally {
@@ -279,7 +347,7 @@ export function AdminPaymentManager() {
   }
 
   async function saveCorrection(receipt: PaymentReceipt) {
-    const numericAmount = Number(editAmount.replace(/\s/g, "").replace(",", "."));
+    const numericAmount = numericInput(editAmount);
     if (!Number.isFinite(numericAmount) || numericAmount <= 0) return setError("Введите корректную сумму оплаты.");
     if (!editMonth) return setError("Выберите месяц оплаты.");
     setSaving(true);
@@ -331,15 +399,20 @@ export function AdminPaymentManager() {
 
   if (!enabled) return null;
 
-  const unpaidCount = (overview?.pendingStudents || 0) + (overview?.overdueStudents || 0);
   const displayBranch = role === "admin" ? staffBranch : (branchFilter || "Все филиалы");
+  const chargedAmount = overview?.chargedAmount || 0;
+  const remainingAmount = overview?.remainingAmount || 0;
+  const hasCharges = stateCounts.chargeSet > 0;
 
   const filters: Array<{ id: OverviewFilter; label: string; count: number }> = [
     { id: "all", label: "Все", count: overview?.totalStudents || 0 },
-    { id: "paid", label: "Оплатили", count: overview?.paidStudents || 0 },
-    { id: "unpaid", label: "Не оплатили", count: unpaidCount },
-    { id: "needs_amount", label: "Нужно внести сумму", count: overview?.needsAmountStudents || 0 },
-    { id: "overdue", label: "Просрочено", count: overview?.overdueStudents || 0 },
+    { id: "received", label: "Есть поступление", count: stateCounts.received },
+    { id: "paid", label: "Оплачено", count: stateCounts.paid },
+    { id: "partial", label: "Частично", count: stateCounts.partial },
+    { id: "debt", label: "С долгом", count: stateCounts.debt },
+    { id: "needs_charge", label: "Нужно начислить", count: stateCounts.needsCharge },
+    { id: "overdue", label: "Просрочено", count: stateCounts.overdue },
+    { id: "overpaid", label: "Переплата", count: stateCounts.overpaid },
   ];
 
   return (
@@ -355,7 +428,7 @@ export function AdminPaymentManager() {
               <div>
                 <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#D96A24]">OPEN STARS ADMIN</p>
                 <h2 className="mt-1 text-2xl font-semibold">Оплата · {displayBranch}</h2>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-black/45">Сводка считается только по фактическим поступлениям. Старый статус «Оплачено» без суммы отдельно помечается как «Нужно внести сумму».</p>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-black/45">Начисление — сколько ребёнок должен за месяц. Поступление — сколько денег реально получили. Остаток и частичная оплата считаются автоматически.</p>
               </div>
               <button type="button" onClick={() => setOpen(false)} className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white"><X size={20} /></button>
             </div>
@@ -372,12 +445,13 @@ export function AdminPaymentManager() {
               )}
             </div>
 
-            <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-              <div className="rounded-[20px] border border-black/[0.05] bg-[#171717] p-4 text-white"><div className="flex items-center gap-2 text-white/55"><WalletCards size={16} /><p className="text-xs font-semibold">Собрано</p></div><p className="mt-2 text-2xl font-semibold tracking-[-0.04em]">{money(overview?.collectedAmount || 0)}</p><p className="mt-1 text-[11px] text-white/35">за {monthLabel(month)}</p></div>
-              <div className="rounded-[20px] border border-black/[0.05] bg-white p-4"><div className="flex items-center gap-2 text-[#4D512E]"><CheckCircle2 size={16} /><p className="text-xs font-semibold">Оплатили</p></div><p className="mt-2 text-2xl font-semibold tracking-[-0.04em]">{overview?.paidStudents || 0} <span className="text-base text-black/25">/ {overview?.totalStudents || 0}</span></p></div>
-              <div className="rounded-[20px] border border-black/[0.05] bg-white p-4"><div className="flex items-center gap-2 text-[#C95320]"><Clock3 size={16} /><p className="text-xs font-semibold">Не оплатили</p></div><p className="mt-2 text-2xl font-semibold tracking-[-0.04em]">{unpaidCount}</p><p className="mt-1 text-[11px] text-black/35">ожидают + просрочено</p></div>
-              <div className="rounded-[20px] border border-red-100 bg-red-50/60 p-4"><div className="flex items-center gap-2 text-red-600"><AlertTriangle size={16} /><p className="text-xs font-semibold">Просрочено</p></div><p className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-red-700">{overview?.overdueStudents || 0}</p></div>
-              <div className="rounded-[20px] border border-amber-100 bg-amber-50/60 p-4"><div className="flex items-center gap-2 text-amber-700"><Banknote size={16} /><p className="text-xs font-semibold">Без суммы</p></div><p className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-amber-800">{overview?.needsAmountStudents || 0}</p><p className="mt-1 text-[11px] text-amber-700/60">старое «Оплачено»</p></div>
+            <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+              <div className="rounded-[20px] border border-black/[0.05] bg-[#171717] p-4 text-white"><div className="flex items-center gap-2 text-white/55"><WalletCards size={16} /><p className="text-xs font-semibold">Собрано</p></div><p className="mt-2 text-2xl font-semibold tracking-[-0.04em]">{money(overview?.collectedAmount || 0)}</p><p className="mt-1 text-[11px] text-white/35">фактические деньги</p></div>
+              <div className="rounded-[20px] border border-black/[0.05] bg-white p-4"><div className="flex items-center gap-2 text-[#4D512E]"><Banknote size={16} /><p className="text-xs font-semibold">Начислено</p></div><p className="mt-2 text-2xl font-semibold tracking-[-0.04em]">{hasCharges ? money(chargedAmount) : "—"}</p><p className="mt-1 text-[11px] text-black/35">{stateCounts.chargeSet} из {overview?.totalStudents || 0}</p></div>
+              <div className="rounded-[20px] border border-[#D96A24]/15 bg-[#FFF8F1] p-4"><div className="flex items-center gap-2 text-[#C95320]"><Clock3 size={16} /><p className="text-xs font-semibold">Остаток</p></div><p className="mt-2 text-2xl font-semibold tracking-[-0.04em]">{hasCharges ? money(remainingAmount) : "—"}</p><p className="mt-1 text-[11px] text-black/35">по заданным начислениям</p></div>
+              <div className="rounded-[20px] border border-black/[0.05] bg-white p-4"><div className="flex items-center gap-2 text-[#4D512E]"><CheckCircle2 size={16} /><p className="text-xs font-semibold">Полностью</p></div><p className="mt-2 text-2xl font-semibold tracking-[-0.04em]">{stateCounts.paid}</p><p className="mt-1 text-[11px] text-black/35">оплачено без остатка</p></div>
+              <div className="rounded-[20px] border border-amber-100 bg-amber-50/60 p-4"><div className="flex items-center gap-2 text-amber-700"><Banknote size={16} /><p className="text-xs font-semibold">Частично</p></div><p className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-amber-800">{stateCounts.partial}</p></div>
+              <div className="rounded-[20px] border border-amber-100 bg-amber-50/60 p-4"><div className="flex items-center gap-2 text-amber-700"><AlertTriangle size={16} /><p className="text-xs font-semibold">Нужно начислить</p></div><p className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-amber-800">{stateCounts.needsCharge}</p></div>
             </div>
 
             <AdminPaymentLinkSettings />
@@ -392,12 +466,15 @@ export function AdminPaymentManager() {
                 <div className="mt-3 flex flex-wrap gap-2">{filters.map((item) => <button key={item.id} type="button" onClick={() => setOverviewFilter(item.id)} className={`rounded-full px-3 py-2 text-[11px] font-semibold ${overviewFilter === item.id ? "bg-[#171717] text-white" : "bg-[#FAF9F5] text-black/45"}`}>{item.label} · {item.count}</button>)}</div>
                 {loading && !overview ? <div className="grid min-h-[300px] place-items-center"><LoaderCircle className="animate-spin text-black/20" /></div> : (
                   <div className="mt-4 max-h-[620px] space-y-2 overflow-y-auto">
-                    {visibleStudents.length === 0 ? <div className="rounded-[18px] bg-[#FAF9F5] px-4 py-10 text-center text-sm text-black/35">По выбранному фильтру никого нет.</div> : visibleStudents.map((student) => (
-                      <button key={student.childId} type="button" onClick={() => void choose(student)} className={`w-full rounded-[16px] border p-3.5 text-left transition ${student.childId === selectedId ? "border-[#D96A24]/30 bg-[#D96A24]/[0.04]" : "border-black/[0.055] hover:bg-[#FAF9F5]"}`}>
-                        <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate text-sm font-semibold">{student.name}</p><p className="mt-1 text-xs text-black/35">{student.groupName || "Группа не указана"}</p></div><span className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-semibold ${stateStyle(student.state)}`}>{overviewLabels[student.state]}</span></div>
-                        {student.state === "paid" && <div className="mt-2 flex items-center justify-between gap-3 text-xs"><span className="font-semibold text-[#4D512E]">{money(student.amountPaid)}</span><span className="text-black/30">{student.latestMethod ? methodLabels[student.latestMethod] : ""}</span></div>}
-                      </button>
-                    ))}
+                    {visibleStudents.length === 0 ? <div className="rounded-[18px] bg-[#FAF9F5] px-4 py-10 text-center text-sm text-black/35">По выбранному фильтру никого нет.</div> : visibleStudents.map((student) => {
+                      const state = effectiveState(student);
+                      return (
+                        <button key={student.childId} type="button" onClick={() => void choose(student)} className={`w-full rounded-[16px] border p-3.5 text-left transition ${student.childId === selectedId ? "border-[#D96A24]/30 bg-[#D96A24]/[0.04]" : "border-black/[0.055] hover:bg-[#FAF9F5]"}`}>
+                          <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate text-sm font-semibold">{student.name}</p><p className="mt-1 text-xs text-black/35">{student.groupName || "Группа не указана"}</p></div><span className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-semibold ${stateStyle(state)}`}>{overviewLabels[state]}</span></div>
+                          {student.chargeSet ? <div className="mt-2 grid grid-cols-3 gap-2 text-[11px]"><span><span className="text-black/30">Начислено</span><br/><strong>{money(student.expectedAmount)}</strong></span><span><span className="text-black/30">Оплачено</span><br/><strong>{money(student.amountPaid)}</strong></span><span><span className="text-black/30">Остаток</span><br/><strong className={student.remainingAmount > 0 ? "text-[#C95320]" : "text-[#4D512E]"}>{money(student.remainingAmount)}</strong></span></div> : student.amountPaid > 0 ? <p className="mt-2 text-xs font-semibold text-[#4D512E]">Получено {money(student.amountPaid)} · начисление ещё не задано</p> : null}
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
               </section>
@@ -406,24 +483,32 @@ export function AdminPaymentManager() {
                 <section className="rounded-[24px] border border-black/[0.06] bg-white p-5">
                   {selected ? (
                     <>
-                      <div className="flex items-start justify-between gap-3"><div><h3 className="text-lg font-semibold">{selected.name}</h3><p className="mt-1 text-xs text-black/35">{selected.branch} · {selected.groupName || "группа не указана"}</p></div><span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold ${stateStyle(selected.state)}`}>{overviewLabels[selected.state]}</span></div>
-                      <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                        <label className="text-xs font-semibold text-black/55">Месяц<input type="month" className={inputClass} value={month} onChange={(event) => void changeMonth(event.target.value)} /></label>
-                        <label className="text-xs font-semibold text-black/55">Статус<select className={inputClass} value={status} onChange={(event) => setStatus(event.target.value as PaymentStatus)}><option value="paid">Оплачено</option><option value="pending">Ожидает оплаты</option><option value="overdue">Просрочено</option></select></label>
+                      <div className="flex items-start justify-between gap-3"><div><h3 className="text-lg font-semibold">{selected.name}</h3><p className="mt-1 text-xs text-black/35">{selected.branch} · {selected.groupName || "группа не указана"}</p></div><span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold ${stateStyle(effectiveState(selected))}`}>{overviewLabels[effectiveState(selected)]}</span></div>
+                      <label className="mt-5 block text-xs font-semibold text-black/55">Месяц<input type="month" className={inputClass} value={month} onChange={(event) => void changeMonth(event.target.value)} /></label>
+
+                      <div className="mt-4 rounded-[18px] border border-[#5F6338]/12 bg-[#F5F5EF] p-4">
+                        <div className="flex items-center gap-2"><Banknote size={17} className="text-[#5F6338]" /><div><p className="text-sm font-semibold">Начисление за месяц</p><p className="mt-0.5 text-[11px] text-black/40">Сколько ребёнок должен за обучение в этом месяце.</p></div></div>
+                        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                          <label className="text-xs font-semibold text-black/55">Начислено, ₽<input inputMode="decimal" className={inputClass} value={chargeAmount} onChange={(event) => setChargeAmount(event.target.value)} placeholder="Например, 6000" /></label>
+                          <label className="text-xs font-semibold text-black/55">Оплатить до<input type="date" className={inputClass} value={chargeDueDate} onChange={(event) => setChargeDueDate(event.target.value)} /></label>
+                        </div>
+                        <label className="mt-3 block text-xs font-semibold text-black/55">Комментарий к начислению<input className={inputClass} value={chargeNote} onChange={(event) => setChargeNote(event.target.value)} placeholder="Скидка, перерасчёт, два направления — необязательно" /></label>
+                        <p className="mt-2 text-[11px] leading-5 text-black/40">Можно указать 0 ₽, если в этом месяце начисления нет. Старые фактические оплаты при этом не меняются.</p>
+                        <button type="button" onClick={() => void saveCharge()} disabled={saving} className="mt-3 flex w-full items-center justify-center gap-2 rounded-[13px] bg-[#5F6338] px-4 py-3 text-xs font-semibold text-white disabled:opacity-50">{saving ? <LoaderCircle className="animate-spin" size={15} /> : <Banknote size={15} />}Сохранить начисление</button>
                       </div>
 
-                      {status === "paid" && (
-                        <div className="mt-4 rounded-[18px] bg-[#F7F5EF] p-4">
-                          <div className="flex items-center gap-2"><Banknote size={17} className="text-[#5F6338]" /><p className="text-sm font-semibold">Добавить фактическое поступление</p></div>
-                          <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                            <label className="text-xs font-semibold text-black/55">Сумма, ₽<input inputMode="decimal" className={inputClass} value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="5500" /></label>
-                            <label className="text-xs font-semibold text-black/55">Способ оплаты<select className={inputClass} value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value as PaymentMethod)}><option value="online">Онлайн · Точка</option><option value="cash">Наличные</option><option value="bank_transfer">Перевод на счёт</option><option value="other">Другое</option></select></label>
-                          </div>
-                          <label className="mt-3 block text-xs font-semibold text-black/55">Комментарий<input className={inputClass} value={note} onChange={(event) => setNote(event.target.value)} placeholder="Необязательно" /></label>
-                        </div>
-                      )}
+                      {selected.chargeSet && <div className="mt-4 grid grid-cols-3 gap-2 rounded-[16px] bg-[#FAF9F5] p-3 text-center"><div><p className="text-[10px] text-black/35">Начислено</p><p className="mt-1 text-sm font-semibold">{money(selected.expectedAmount)}</p></div><div><p className="text-[10px] text-black/35">Оплачено</p><p className="mt-1 text-sm font-semibold text-[#4D512E]">{money(selected.amountPaid)}</p></div><div><p className="text-[10px] text-black/35">Остаток</p><p className={`mt-1 text-sm font-semibold ${selected.remainingAmount > 0 ? "text-[#C95320]" : "text-[#4D512E]"}`}>{money(selected.remainingAmount)}</p></div></div>}
 
-                      <button onClick={() => void save()} disabled={saving} className="mt-5 flex w-full items-center justify-center gap-2 rounded-[14px] bg-[#171717] px-5 py-3.5 text-sm font-semibold text-white disabled:opacity-50">{saving ? <LoaderCircle className="animate-spin" size={17} /> : <CreditCard size={17} />}{status === "paid" ? "Подтвердить оплату" : "Сохранить статус"}</button>
+                      <div className="mt-4 rounded-[18px] bg-[#F7F5EF] p-4">
+                        <div className="flex items-center gap-2"><CreditCard size={17} className="text-[#D96A24]" /><div><p className="text-sm font-semibold">Добавить фактическое поступление</p><p className="mt-0.5 text-[11px] text-black/40">Реально полученные деньги. Можно вносить частями.</p></div></div>
+                        {!selected.chargeSet && <div className="mt-3 rounded-[12px] bg-amber-50 px-3 py-2 text-[11px] leading-5 text-amber-800">Оплату можно принять сейчас, но долг и остаток появятся только после того, как вы зададите начисление.</div>}
+                        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                          <label className="text-xs font-semibold text-black/55">Сумма, ₽<input inputMode="decimal" className={inputClass} value={amount} onChange={(event) => setAmount(event.target.value)} placeholder={selected.remainingAmount > 0 ? String(selected.remainingAmount) : "5500"} /></label>
+                          <label className="text-xs font-semibold text-black/55">Способ оплаты<select className={inputClass} value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value as PaymentMethod)}><option value="online">Онлайн · Точка</option><option value="cash">Наличные</option><option value="bank_transfer">Перевод на счёт</option><option value="other">Другое</option></select></label>
+                        </div>
+                        <label className="mt-3 block text-xs font-semibold text-black/55">Комментарий<input className={inputClass} value={note} onChange={(event) => setNote(event.target.value)} placeholder="Необязательно" /></label>
+                        <button onClick={() => void saveReceipt()} disabled={saving} className="mt-4 flex w-full items-center justify-center gap-2 rounded-[14px] bg-[#171717] px-5 py-3.5 text-sm font-semibold text-white disabled:opacity-50">{saving ? <LoaderCircle className="animate-spin" size={17} /> : <CreditCard size={17} />}Подтвердить поступление</button>
+                      </div>
                     </>
                   ) : <div className="grid min-h-[230px] place-items-center text-center text-sm text-black/40"><div><CreditCard className="mx-auto text-black/15" size={28} /><p className="mt-3">Выберите ребёнка в реестре слева.</p></div></div>}
                 </section>
@@ -457,7 +542,7 @@ export function AdminPaymentManager() {
                     <button type="button" onClick={() => setServiceHistoryOpen((current) => !current)} className="flex w-full items-center justify-between gap-3 text-left"><div className="flex items-center gap-2"><History size={16} className="text-black/35" /><div><p className="text-sm font-semibold">Служебная история</p><p className="mt-0.5 text-xs text-black/35">Старые статусы и отменённые операции</p></div></div><ChevronDown size={18} className={`text-black/30 transition ${serviceHistoryOpen ? "rotate-180" : ""}`} /></button>
                     {serviceHistoryOpen && <div className="mt-4 space-y-5">
                       {cancelledReceipts.length > 0 && <div><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-black/30">Отменённые поступления</p><div className="mt-2 divide-y divide-black/[0.06]">{cancelledReceipts.map((receipt) => <div key={receipt.id} className="py-3 opacity-55"><p className="text-sm font-semibold line-through">{money(receipt.amount)} · {methodLabels[receipt.paymentMethod]}</p><p className="mt-1 text-[11px] text-red-600">Отменено: {receipt.voidReason}</p></div>)}</div></div>}
-                      <div><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-black/30">История статусов</p>{history.length === 0 ? <p className="mt-2 text-sm text-black/35">Изменений нет.</p> : <div className="mt-2 divide-y divide-black/[0.06]">{history.map((item) => <div key={item.id} className="py-3"><div className="flex items-center gap-2">{item.newStatus === "paid" ? <CheckCircle2 size={15} className="text-[#5F6338]" /> : <Clock3 size={15} className={item.newStatus === "overdue" ? "text-red-500" : "text-[#D96A24]"} />}<p className="text-sm font-semibold">{monthLabel(item.month)} · {labels[item.newStatus]}</p></div><p className="mt-1 pl-6 text-[11px] text-black/35">{dateLabel(item.changedAt)} · {item.changedByName}</p></div>)}</div>}</div>
+                      <div><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-black/30">История старых статусов</p>{history.length === 0 ? <p className="mt-2 text-sm text-black/35">Изменений нет.</p> : <div className="mt-2 divide-y divide-black/[0.06]">{history.map((item) => <div key={item.id} className="py-3"><div className="flex items-center gap-2">{item.newStatus === "paid" ? <CheckCircle2 size={15} className="text-[#5F6338]" /> : <Clock3 size={15} className={item.newStatus === "overdue" ? "text-red-500" : "text-[#D96A24]"} />}<p className="text-sm font-semibold">{monthLabel(item.month)} · {labels[item.newStatus]}</p></div><p className="mt-1 pl-6 text-[11px] text-black/35">{dateLabel(item.changedAt)} · {item.changedByName}</p></div>)}</div>}</div>
                     </div>}
                   </section>
                 )}

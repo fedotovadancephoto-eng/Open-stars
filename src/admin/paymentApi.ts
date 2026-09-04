@@ -5,7 +5,15 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_1MORh5rY7uMDVYLYVX5VAA_cyoph4-7
 
 export type PaymentStatus = "paid" | "pending" | "overdue";
 export type PaymentMethod = "online" | "cash" | "bank_transfer" | "other";
-export type PaymentOverviewState = "paid" | "needs_amount" | "pending" | "overdue";
+export type PaymentOverviewState =
+  | "paid"
+  | "partial"
+  | "needs_charge"
+  | "needs_amount"
+  | "pending"
+  | "overdue"
+  | "overpaid"
+  | "no_charge";
 export type PaymentChild = { id: string; name: string; branch: string; groupName: string; paymentStatus: string };
 export type PaymentHistory = { id: string; month: string; oldStatus: string; newStatus: string; changedAt: string; changedByName: string };
 export type PaymentReceipt = {
@@ -26,7 +34,14 @@ export type PaymentOverviewStudent = {
   branch: string;
   groupName: string;
   state: PaymentOverviewState;
+  chargeId: string;
+  chargeSet: boolean;
+  expectedAmount: number;
   amountPaid: number;
+  remainingAmount: number;
+  overpaidAmount: number;
+  dueDate: string;
+  chargeNote: string;
   latestReceiptId: string;
   latestMethod: PaymentMethod | "";
   latestReceivedAt: string;
@@ -39,11 +54,19 @@ export type PaymentOverview = {
   month: string;
   totalStudents: number;
   paidStudents: number;
+  partialStudents: number;
+  needsChargeStudents: number;
   needsAmountStudents: number;
   pendingStudents: number;
   overdueStudents: number;
+  overpaidStudents: number;
+  noChargeStudents: number;
+  receivedStudents: number;
   outstandingStudents: number;
   collectedAmount: number;
+  chargedAmount: number;
+  remainingAmount: number;
+  overpaidAmount: number;
   students: PaymentOverviewStudent[];
 };
 export type PaymentLink = { branch: string; paymentUrl: string; enabled: boolean; updatedAt: string };
@@ -75,6 +98,7 @@ async function rpc<T>(name: string, body: Record<string, unknown> = {}) {
     if (message.includes("invalid status")) message = "Выберите корректный статус оплаты.";
     if (message.includes("invalid payment url")) message = "Ссылка должна начинаться с http:// или https://";
     if (message.includes("invalid branch")) message = "Выберите корректный филиал.";
+    if (message.includes("invalid expected amount")) message = "Введите корректную сумму начисления.";
     if (message.includes("invalid amount")) message = "Введите корректную сумму оплаты.";
     if (message.includes("invalid payment method")) message = "Выберите способ оплаты.";
     if (message.includes("void reason required")) message = "Укажите причину отмены оплаты.";
@@ -114,24 +138,63 @@ export async function fetchPaymentOverview(month: string, branch = ""): Promise<
     month: data.month || `${month}-01`,
     totalStudents: Number(data.totalStudents || 0),
     paidStudents: Number(data.paidStudents || 0),
+    partialStudents: Number(data.partialStudents || 0),
+    needsChargeStudents: Number(data.needsChargeStudents || 0),
     needsAmountStudents: Number(data.needsAmountStudents || 0),
     pendingStudents: Number(data.pendingStudents || 0),
     overdueStudents: Number(data.overdueStudents || 0),
+    overpaidStudents: Number(data.overpaidStudents || 0),
+    noChargeStudents: Number(data.noChargeStudents || 0),
+    receivedStudents: Number(data.receivedStudents || data.paidStudents || 0),
     outstandingStudents: Number(data.outstandingStudents || 0),
     collectedAmount: Number(data.collectedAmount || 0),
+    chargedAmount: Number(data.chargedAmount || 0),
+    remainingAmount: Number(data.remainingAmount || 0),
+    overpaidAmount: Number(data.overpaidAmount || 0),
     students: (Array.isArray(data.students) ? data.students : []).map((item: any) => ({
       childId: item.childId || "",
       name: item.name || "Ученик",
       branch: item.branch || "",
       groupName: item.groupName || "",
       state: (item.state || "pending") as PaymentOverviewState,
+      chargeId: item.chargeId || "",
+      chargeSet: Boolean(item.chargeSet),
+      expectedAmount: Number(item.expectedAmount || 0),
       amountPaid: Number(item.amountPaid || 0),
+      remainingAmount: Number(item.remainingAmount || 0),
+      overpaidAmount: Number(item.overpaidAmount || 0),
+      dueDate: item.dueDate || "",
+      chargeNote: item.chargeNote || "",
       latestReceiptId: item.latestReceiptId || "",
       latestMethod: (item.latestMethod || "") as PaymentMethod | "",
       latestReceivedAt: item.latestReceivedAt || "",
       paymentRecordStatus: item.paymentRecordStatus || "",
     })),
   };
+}
+
+export async function setMonthlyCharge(input: {
+  childId: string;
+  month: string;
+  expectedAmount: number;
+  dueDate?: string;
+  note?: string;
+}) {
+  return rpc<{
+    chargeId: string;
+    childId: string;
+    branch: string;
+    month: string;
+    expectedAmount: number;
+    dueDate: string;
+    note: string;
+  }>("staff_set_monthly_charge", {
+    p_child_id: input.childId,
+    p_month: `${input.month}-01`,
+    p_expected_amount: input.expectedAmount,
+    p_due_date: input.dueDate || null,
+    p_note: input.note?.trim() || null,
+  });
 }
 
 export async function setPaymentStatus(childId: string, month: string, status: PaymentStatus) {

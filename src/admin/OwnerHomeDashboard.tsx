@@ -183,11 +183,19 @@ export function OwnerHomeDashboard({ children, onOpenStudents, onOpenPayments, o
   const groupsCount = useMemo(() => new Set(activeChildren.map((child) => `${child.branch}:${child.groupName}`).filter((value) => !value.endsWith(":"))).size, [activeChildren]);
 
   const paidStudents = visiblePaymentStudents.filter((item) => item.state === "paid").length;
+  const partialStudents = visiblePaymentStudents.filter((item) => item.state === "partial").length;
+  const needsChargeStudents = visiblePaymentStudents.filter((item) => item.state === "needs_charge" || (!item.chargeSet && item.state !== "needs_amount")).length;
   const needsAmountStudents = visiblePaymentStudents.filter((item) => item.state === "needs_amount").length;
-  const pendingStudents = visiblePaymentStudents.filter((item) => item.state === "pending").length;
+  const pendingStudents = visiblePaymentStudents.filter((item) => item.state === "pending" && item.chargeSet).length;
   const overdueStudents = visiblePaymentStudents.filter((item) => item.state === "overdue").length;
-  const outstandingStudents = needsAmountStudents + pendingStudents + overdueStudents;
+  const overpaidStudents = visiblePaymentStudents.filter((item) => item.state === "overpaid").length;
+  const receivedStudents = visiblePaymentStudents.filter((item) => item.amountPaid > 0).length;
+  const chargedStudents = visiblePaymentStudents.filter((item) => item.chargeSet).length;
+  const outstandingStudents = partialStudents + pendingStudents + overdueStudents;
   const collectedAmount = visiblePaymentStudents.reduce((sum, item) => sum + item.amountPaid, 0);
+  const chargedAmount = visiblePaymentStudents.filter((item) => item.chargeSet).reduce((sum, item) => sum + item.expectedAmount, 0);
+  const remainingAmount = visiblePaymentStudents.filter((item) => item.chargeSet).reduce((sum, item) => sum + item.remainingAmount, 0);
+  const overpaidAmount = visiblePaymentStudents.filter((item) => item.chargeSet).reduce((sum, item) => sum + item.overpaidAmount, 0);
 
   const targetTotal = visibleGoals.reduce((sum, goal) => sum + goal.target, 0);
   const activeTotalFromGoals = visibleGoals.reduce((sum, goal) => sum + goal.activeStudents, 0);
@@ -202,8 +210,10 @@ export function OwnerHomeDashboard({ children, onOpenStudents, onOpenPayments, o
   const branchOptions = ["Все филиалы", ...(context?.branches.map((item) => item.name) || [])];
   const attention = [
     pending.length > 0 ? { key: "pending", label: "Расходы ждут вашего подтверждения", value: `${pending.length} · ${money(pendingAmount)}`, action: onOpenBusiness } : null,
+    remainingAmount > 0 ? { key: "payment-debt", label: "Остаток по заданным начислениям", value: money(remainingAmount), action: onOpenPayments } : null,
     overdueStudents > 0 ? { key: "overdue", label: "Просроченные оплаты", value: String(overdueStudents), action: onOpenPayments } : null,
-    needsAmountStudents > 0 ? { key: "needs-amount", label: "Оплаты без внесённой фактической суммы", value: String(needsAmountStudents), action: onOpenPayments } : null,
+    needsChargeStudents > 0 ? { key: "needs-charge", label: "Ученикам нужно задать начисление", value: String(needsChargeStudents), action: onOpenPayments } : null,
+    needsAmountStudents > 0 ? { key: "needs-amount", label: "Старые оплаты без фактической суммы", value: String(needsAmountStudents), action: onOpenPayments } : null,
     inactiveParents.length > 0 ? { key: "inactive", label: "Родители ещё не активировали доступ", value: String(inactiveParents.length), action: onOpenStudents } : null,
     incompleteCards.length > 0 ? { key: "cards", label: "Карточки учеников нужно дозаполнить", value: String(incompleteCards.length), action: onOpenStudents } : null,
   ].filter(Boolean) as Array<{ key: string; label: string; value: string; action: () => void }>;
@@ -267,19 +277,24 @@ export function OwnerHomeDashboard({ children, onOpenStudents, onOpenPayments, o
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#D96A24]">Оплаты · {monthLabel()}</p>
-            <h2 className="mt-1 text-xl font-semibold">Собрано {money(collectedAmount)}</h2>
-            <p className="mt-2 text-sm text-black/40">Только подтверждённые фактические поступления из нового реестра оплат.</p>
+            <h2 className="mt-1 text-xl font-semibold">Собрано {money(collectedAmount)}{chargedStudents > 0 ? ` · Остаток ${money(remainingAmount)}` : ""}</h2>
+            <p className="mt-2 text-sm text-black/40">Начисление — сколько должны за месяц. Поступление — только реально полученные деньги. Частичные оплаты считаются автоматически.</p>
           </div>
           <ArrowRight size={20} className="shrink-0 text-[#D96A24]" />
         </div>
-        <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-5">
-          <div className="rounded-[16px] bg-white p-3"><p className="text-[11px] text-black/35">Всего</p><p className="mt-1 text-xl font-semibold">{visiblePaymentStudents.length}</p></div>
-          <div className="rounded-[16px] bg-white p-3"><p className="text-[11px] text-black/35">Оплатили</p><p className="mt-1 text-xl font-semibold text-[#4D512E]">{paidStudents}</p></div>
-          <div className="rounded-[16px] bg-white p-3"><p className="text-[11px] text-black/35">Не оплатили</p><p className="mt-1 text-xl font-semibold">{outstandingStudents}</p></div>
-          <div className="rounded-[16px] bg-white p-3"><p className="text-[11px] text-black/35">Нужно внести сумму</p><p className="mt-1 text-xl font-semibold">{needsAmountStudents}</p></div>
+        <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
+          <div className="rounded-[16px] bg-white p-3"><p className="text-[11px] text-black/35">Начислено</p><p className="mt-1 text-lg font-semibold">{chargedStudents > 0 ? money(chargedAmount) : "—"}</p><p className="mt-1 text-[10px] text-black/30">{chargedStudents} из {visiblePaymentStudents.length}</p></div>
+          <div className="rounded-[16px] bg-white p-3"><p className="text-[11px] text-black/35">Остаток</p><p className="mt-1 text-lg font-semibold text-[#C95320]">{chargedStudents > 0 ? money(remainingAmount) : "—"}</p><p className="mt-1 text-[10px] text-black/30">{outstandingStudents} с долгом</p></div>
+          <div className="rounded-[16px] bg-white p-3"><p className="text-[11px] text-black/35">Полностью</p><p className="mt-1 text-xl font-semibold text-[#4D512E]">{paidStudents}</p></div>
+          <div className="rounded-[16px] bg-white p-3"><p className="text-[11px] text-black/35">Частично</p><p className="mt-1 text-xl font-semibold text-amber-700">{partialStudents}</p></div>
+          <div className="rounded-[16px] bg-white p-3"><p className="text-[11px] text-black/35">Нужно начислить</p><p className="mt-1 text-xl font-semibold">{needsChargeStudents}</p></div>
           <div className="rounded-[16px] bg-white p-3"><p className="text-[11px] text-black/35">Просрочено</p><p className="mt-1 text-xl font-semibold text-[#C95320]">{overdueStudents}</p></div>
         </div>
-        {pendingStudents > 0 && <p className="mt-3 text-xs text-black/35">Ожидают оплаты: {pendingStudents}</p>}
+        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-black/35">
+          <span>Есть поступление: {receivedStudents}</span>
+          {needsAmountStudents > 0 && <span>Нужно внести старую сумму: {needsAmountStudents}</span>}
+          {overpaidStudents > 0 && <span>Переплата: {overpaidStudents} · {money(overpaidAmount)}</span>}
+        </div>
       </button>
 
       <div className="mt-5 grid gap-5 xl:grid-cols-[1.05fr_0.95fr]">
