@@ -14,7 +14,7 @@ import {
   X,
 } from "lucide-react";
 
-import { onAdminSection } from "@/admin/adminNavigation";
+import { onAdminSection, openAdminSection } from "@/admin/adminNavigation";
 import {
   BusinessExpenseContext,
   ExpenseRequest,
@@ -47,6 +47,7 @@ const statusLabel: Record<string, string> = {
   cancelled: "Отменён",
   draft: "Черновик",
 };
+const adminExpenseCategoryCodes = new Set(["cleaning", "inventory_purchase", "household", "client_change"]);
 
 function today() {
   const date = new Date();
@@ -124,7 +125,12 @@ export function AdminExpenseManager() {
     } else if (!branchId && next.branches.length) {
       setBranchId(next.branches[0].id);
     }
-    if (!categoryId && next.categories.length) setCategoryId(next.categories[0].id);
+    const nextCategories = next.role === "admin"
+      ? next.categories.filter((item) => adminExpenseCategoryCodes.has(item.code))
+      : next.categories;
+    if (!categoryId || !nextCategories.some((item) => item.id === categoryId)) {
+      setCategoryId(nextCategories[0]?.id || "");
+    }
     if (next.role === "owner") {
       const nextSummary = await fetchOwnerExpenseSummary(nextFrom, nextTo);
       setSummary(nextSummary);
@@ -145,6 +151,12 @@ export function AdminExpenseManager() {
 
   const isOwner = context?.role === "owner";
   const myBranchLocked = context?.role === "admin";
+  const visibleCategories = useMemo(
+    () => context?.role === "admin"
+      ? context.categories.filter((item) => adminExpenseCategoryCodes.has(item.code))
+      : context?.categories || [],
+    [context]
+  );
   const recent = useMemo(() => context?.requests.slice(0, 40) || [], [context]);
   const ownerCashflow = useMemo(() => (context?.cashflow || []).filter((item) => item.direction === "expense").slice(0, 30), [context]);
 
@@ -383,11 +395,25 @@ export function AdminExpenseManager() {
                   </label>}
 
                   <label className="block text-xs font-semibold text-black/55">Категория
-                    <select className={inputClass} value={categoryId} onChange={(event) => setCategoryId(event.target.value)}>
+                    <select className={inputClass} value={categoryId} onChange={(event) => {
+                      const value = event.target.value;
+                      if (value === "__payroll__") {
+                        setOpen(false);
+                        window.setTimeout(() => openAdminSection("payroll"), 0);
+                        return;
+                      }
+                      setCategoryId(value);
+                    }}>
                       <option value="">Выберите категорию</option>
-                      {context?.categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+                      {isOwner ? context?.categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>) : (
+                        <>
+                          {visibleCategories.filter((category) => category.code !== "client_change").map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+                          <option value="__payroll__">Зарплата педагогам</option>
+                          {visibleCategories.filter((category) => category.code === "client_change").map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+                        </>
+                      )}
                     </select>
-                    {!isOwner && <span className="mt-1.5 block text-[11px] text-black/30">Зарплаты и другие чувствительные категории доступны только владельцу.</span>}
+                    {!isOwner && <span className="mt-1.5 block text-[11px] text-black/30">Зарплата педагогам оформляется отдельным блоком с педагогом и неделей.</span>}
                   </label>
 
                   <div className="grid gap-3 sm:grid-cols-2">
@@ -413,7 +439,7 @@ export function AdminExpenseManager() {
                     </div>
                   )}
 
-                  <label className="block text-xs font-semibold text-black/55">Комментарий<textarea className={`${inputClass} min-h-[90px] resize-none`} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Например: канцтовары для филиала"/></label>
+                  <label className="block text-xs font-semibold text-black/55">Комментарий<textarea className={`${inputClass} min-h-[90px] resize-none`} value={description} onChange={(event) => setDescription(event.target.value)} placeholder={isOwner ? "Например: аренда, реклама или закупка" : "Например: бытовая химия или инвентарь"}/></label>
 
                   <label className="block text-xs font-semibold text-black/55">Чек или подтверждающий файл
                     <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,application/pdf" className="hidden" onChange={(event) => setReceipt(event.target.files?.[0] || null)}/>
