@@ -1,12 +1,5 @@
 -- OPEN STARS · CRM conversion: paid lead -> student without repeated parent data
-
-alter table public.child_internal_profiles drop constraint if exists child_internal_profiles_source_check;
-alter table public.child_internal_profiles add constraint child_internal_profiles_source_check
-check (acquisition_source is null or acquisition_source = any (array[
-  'Instagram'::text,'Звонок'::text,'VK'::text,'2ГИС'::text,'Яндекс'::text,'Сайт'::text,
-  'Рекомендация'::text,'Старая база'::text,'Наружная реклама'::text,'Партнёры'::text,
-  'Мероприятие'::text,'Другое'::text
-]));
+-- Existing child acquisition-source catalog stays unchanged. CRM-only source «Звонок» is stored as «Другое» + note.
 
 create or replace function public.crm_convert_lead_to_student(
   p_lead_id uuid,
@@ -101,8 +94,16 @@ begin
     nullif(trim(coalesce(p_lesson_time,'')),''),v_admin_name,null
   ) returning id into v_child_id;
 
-  v_source := case when v_lead.source in ('Instagram','Звонок','VK','2ГИС','Яндекс','Сайт','Рекомендация','Старая база','Наружная реклама','Партнёры','Мероприятие','Другое') then v_lead.source else 'Другое' end;
-  v_source_note := case when v_source='Другое' then coalesce(nullif(v_lead.source_note,''),v_lead.source) else null end;
+  if v_lead.source in ('Instagram','VK','2ГИС','Яндекс','Сайт','Рекомендация','Старая база','Наружная реклама','Партнёры','Мероприятие') then
+    v_source := v_lead.source;
+    v_source_note := null;
+  else
+    v_source := 'Другое';
+    v_source_note := case
+      when v_lead.source = 'Другое' then coalesce(nullif(v_lead.source_note,''),'Другое')
+      else coalesce(nullif(v_lead.source_note,''),v_lead.source)
+    end;
+  end if;
 
   insert into public.child_internal_profiles(child_id,acquisition_source,acquisition_source_note,updated_by_profile_id)
   values(v_child_id,v_source,v_source_note,v_actor)
