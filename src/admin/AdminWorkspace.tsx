@@ -6,6 +6,7 @@ import { AdminNewsManager } from "@/admin/AdminNewsManager";
 import { AdminParentActivationManager } from "@/admin/AdminParentActivationManager";
 import { AdminParentPasswordResetManager } from "@/admin/AdminParentPasswordResetManager";
 import { AdminPaymentManager } from "@/admin/AdminPaymentManager";
+import { AdminPayrollManager } from "@/admin/AdminPayrollManager";
 import { AdminPhotoSessionManager } from "@/admin/AdminPhotoSessionManager";
 import { AdminReportExport } from "@/admin/AdminReportExport";
 import { AdminScheduleManager } from "@/admin/AdminScheduleManager";
@@ -38,6 +39,7 @@ export default function AdminWorkspace() {
       <AdminStaffManager />
       <AdminReportExport />
       <AdminExpenseManager />
+      <AdminPayrollManager />
       <OwnerBusinessDashboard />
       <OwnerHomeLanding />
     </>
