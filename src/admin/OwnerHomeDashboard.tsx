@@ -208,6 +208,18 @@ export function OwnerHomeDashboard({ children, onOpenStudents, onOpenPayments, o
     incompleteCards.length > 0 ? { key: "cards", label: "Карточки учеников нужно дозаполнить", value: String(incompleteCards.length), action: onOpenStudents } : null,
   ].filter(Boolean) as Array<{ key: string; label: string; value: string; action: () => void }>;
 
+  if (loading && !context && !paymentOverview) {
+    return (
+      <div className="grid min-h-[62vh] place-items-center">
+        <div className="text-center">
+          <LoaderCircle className="mx-auto animate-spin text-[#5F6338]" size={30} />
+          <p className="mt-4 text-lg font-semibold">Загружаем реальные данные</p>
+          <p className="mt-2 text-sm text-black/40">Цели, оплаты и ДДС появятся одновременно.</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
