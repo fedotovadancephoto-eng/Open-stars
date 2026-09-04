@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Archive,
+  Banknote,
   BookOpenCheck,
   CalendarDays,
   Camera,
@@ -34,6 +35,7 @@ const items: Array<{
 }> = [
   { section: "business", label: "Бизнес", icon: WalletCards, accent: "orange", roles: ["owner"] },
   { section: "expenses", label: "Расходы", icon: ReceiptText, accent: "olive", roles: ["owner", "project_director", "admin", "manager"] },
+  { section: "payroll", label: "Зарплата педагогам", icon: Banknote, accent: "orange", roles: ["owner", "admin"] },
   { section: "add-student", label: "Добавить ученика", icon: UserPlus, accent: "orange", roles: ["owner", "project_director", "admin", "manager"] },
   { section: "archive", label: "Выбывшие", icon: Archive, accent: "neutral", roles: ["owner", "project_director", "admin", "manager"] },
   { section: "parent-activation", label: "Активация родителей", icon: KeyRound, accent: "orange", roles: ["owner", "project_director", "admin", "manager"] },
@@ -56,7 +58,7 @@ const accentClass = {
   neutral: "bg-black/[0.055] text-[#171717]",
 };
 
-const legacyLabels = new Set(items.filter((item) => !["team", "reports", "expenses", "business"].includes(item.section)).map((item) => item.label));
+const legacyLabels = new Set(items.filter((item) => !["team", "reports", "expenses", "payroll", "business"].includes(item.section)).map((item) => item.label));
 
 function normalize(value: string | null | undefined) {
   return (value || "").replace(/\s+/g, " ").trim();
