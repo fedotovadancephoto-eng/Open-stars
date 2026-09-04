@@ -16,6 +16,7 @@ import {
   Newspaper,
   ReceiptText,
   ShieldCheck,
+  Target,
   UserPlus,
   WalletCards,
   X,
@@ -34,6 +35,7 @@ const items: Array<{
   teacherVisible?: boolean;
 }> = [
   { section: "business", label: "Бизнес", icon: WalletCards, accent: "orange", roles: ["owner"] },
+  { section: "crm", label: "CRM · Продажи", icon: Target, accent: "orange", roles: ["owner", "project_director", "admin", "manager"] },
   { section: "expenses", label: "Расходы", icon: ReceiptText, accent: "olive", roles: ["owner", "project_director", "admin", "manager"] },
   { section: "payroll", label: "Зарплата педагогам", icon: Banknote, accent: "orange", roles: ["owner", "admin"] },
   { section: "add-student", label: "Добавить ученика", icon: UserPlus, accent: "orange", roles: ["owner", "project_director", "admin", "manager"] },
@@ -58,7 +60,7 @@ const accentClass = {
   neutral: "bg-black/[0.055] text-[#171717]",
 };
 
-const legacyLabels = new Set(items.filter((item) => !["team", "reports", "expenses", "payroll", "business"].includes(item.section)).map((item) => item.label));
+const legacyLabels = new Set(items.filter((item) => !["team", "reports", "expenses", "payroll", "business", "crm"].includes(item.section)).map((item) => item.label));
 
 function normalize(value: string | null | undefined) {
   return (value || "").replace(/\s+/g, " ").trim();
