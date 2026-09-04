@@ -1,10 +1,11 @@
 import { FormEvent, useEffect, useState } from "react";
-import { Eye, EyeOff, LockKeyhole, LogOut, Phone, Target } from "lucide-react";
+import { Eye, EyeOff, KeyRound, LockKeyhole, LogOut, Phone, Target } from "lucide-react";
 
 import { AdminCrmManager } from "@/admin/AdminCrmManager";
 import { clearStaffSession, getValidStaffSession } from "@/admin/adminApi";
 import { openAdminSection } from "@/admin/adminNavigation";
 import { CrmRole, fetchCrmContext } from "@/admin/crmApi";
+import { registerStaff } from "@/admin/staffRegisterApi";
 import { Logo } from "@/components/Logo";
 
 const SUPABASE_URL = "https://yiwiykbuaggyslfyhlfo.supabase.co";
@@ -21,6 +22,7 @@ const roleLabels: Record<CrmRole, string> = {
 };
 
 type State = "checking" | "guest" | "ready" | "error";
+type LoginMode = "login" | "activate";
 type AuthPayload = {
   access_token?: string;
   refresh_token?: string;
@@ -28,8 +30,6 @@ type AuthPayload = {
   expires_at?: number;
   token_type?: string;
   user?: { id?: string };
-  error_description?: string;
-  msg?: string;
 };
 
 function normalizePhone(input: string) {
@@ -82,7 +82,9 @@ async function loginCrmStaff(phoneInput: string, password: string) {
 }
 
 function CrmLogin({ onSuccess }: { onSuccess: () => void }) {
+  const [mode, setMode] = useState<LoginMode>("login");
   const [phone, setPhone] = useState("");
+  const [activationCode, setActivationCode] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -92,24 +94,41 @@ function CrmLogin({ onSuccess }: { onSuccess: () => void }) {
     event.preventDefault();
     setLoading(true); setError("");
     try {
+      if (mode === "activate") {
+        await registerStaff(phone, activationCode, password);
+      }
       await loginCrmStaff(phone, password);
       onSuccess();
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Не удалось войти в CRM.");
+      setError(reason instanceof Error ? reason.message : mode === "activate" ? "Не удалось активировать CRM-доступ." : "Не удалось войти в CRM.");
     } finally { setLoading(false); }
+  }
+
+  function changeMode(next: LoginMode) {
+    setMode(next);
+    setError("");
+    setActivationCode("");
   }
 
   return <div className="grid min-h-screen place-items-center bg-[#FAF9F5] px-5 py-10">
     <div className="w-full max-w-md rounded-[28px] border border-black/[0.06] bg-white p-6 shadow-[0_18px_60px_rgba(0,0,0,0.08)] sm:p-8">
       <Logo />
       <p className="mt-8 text-[11px] font-bold uppercase tracking-[0.2em] text-[#D96A24]">OPEN STARS · CRM</p>
-      <h1 className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-[#171717]">Лиды и продажи</h1>
-      <p className="mt-2 text-sm leading-6 text-black/45">Рабочий вход для продаж, маркетинга и сотрудников с доступом к CRM.</p>
+      <h1 className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-[#171717]">{mode === "login" ? "Лиды и продажи" : "Первый вход в CRM"}</h1>
+      <p className="mt-2 text-sm leading-6 text-black/45">{mode === "login" ? "Рабочий вход для продаж, маркетинга и сотрудников с доступом к CRM." : "Введите рабочий номер, одноразовый код от руководителя и придумайте личный пароль."}</p>
+
+      <div className="mt-6 grid grid-cols-2 gap-1.5 rounded-[16px] bg-[#ECEAE2] p-1.5">
+        <button type="button" onClick={()=>changeMode("login")} className={`rounded-[12px] px-3 py-2.5 text-sm font-semibold ${mode === "login" ? "bg-white text-[#171717] shadow-sm" : "text-black/45"}`}>Войти</button>
+        <button type="button" onClick={()=>changeMode("activate")} className={`rounded-[12px] px-3 py-2.5 text-sm font-semibold ${mode === "activate" ? "bg-white text-[#171717] shadow-sm" : "text-black/45"}`}>Активировать</button>
+      </div>
+
       <form onSubmit={submit} className="mt-6 space-y-4">
         <label className="block text-xs font-semibold text-black/55">Номер телефона<div className="relative mt-2"><Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-[#5F6338]" size={18}/><input type="tel" value={phone} onChange={e=>setPhone(e.target.value)} placeholder="+7 999 123-45-67" className="w-full rounded-[16px] border border-black/[0.08] bg-[#FAF9F5] py-3.5 pl-12 pr-4 text-sm outline-none focus:border-[#D96A24]/40" required/></div></label>
-        <label className="block text-xs font-semibold text-black/55">Пароль<div className="relative mt-2"><LockKeyhole className="absolute left-4 top-1/2 -translate-y-1/2 text-[#5F6338]" size={18}/><input type={showPassword?"text":"password"} value={password} onChange={e=>setPassword(e.target.value)} className="w-full rounded-[16px] border border-black/[0.08] bg-[#FAF9F5] py-3.5 pl-12 pr-12 text-sm outline-none focus:border-[#D96A24]/40" required/><button type="button" onClick={()=>setShowPassword(v=>!v)} className="absolute right-3 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full text-black/35">{showPassword?<EyeOff size={17}/>:<Eye size={17}/>}</button></div></label>
+        {mode === "activate" && <label className="block text-xs font-semibold text-black/55">Код активации<div className="relative mt-2"><KeyRound className="absolute left-4 top-1/2 -translate-y-1/2 text-[#D96A24]" size={18}/><input value={activationCode} onChange={e=>setActivationCode(e.target.value.toUpperCase().replace(/[^0-9A-F]/g, "").slice(0, 6))} placeholder="6 символов" minLength={6} maxLength={6} className="w-full rounded-[16px] border border-black/[0.08] bg-[#FAF9F5] py-3.5 pl-12 pr-4 text-sm font-semibold uppercase tracking-[0.18em] outline-none focus:border-[#D96A24]/40" required/></div></label>}
+        <label className="block text-xs font-semibold text-black/55">{mode === "activate" ? "Придумайте пароль" : "Пароль"}<div className="relative mt-2"><LockKeyhole className="absolute left-4 top-1/2 -translate-y-1/2 text-[#5F6338]" size={18}/><input type={showPassword?"text":"password"} value={password} onChange={e=>setPassword(e.target.value)} minLength={mode === "activate" ? 8 : undefined} className="w-full rounded-[16px] border border-black/[0.08] bg-[#FAF9F5] py-3.5 pl-12 pr-12 text-sm outline-none focus:border-[#D96A24]/40" required/><button type="button" onClick={()=>setShowPassword(v=>!v)} className="absolute right-3 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full text-black/35">{showPassword?<EyeOff size={17}/>:<Eye size={17}/>}</button></div></label>
+        {mode === "activate" && <p className="rounded-[14px] bg-[#5F6338]/[0.07] px-4 py-3 text-xs leading-5 text-[#4D512E]">Код используется один раз. После активации сотрудник входит только по рабочему телефону и своему паролю.</p>}
         {error&&<div className="rounded-[14px] bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
-        <button disabled={loading} className="w-full rounded-[16px] bg-[#171717] py-3.5 text-sm font-semibold text-white disabled:opacity-50">{loading?"Проверяем доступ…":"Войти в CRM"}</button>
+        <button disabled={loading} className="w-full rounded-[16px] bg-[#171717] py-3.5 text-sm font-semibold text-white disabled:opacity-50">{loading ? (mode === "activate" ? "Активируем…" : "Проверяем доступ…") : (mode === "activate" ? "Активировать и войти" : "Войти в CRM")}</button>
       </form>
     </div>
   </div>;
