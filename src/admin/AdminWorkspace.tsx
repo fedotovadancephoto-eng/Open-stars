@@ -16,6 +16,7 @@ import { AdminStudentOperations } from "@/admin/AdminStudentOperations";
 import { AdminStudyManager } from "@/admin/AdminStudyManager";
 import { AdminTopMenu } from "@/admin/AdminTopMenu";
 import { ChildPhotoUpload } from "@/admin/ChildPhotoUpload";
+import { CrmAccessManager } from "@/admin/CrmAccessManager";
 import { OwnerBusinessDashboard } from "@/admin/OwnerBusinessDashboard";
 import { OwnerHomeLanding } from "@/admin/OwnerHomeLanding";
 import { StaffModeSwitch } from "@/admin/StaffModeSwitch";
@@ -42,6 +43,7 @@ export default function AdminWorkspace() {
       <AdminExpenseManager />
       <AdminPayrollManager />
       <AdminCrmManager />
+      <CrmAccessManager />
       <OwnerBusinessDashboard />
       <OwnerHomeLanding />
     </>
