@@ -50,6 +50,24 @@ export type CrmMarketingRow = {
   lost: number;
 };
 
+export type CrmStudentConversionInput = {
+  leadId: string;
+  firstName: string;
+  lastName: string;
+  groupName: "Базовый" | "Продвинутый" | "PRO";
+  birthDate?: string;
+  lessonDay?: string;
+  lessonTime?: string;
+};
+
+export type CrmStudentConversionResult = {
+  childId: string;
+  familyId?: string;
+  parentProfileId?: string;
+  leadId: string;
+  alreadyConverted: boolean;
+};
+
 type ApiError = { message?: string; details?: string };
 
 async function sessionToken() {
@@ -73,6 +91,10 @@ function friendly(message: string) {
   if (message.includes("invalid phone")) return "Проверьте телефон родителя.";
   if (message.includes("source required")) return "Выберите источник клиента.";
   if (message.includes("lost reason required")) return "Укажите причину, почему лид потерян.";
+  if (message.includes("lead must be paid")) return "Сначала сохраните этап «Оплатил», затем оформляйте ученика.";
+  if (message.includes("student already exists")) return "Такой ребёнок уже есть у этого родителя. Откройте существующую карточку ученика.";
+  if (message.includes("child full name required")) return "Укажите имя и фамилию ребёнка.";
+  if (message.includes("invalid group")) return "Выберите группу ребёнка.";
   if (message.includes("not authorized")) return "Недостаточно прав для этого действия.";
   return message || "Не удалось выполнить действие CRM.";
 }
@@ -94,7 +116,7 @@ async function rpc<T>(name: string, body: Record<string, unknown>) {
       const payload = (await response.json()) as ApiError;
       message = payload.message || payload.details || "";
     } catch {
-      // ignore
+      // ignore non-json response
     }
     throw new Error(friendly(message));
   }
@@ -211,6 +233,18 @@ export async function createCrmTask(leadId: string, title: string, dueAt: string
 
 export async function completeCrmTask(taskId: string) {
   return rpc<string>("crm_complete_task", { p_task_id: taskId });
+}
+
+export async function convertCrmLeadToStudent(input: CrmStudentConversionInput) {
+  return rpc<CrmStudentConversionResult>("crm_convert_lead_to_student", {
+    p_lead_id: input.leadId,
+    p_first_name: input.firstName.trim(),
+    p_last_name: input.lastName.trim(),
+    p_group_name: input.groupName,
+    p_birth_date: input.birthDate || null,
+    p_lesson_day: input.lessonDay?.trim() || null,
+    p_lesson_time: input.lessonTime?.trim() || null,
+  });
 }
 
 export async function fetchCrmMarketingSummary(from: string, to: string, branch = "") {
