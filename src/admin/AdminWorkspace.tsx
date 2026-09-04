@@ -1,5 +1,6 @@
 import AdminApp from "@/admin/AdminApp";
 import { AdminCoinManager } from "@/admin/AdminCoinManager";
+import { AdminCrmManager } from "@/admin/AdminCrmManager";
 import { AdminExpenseManager } from "@/admin/AdminExpenseManager";
 import { AdminFeedbackManager } from "@/admin/AdminFeedbackManager";
 import { AdminNewsManager } from "@/admin/AdminNewsManager";
@@ -40,6 +41,7 @@ export default function AdminWorkspace() {
       <AdminReportExport />
       <AdminExpenseManager />
       <AdminPayrollManager />
+      <AdminCrmManager />
       <OwnerBusinessDashboard />
       <OwnerHomeLanding />
     </>
