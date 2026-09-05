@@ -22,6 +22,7 @@ import { ProfileCard } from "@/components/ProfileCard";
 import { AchievementsTab } from "@/components/tabs/AchievementsTab";
 import { CoinsTab } from "@/components/tabs/CoinsTab";
 import { CommentsTab } from "@/components/tabs/CommentsTab";
+import { EventsTab } from "@/components/tabs/EventsTab";
 import { HomeworkTab } from "@/components/tabs/HomeworkTab";
 import { NewsTab } from "@/components/tabs/NewsTab";
 import { PaymentsTab } from "@/components/tabs/PaymentsTab";
@@ -41,6 +42,7 @@ type TabId =
   | "news"
   | "schedule"
   | "payments"
+  | "events"
   | "photos";
 
 type AuthStatus = "checking" | "guest" | "authenticated";
@@ -67,6 +69,7 @@ const parentTabs: TabConfig[] = [
   { id: "schedule", label: "Расписание", icon: CalendarDays, iconBox: "bg-[#5F6338]/12", iconColor: "text-[#4D512E]", hoverBg: "hover:bg-[#5F6338]/[0.055]" },
   { id: "news", label: "Новости", icon: Newspaper, iconBox: "bg-[#D96A24]/12", iconColor: "text-[#C95320]", hoverBg: "hover:bg-[#D96A24]/[0.055]" },
   { id: "payments", label: "Оплата", icon: CreditCard, iconBox: "bg-[#5F6338]/12", iconColor: "text-[#4D512E]", hoverBg: "hover:bg-[#5F6338]/[0.055]" },
+  { id: "events", label: "Мероприятия", icon: CalendarDays, iconBox: "bg-[#D96A24]/12", iconColor: "text-[#C95320]", hoverBg: "hover:bg-[#D96A24]/[0.055]" },
   { id: "photos", label: "Фотосессии", icon: Camera, iconBox: "bg-[#D96A24]/12", iconColor: "text-[#C95320]", hoverBg: "hover:bg-[#D96A24]/[0.055]" },
 ];
 
@@ -315,7 +318,7 @@ function App() {
 
           <section className="mt-5">
             <div className="mb-3 flex items-center gap-3 px-1"><span className="h-px w-7 bg-[#5F6338]" /><p className="text-[11px] font-bold uppercase tracking-[0.19em] text-black/45">Для родителей</p></div>
-            <TabGrid tabs={parentTabs} activeTab={activeTab} onSelect={handleTabSelect} columns="lg:grid-cols-4" />
+            <TabGrid tabs={parentTabs} activeTab={activeTab} onSelect={handleTabSelect} columns="sm:grid-cols-3 lg:grid-cols-5" />
           </section>
 
           <section ref={tabContentRef} className="mt-6 scroll-mt-24 pb-8">
@@ -327,6 +330,7 @@ function App() {
             {activeTab === "schedule" && <ScheduleTab />}
             {activeTab === "news" && <NewsTab />}
             {activeTab === "payments" && <PaymentsTab />}
+            {activeTab === "events" && <EventsTab childId={child.id} childName={childFirstName} />}
             {activeTab === "photos" && <PhotosTab />}
           </section>
 
