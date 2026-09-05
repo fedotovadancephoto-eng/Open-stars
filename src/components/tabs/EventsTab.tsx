@@ -85,6 +85,8 @@ export function EventsTab({ childId, childName }: { childId: string; childName: 
             const participating = participant?.status === "participating";
             const declined = participant?.status === "declined";
             const canChoose = event.status === "open";
+            const hasPayment = paid > 0;
+            const remaining = fee == null ? null : Math.max(fee - paid, 0);
             return (
               <article key={event.id} className="rounded-[22px] border border-black/[0.06] bg-[#FAF9F5] p-4 sm:p-5">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -104,19 +106,23 @@ export function EventsTab({ childId, childName }: { childId: string; childName: 
                   <div className="shrink-0 rounded-[17px] bg-white px-4 py-3 sm:min-w-[150px]">
                     <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-black/35">Стоимость</p>
                     <p className="mt-1 text-lg font-semibold">{fee == null ? "Уточняется" : money(fee)}</p>
-                    {paid > 0 && <p className="mt-1 flex items-center gap-1 text-xs font-semibold text-[#4D512E]"><CreditCard size={13}/> Оплачено {money(paid)}</p>}
+                    {hasPayment && <p className="mt-1 flex items-center gap-1 text-xs font-semibold text-[#4D512E]"><CreditCard size={13}/> Оплачено {money(paid)}</p>}
+                    {hasPayment && remaining !== null && <p className="mt-1 text-[10px] text-black/40">{remaining > 0 ? `Осталось ${money(remaining)}` : "Оплачено полностью"}</p>}
                   </div>
                 </div>
 
                 {canChoose && (
-                  <div className="mt-4 grid grid-cols-2 gap-2">
-                    <button type="button" disabled={busyId === event.id} onClick={() => void choose(event.id, "participating")} className={`flex min-h-[44px] items-center justify-center gap-2 rounded-[13px] px-3 text-sm font-semibold transition disabled:opacity-50 ${participating ? "bg-[#5F6338] text-white" : "bg-white text-[#171717]"}`}>
-                      {busyId === event.id ? <LoaderCircle size={16} className="animate-spin"/> : <Check size={16}/>} Участвуем
-                    </button>
-                    <button type="button" disabled={busyId === event.id} onClick={() => void choose(event.id, "declined")} className={`flex min-h-[44px] items-center justify-center gap-2 rounded-[13px] px-3 text-sm font-semibold transition disabled:opacity-50 ${declined ? "bg-[#171717] text-white" : "bg-white text-black/50"}`}>
-                      <X size={16}/> Не участвуем
-                    </button>
-                  </div>
+                  <>
+                    <div className="mt-4 grid grid-cols-2 gap-2">
+                      <button type="button" disabled={busyId === event.id} onClick={() => void choose(event.id, "participating")} className={`flex min-h-[44px] items-center justify-center gap-2 rounded-[13px] px-3 text-sm font-semibold transition disabled:opacity-50 ${participating ? "bg-[#5F6338] text-white" : "bg-white text-[#171717]"}`}>
+                        {busyId === event.id ? <LoaderCircle size={16} className="animate-spin"/> : <Check size={16}/>} Участвуем
+                      </button>
+                      <button type="button" disabled={busyId === event.id || hasPayment} onClick={() => void choose(event.id, "declined")} className={`flex min-h-[44px] items-center justify-center gap-2 rounded-[13px] px-3 text-sm font-semibold transition disabled:opacity-40 ${declined ? "bg-[#171717] text-white" : "bg-white text-black/50"}`}>
+                        <X size={16}/> Не участвуем
+                      </button>
+                    </div>
+                    {hasPayment && <p className="mt-2 text-[11px] leading-5 text-black/40">Оплата уже зафиксирована. Для отмены участия обратитесь к администратору.</p>}
+                  </>
                 )}
               </article>
             );
