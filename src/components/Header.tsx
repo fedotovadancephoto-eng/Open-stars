@@ -7,6 +7,7 @@ import {
   Camera,
   Coins,
   CreditCard,
+  FileCheck2,
   LogOut,
   Menu,
   MessageCircle,
@@ -35,6 +36,7 @@ const menuItems = [
   { id: "schedule", label: "Расписание", icon: CalendarDays },
   { id: "news", label: "Новости", icon: Newspaper },
   { id: "payments", label: "Оплата", icon: CreditCard },
+  { id: "documents", label: "Документы", icon: FileCheck2 },
   { id: "photos", label: "Фотосессии", icon: Camera },
 ];
 
@@ -67,6 +69,10 @@ export function Header({ onNavigate, onLogout }: HeaderProps) {
 
   const navigate = (tab: string) => {
     setPanel(null);
+    if (tab === "documents") {
+      window.location.href = "/documents";
+      return;
+    }
     onNavigate?.(tab);
   };
 
