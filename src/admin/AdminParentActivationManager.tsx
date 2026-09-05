@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { Check, Clipboard, Download, KeyRound, LoaderCircle, RefreshCw, Search, UsersRound, X } from "lucide-react";
+import { Check, Clipboard, Download, KeyRound, LoaderCircle, LockKeyhole, RefreshCw, Search, UsersRound, X } from "lucide-react";
 
 import { AdminChild, StaffRole, fetchAdminChildren, fetchStaffIdentity, getValidStaffSession } from "@/admin/adminApi";
+import { openAdminSection } from "@/admin/adminNavigation";
 import {
   BulkParentActivationCode,
   ParentActivationCode,
@@ -74,8 +75,6 @@ export function AdminParentActivationManager() {
     const identity = await fetchStaffIdentity();
     if (identity.role === "teacher") return;
 
-    // Показываем раздел сразу после подтверждения роли. Загрузка списка родителей
-    // не должна скрывать кнопку «Активация родителей» при временной ошибке чтения.
     setRole(identity.role);
     setEnabled(true);
 
@@ -118,6 +117,11 @@ export function AdminParentActivationManager() {
     try { await load(); }
     catch (e) { setError(e instanceof Error ? e.message : "Не удалось загрузить родителей."); }
     finally { setLoading(false); }
+  }
+
+  function openPasswordReset() {
+    setOpen(false);
+    window.setTimeout(() => openAdminSection("parent-password-reset"), 0);
   }
 
   async function generateOne(child: AdminChild) {
@@ -181,13 +185,24 @@ export function AdminParentActivationManager() {
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#D96A24]">OPEN STARS ADMIN</p>
-            <h2 className="mt-1 text-2xl font-semibold">Активация родителей</h2>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-black/45">Код нужен только один раз. Родитель вводит номер + код, задаёт свой пароль и дальше входит по номеру и паролю без SMS.</p>
+            <h2 className="mt-1 text-2xl font-semibold">Доступ родителей</h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-black/45">Здесь администратор решает обе задачи доступа: активирует новый кабинет или помогает уже активированному родителю восстановить пароль.</p>
           </div>
           <button type="button" onClick={() => setOpen(false)} className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white"><X size={20}/></button>
         </div>
 
-        <section className="mt-6 rounded-[24px] border border-black/[0.06] bg-white p-5 sm:p-6">
+        <div className="mt-5 grid grid-cols-2 gap-2">
+          <div className="rounded-[16px] bg-[#171717] px-4 py-3 text-white">
+            <div className="flex items-center gap-2"><KeyRound size={16}/><span className="text-sm font-semibold">Активация кабинета</span></div>
+            <p className="mt-1 text-[11px] text-white/55">Для нового родителя или перевыпуска кода.</p>
+          </div>
+          <button type="button" onClick={openPasswordReset} className="rounded-[16px] border border-black/[0.06] bg-white px-4 py-3 text-left transition hover:bg-[#FAF9F5] active:scale-[0.99]">
+            <div className="flex items-center gap-2"><LockKeyhole size={16} className="text-[#D96A24]"/><span className="text-sm font-semibold">Сброс пароля</span></div>
+            <p className="mt-1 text-[11px] text-black/40">Для уже активированного кабинета.</p>
+          </button>
+        </div>
+
+        <section className="mt-5 rounded-[24px] border border-black/[0.06] bg-white p-5 sm:p-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
             <label className="flex-1 text-xs font-semibold text-black/55">Филиал
               <select value={branch} onChange={(e) => { setBranch(e.target.value); setBulkRows([]); }} disabled={role === "admin"} className="mt-1.5 w-full rounded-[13px] border border-black/[0.08] bg-[#FAF9F5] px-3.5 py-3 text-sm outline-none disabled:opacity-65">
@@ -231,7 +246,7 @@ export function AdminParentActivationManager() {
               return <div key={child.id} className="rounded-[16px] border border-black/[0.055] p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div><p className="font-semibold">{child.fullName}</p><p className="mt-1 text-xs text-black/40">{child.parentName || "Родитель"} · {child.parentPhone || "телефон не указан"} · {child.groupName}</p><p className={`mt-1 text-[11px] font-semibold ${active ? "text-[#4D512E]" : "text-[#C95320]"}`}>{active ? "Кабинет активирован" : invited ? "Код уже выдавался — при необходимости его можно перевыпустить" : "Кабинет не активирован"}</p></div>
-                  {active ? <span className="rounded-full bg-[#5F6338]/10 px-3 py-2 text-xs font-semibold text-[#4D512E]">Активирован</span> : <button type="button" disabled={busyId === child.id} onClick={() => generateOne(child)} className={`flex shrink-0 items-center justify-center gap-1.5 rounded-[12px] px-3.5 py-2.5 text-xs font-semibold text-white disabled:opacity-50 ${invited ? "bg-[#D96A24]" : "bg-[#171717]"}`}>{busyId === child.id ? <LoaderCircle className="animate-spin" size={14}/> : invited ? <RefreshCw size={14}/> : <KeyRound size={14}/>} {invited ? "Перевыпустить код" : "Сгенерировать код"}</button>}
+                  {active ? <button type="button" onClick={openPasswordReset} className="flex shrink-0 items-center justify-center gap-1.5 rounded-[12px] bg-[#5F6338]/10 px-3.5 py-2.5 text-xs font-semibold text-[#4D512E]"><LockKeyhole size={14}/> Сбросить пароль</button> : <button type="button" disabled={busyId === child.id} onClick={() => generateOne(child)} className={`flex shrink-0 items-center justify-center gap-1.5 rounded-[12px] px-3.5 py-2.5 text-xs font-semibold text-white disabled:opacity-50 ${invited ? "bg-[#D96A24]" : "bg-[#171717]"}`}>{busyId === child.id ? <LoaderCircle className="animate-spin" size={14}/> : invited ? <RefreshCw size={14}/> : <KeyRound size={14}/>} {invited ? "Перевыпустить код" : "Сгенерировать код"}</button>}
                 </div>
                 {result && <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-[13px] bg-[#F2F0E8] px-3.5 py-3"><div><p className="text-[10px] font-bold uppercase tracking-wide text-black/35">Код активации</p><p className="mt-0.5 text-xl font-bold tracking-[0.12em]">{result.activationCode}</p><p className="mt-1 text-[10px] text-black/35">Действует до {dateLabel(result.expiresAt)}</p>{invited && <p className="mt-1 text-[10px] font-semibold text-[#C95320]">Старый код больше не действует.</p>}</div><button type="button" onClick={() => copyCode(child.id, result.activationCode)} className="flex items-center gap-1.5 rounded-[11px] bg-white px-3 py-2 text-xs font-semibold">{copied === child.id ? <Check size={14}/> : <Clipboard size={14}/>} {copied === child.id ? "Скопировано" : "Копировать"}</button></div>}
               </div>;

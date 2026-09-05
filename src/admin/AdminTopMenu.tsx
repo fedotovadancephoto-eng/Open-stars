@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Archive,
-  Banknote,
   BookOpenCheck,
   CalendarDays,
   Camera,
@@ -11,7 +10,6 @@ import {
   FileSpreadsheet,
   ImagePlus,
   KeyRound,
-  LockKeyhole,
   Menu,
   MessageSquareHeart,
   Newspaper,
@@ -37,23 +35,21 @@ const items: Array<{
 }> = [
   { section: "business", label: "Бизнес", icon: WalletCards, accent: "orange", roles: ["owner"] },
   { section: "crm", label: "CRM · Продажи", icon: Target, accent: "orange", roles: ["owner", "project_director", "admin", "manager"] },
-  { section: "crm-access", label: "Доступы CRM", icon: ShieldCheck, accent: "neutral", roles: ["owner", "project_director"] },
+  { section: "payments", label: "Оплаты родителей", icon: CreditCard, accent: "olive", roles: ["owner", "project_director", "admin", "manager"] },
   { section: "expenses", label: "Расходы", icon: ReceiptText, accent: "olive", roles: ["owner", "project_director", "admin", "manager"] },
-  { section: "payroll", label: "Зарплата педагогам", icon: Banknote, accent: "orange", roles: ["owner", "admin"] },
   { section: "documents", label: "Документы родителей", icon: FileCheck2, accent: "orange", roles: ["owner", "project_director", "admin", "manager"] },
+  { section: "parent-activation", label: "Доступ родителей", icon: KeyRound, accent: "orange", roles: ["owner", "project_director", "admin", "manager"] },
   { section: "add-student", label: "Добавить ученика", icon: UserPlus, accent: "orange", roles: ["owner", "project_director", "admin", "manager"] },
   { section: "archive", label: "Выбывшие", icon: Archive, accent: "neutral", roles: ["owner", "project_director", "admin", "manager"] },
-  { section: "parent-activation", label: "Активация родителей", icon: KeyRound, accent: "orange", roles: ["owner", "project_director", "admin", "manager"] },
-  { section: "parent-password-reset", label: "Пароль родителя", icon: LockKeyhole, accent: "neutral", roles: ["owner", "project_director", "admin", "manager"] },
   { section: "child-photo", label: "Фото ребёнка", icon: ImagePlus, accent: "olive", roles: ["owner", "project_director", "admin", "manager"] },
   { section: "schedule", label: "Расписание", icon: CalendarDays, accent: "neutral", roles: ["owner", "project_director", "admin", "manager", "teacher"], teacherVisible: true },
   { section: "study", label: "Учебная часть", icon: BookOpenCheck, accent: "orange", roles: ["owner", "project_director", "admin", "manager", "teacher"], teacherVisible: true },
   { section: "reports", label: "Excel-отчёты", icon: FileSpreadsheet, accent: "olive", roles: ["owner", "project_director", "admin", "manager", "teacher"], teacherVisible: true },
   { section: "coins", label: "Star Coin", icon: Coins, accent: "olive", roles: ["owner", "project_director", "admin", "manager"] },
   { section: "news", label: "Новости", icon: Newspaper, accent: "neutral", roles: ["owner", "project_director", "admin", "manager"] },
-  { section: "payments", label: "Оплата", icon: CreditCard, accent: "olive", roles: ["owner", "project_director", "admin", "manager"] },
   { section: "photos", label: "Фотосессии", icon: Camera, accent: "orange", roles: ["owner", "project_director", "admin", "manager"] },
   { section: "feedback", label: "Обратная связь", icon: MessageSquareHeart, accent: "olive", roles: ["owner", "project_director", "admin", "manager"] },
+  { section: "crm-access", label: "Доступы CRM", icon: ShieldCheck, accent: "neutral", roles: ["owner", "project_director"] },
   { section: "team", label: "Сотрудники", icon: ShieldCheck, accent: "neutral", roles: ["owner", "project_director"] },
 ];
 
@@ -63,7 +59,13 @@ const accentClass = {
   neutral: "bg-black/[0.055] text-[#171717]",
 };
 
-const legacyLabels = new Set(items.filter((item) => !["team", "reports", "expenses", "payroll", "business", "documents", "crm", "crm-access"].includes(item.section)).map((item) => item.label));
+const legacyLabels = new Set([
+  ...items.filter((item) => !["team", "reports", "expenses", "business", "documents", "crm", "crm-access"].includes(item.section)).map((item) => item.label),
+  "Оплата",
+  "Активация родителей",
+  "Пароль родителя",
+  "Зарплата педагогам",
+]);
 
 function normalize(value: string | null | undefined) {
   return (value || "").replace(/\s+/g, " ").trim();
@@ -152,7 +154,7 @@ export function AdminTopMenu() {
       </div>
 
       {open && (
-        <div className="fixed left-4 right-4 z-[66] mx-auto max-w-xl rounded-[24px] border border-black/[0.07] bg-white p-3 shadow-[0_22px_60px_rgba(0,0,0,0.20)] sm:left-auto sm:right-6 sm:w-[520px]" style={{ top: "calc(env(safe-area-inset-top, 0px) + 9.25rem)" }}>
+        <div className="fixed left-4 right-4 z-[66] mx-auto max-h-[calc(100dvh-env(safe-area-inset-top,0px)-10rem)] max-w-xl overflow-y-auto overscroll-contain rounded-[24px] border border-black/[0.07] bg-white p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] shadow-[0_22px_60px_rgba(0,0,0,0.20)] sm:left-auto sm:right-6 sm:max-h-[calc(100vh-11rem)] sm:w-[520px]" style={{ top: "calc(env(safe-area-inset-top, 0px) + 9.25rem)" }}>
           <div className="px-2 pb-2 pt-1"><p className="text-[10px] font-bold uppercase tracking-[0.19em] text-[#D96A24]">{teacherView ? "OPEN STARS · ПЕДАГОГ" : "OPEN STARS ADMIN"}</p><p className="mt-1 text-lg font-semibold tracking-[-0.02em] text-[#171717]">{teacherView ? "Рабочие разделы педагога" : "Быстрые действия"}</p></div>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             {visibleItems.map((item) => {
