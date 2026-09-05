@@ -35,21 +35,21 @@ const items: Array<{
 }> = [
   { section: "business", label: "Бизнес", icon: WalletCards, accent: "orange", roles: ["owner"] },
   { section: "crm", label: "CRM · Продажи", icon: Target, accent: "orange", roles: ["owner", "project_director", "admin", "manager"] },
-  { section: "crm-access", label: "Доступы CRM", icon: ShieldCheck, accent: "neutral", roles: ["owner", "project_director"] },
+  { section: "payments", label: "Оплаты родителей", icon: CreditCard, accent: "olive", roles: ["owner", "project_director", "admin", "manager"] },
   { section: "expenses", label: "Расходы", icon: ReceiptText, accent: "olive", roles: ["owner", "project_director", "admin", "manager"] },
   { section: "documents", label: "Документы родителей", icon: FileCheck2, accent: "orange", roles: ["owner", "project_director", "admin", "manager"] },
+  { section: "parent-activation", label: "Доступ родителей", icon: KeyRound, accent: "orange", roles: ["owner", "project_director", "admin", "manager"] },
   { section: "add-student", label: "Добавить ученика", icon: UserPlus, accent: "orange", roles: ["owner", "project_director", "admin", "manager"] },
   { section: "archive", label: "Выбывшие", icon: Archive, accent: "neutral", roles: ["owner", "project_director", "admin", "manager"] },
-  { section: "parent-activation", label: "Доступ родителей", icon: KeyRound, accent: "orange", roles: ["owner", "project_director", "admin", "manager"] },
   { section: "child-photo", label: "Фото ребёнка", icon: ImagePlus, accent: "olive", roles: ["owner", "project_director", "admin", "manager"] },
   { section: "schedule", label: "Расписание", icon: CalendarDays, accent: "neutral", roles: ["owner", "project_director", "admin", "manager", "teacher"], teacherVisible: true },
   { section: "study", label: "Учебная часть", icon: BookOpenCheck, accent: "orange", roles: ["owner", "project_director", "admin", "manager", "teacher"], teacherVisible: true },
   { section: "reports", label: "Excel-отчёты", icon: FileSpreadsheet, accent: "olive", roles: ["owner", "project_director", "admin", "manager", "teacher"], teacherVisible: true },
   { section: "coins", label: "Star Coin", icon: Coins, accent: "olive", roles: ["owner", "project_director", "admin", "manager"] },
   { section: "news", label: "Новости", icon: Newspaper, accent: "neutral", roles: ["owner", "project_director", "admin", "manager"] },
-  { section: "payments", label: "Оплата", icon: CreditCard, accent: "olive", roles: ["owner", "project_director", "admin", "manager"] },
   { section: "photos", label: "Фотосессии", icon: Camera, accent: "orange", roles: ["owner", "project_director", "admin", "manager"] },
   { section: "feedback", label: "Обратная связь", icon: MessageSquareHeart, accent: "olive", roles: ["owner", "project_director", "admin", "manager"] },
+  { section: "crm-access", label: "Доступы CRM", icon: ShieldCheck, accent: "neutral", roles: ["owner", "project_director"] },
   { section: "team", label: "Сотрудники", icon: ShieldCheck, accent: "neutral", roles: ["owner", "project_director"] },
 ];
 
@@ -61,6 +61,7 @@ const accentClass = {
 
 const legacyLabels = new Set([
   ...items.filter((item) => !["team", "reports", "expenses", "business", "documents", "crm", "crm-access"].includes(item.section)).map((item) => item.label),
+  "Оплата",
   "Активация родителей",
   "Пароль родителя",
   "Зарплата педагогам",
