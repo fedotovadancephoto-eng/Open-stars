@@ -36,6 +36,7 @@ const items: Array<{
   { section: "business", label: "Бизнес", icon: WalletCards, accent: "orange", roles: ["owner"] },
   { section: "crm", label: "CRM · Продажи", icon: Target, accent: "orange", roles: ["owner", "project_director", "admin", "manager"] },
   { section: "payments", label: "Оплаты родителей", icon: CreditCard, accent: "olive", roles: ["owner", "project_director", "admin", "manager"] },
+  { section: "events", label: "Мероприятия", icon: CalendarDays, accent: "orange", roles: ["owner", "project_director", "admin", "manager"] },
   { section: "expenses", label: "Расходы", icon: ReceiptText, accent: "olive", roles: ["owner", "project_director", "admin", "manager"] },
   { section: "documents", label: "Документы родителей", icon: FileCheck2, accent: "orange", roles: ["owner", "project_director", "admin", "manager"] },
   { section: "parent-activation", label: "Доступ родителей", icon: KeyRound, accent: "orange", roles: ["owner", "project_director", "admin", "manager"] },
@@ -60,7 +61,7 @@ const accentClass = {
 };
 
 const legacyLabels = new Set([
-  ...items.filter((item) => !["team", "reports", "expenses", "business", "documents", "crm", "crm-access"].includes(item.section)).map((item) => item.label),
+  ...items.filter((item) => !["team", "reports", "expenses", "business", "documents", "crm", "crm-access", "events"].includes(item.section)).map((item) => item.label),
   "Оплата",
   "Активация родителей",
   "Пароль родителя",
