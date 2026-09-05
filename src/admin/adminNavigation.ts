@@ -17,6 +17,8 @@ export type AdminSection =
   | "reports"
   | "expenses"
   | "payroll"
+  | "crm"
+  | "crm-access"
   | "business";
 
 export const ADMIN_SECTION_EVENT = "openstars:admin-section";
