@@ -2,6 +2,7 @@ import AdminApp from "@/admin/AdminApp";
 import { AdminCoinManager } from "@/admin/AdminCoinManager";
 import { AdminCrmManager } from "@/admin/AdminCrmManager";
 import { AdminDocumentsManager } from "@/admin/AdminDocumentsManager";
+import { AdminEventsManager } from "@/admin/AdminEventsManager";
 import { AdminExpenseManager } from "@/admin/AdminExpenseManager";
 import { AdminFeedbackManager } from "@/admin/AdminFeedbackManager";
 import { AdminNewsManager } from "@/admin/AdminNewsManager";
@@ -38,6 +39,7 @@ export default function AdminWorkspace() {
       <AdminCoinManager />
       <AdminNewsManager />
       <AdminPaymentManager />
+      <AdminEventsManager />
       <AdminPhotoSessionManager />
       <AdminStaffManager />
       <AdminReportExport />
