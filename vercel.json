@@ -3,6 +3,8 @@
   "alias": ["open-stars-cabinet.vercel.app"],
   "rewrites": [
     { "source": "/admin", "destination": "/index.html" },
-    { "source": "/admin/:path*", "destination": "/index.html" }
+    { "source": "/admin/:path*", "destination": "/index.html" },
+    { "source": "/documents", "destination": "/index.html" },
+    { "source": "/documents/:path*", "destination": "/index.html" }
   ]
 }
