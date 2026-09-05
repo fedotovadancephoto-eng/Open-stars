@@ -1,5 +1,6 @@
 import AdminApp from "@/admin/AdminApp";
 import { AdminCoinManager } from "@/admin/AdminCoinManager";
+import { AdminCrmManager } from "@/admin/AdminCrmManager";
 import { AdminDocumentsManager } from "@/admin/AdminDocumentsManager";
 import { AdminExpenseManager } from "@/admin/AdminExpenseManager";
 import { AdminFeedbackManager } from "@/admin/AdminFeedbackManager";
@@ -16,6 +17,7 @@ import { AdminStudentOperations } from "@/admin/AdminStudentOperations";
 import { AdminStudyManager } from "@/admin/AdminStudyManager";
 import { AdminTopMenu } from "@/admin/AdminTopMenu";
 import { ChildPhotoUpload } from "@/admin/ChildPhotoUpload";
+import { CrmAccessManager } from "@/admin/CrmAccessManager";
 import { OwnerBusinessDashboard } from "@/admin/OwnerBusinessDashboard";
 import { OwnerHomeLanding } from "@/admin/OwnerHomeLanding";
 import { StaffModeSwitch } from "@/admin/StaffModeSwitch";
@@ -42,6 +44,8 @@ export default function AdminWorkspace() {
       <AdminExpenseManager />
       <AdminPayrollManager />
       <AdminDocumentsManager />
+      <AdminCrmManager />
+      <CrmAccessManager />
       <OwnerBusinessDashboard />
       <OwnerHomeLanding />
     </>
