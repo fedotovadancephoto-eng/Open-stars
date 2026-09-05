@@ -10,6 +10,7 @@ export type AdminSection =
   | "coins"
   | "news"
   | "payments"
+  | "documents"
   | "photos"
   | "feedback"
   | "team"
