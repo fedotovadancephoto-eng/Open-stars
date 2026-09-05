@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { CalendarDays, Check, CreditCard, LoaderCircle, MapPin, RefreshCw, X } from "lucide-react";
+import { CalendarDays, Check, CreditCard, LoaderCircle, MapPin, RefreshCw, RotateCcw, X } from "lucide-react";
 
 import { fetchParentEvents, setParentEventParticipation, SchoolEvent } from "@/eventsApi";
 
@@ -18,8 +18,10 @@ function dateTime(value: string) {
 
 function eventStatus(event: SchoolEvent) {
   if (event.status === "completed") return "Мероприятие завершено";
-  if (event.status === "open") return "Открыта запись";
-  return "Запись закрыта";
+  if (event.status === "cancelled") return "Мероприятие отменено";
+  if (event.status === "closed") return "Запись закрыта";
+  if (event.status === "planned") return "Планируется";
+  return "Открыта запись";
 }
 
 export function EventsTab({ childId, childName }: { childId: string; childName: string }) {
@@ -64,7 +66,7 @@ export function EventsTab({ childId, childName }: { childId: string; childName: 
         <div>
           <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#D96A24]">OPEN STARS · МЕРОПРИЯТИЯ</p>
           <h2 className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-[#171717]">Мероприятия для {childName || "ребёнка"}</h2>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-black/45">Здесь можно подтвердить участие. Оплату администратор отмечает отдельно после фактического поступления денег.</p>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-black/45">Здесь видны новые мероприятия и история тех, где вы уже выбрали участие. Оплату администратор отмечает после фактического поступления денег.</p>
         </div>
         <button type="button" onClick={() => void load()} disabled={loading} className="grid h-10 w-10 place-items-center rounded-full bg-[#FAF9F5] text-black/50 disabled:opacity-50" aria-label="Обновить">
           <RefreshCw size={17} className={loading ? "animate-spin" : ""} />
@@ -80,21 +82,26 @@ export function EventsTab({ childId, childName }: { childId: string; childName: 
       ) : (
         <div className="mt-5 space-y-3">
           {rows.map(({ event, participant, payments }) => {
-            const paid = payments.reduce((sum, payment) => sum + payment.amount, 0);
+            const activePayments = payments.filter((payment) => !payment.refundedAt);
+            const refundedPayments = payments.filter((payment) => Boolean(payment.refundedAt));
+            const paid = activePayments.reduce((sum, payment) => sum + payment.amount, 0);
+            const refunded = refundedPayments.reduce((sum, payment) => sum + payment.amount, 0);
             const fee = participant?.feeAmount ?? event.defaultFee;
             const participating = participant?.status === "participating";
             const declined = participant?.status === "declined";
             const canChoose = event.status === "open";
             const hasPayment = paid > 0;
             const remaining = fee == null ? null : Math.max(fee - paid, 0);
+            const cancelled = event.status === "cancelled";
             return (
-              <article key={event.id} className="rounded-[22px] border border-black/[0.06] bg-[#FAF9F5] p-4 sm:p-5">
+              <article key={event.id} className={`rounded-[22px] border p-4 sm:p-5 ${cancelled ? "border-red-100 bg-red-50/50" : "border-black/[0.06] bg-[#FAF9F5]"}`}>
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.08em] ${event.status === "open" ? "bg-[#D96A24]/10 text-[#C95320]" : "bg-black/[0.055] text-black/45"}`}>{eventStatus(event)}</span>
-                      {participating && <span className="rounded-full bg-[#5F6338]/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[#4D512E]">Участвуем</span>}
+                      <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.08em] ${cancelled ? "bg-red-100 text-red-700" : event.status === "open" ? "bg-[#D96A24]/10 text-[#C95320]" : "bg-black/[0.055] text-black/45"}`}>{eventStatus(event)}</span>
+                      {participating && !cancelled && <span className="rounded-full bg-[#5F6338]/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[#4D512E]">Участвуем</span>}
                       {declined && <span className="rounded-full bg-black/[0.055] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-black/40">Отказались</span>}
+                      {refunded > 0 && <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-blue-700">Возврат оформлен</span>}
                     </div>
                     <h3 className="mt-3 text-xl font-semibold tracking-[-0.02em] text-[#171717]">{event.title}</h3>
                     {event.description && <p className="mt-2 text-sm leading-6 text-black/50">{event.description}</p>}
@@ -102,12 +109,14 @@ export function EventsTab({ childId, childName }: { childId: string; childName: 
                       <span className="flex items-center gap-1.5"><CalendarDays size={14}/>{dateTime(event.startsAt)}</span>
                       {event.location && <span className="flex items-center gap-1.5"><MapPin size={14}/>{event.location}</span>}
                     </div>
+                    {cancelled && <p className="mt-3 text-xs leading-5 text-red-700/75">Мероприятие отменено. Если по нему была оплата, информация о возврате отображается справа.</p>}
                   </div>
-                  <div className="shrink-0 rounded-[17px] bg-white px-4 py-3 sm:min-w-[150px]">
+                  <div className="shrink-0 rounded-[17px] bg-white px-4 py-3 sm:min-w-[170px]">
                     <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-black/35">Стоимость</p>
                     <p className="mt-1 text-lg font-semibold">{fee == null ? "Уточняется" : money(fee)}</p>
                     {hasPayment && <p className="mt-1 flex items-center gap-1 text-xs font-semibold text-[#4D512E]"><CreditCard size={13}/> Оплачено {money(paid)}</p>}
                     {hasPayment && remaining !== null && <p className="mt-1 text-[10px] text-black/40">{remaining > 0 ? `Осталось ${money(remaining)}` : "Оплачено полностью"}</p>}
+                    {refunded > 0 && <p className="mt-2 flex items-center gap-1 text-xs font-semibold text-blue-700"><RotateCcw size={13}/> Возврат {money(refunded)}</p>}
                   </div>
                 </div>
 

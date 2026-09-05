@@ -43,6 +43,9 @@ export type EventPayment = {
   receivedAt: string;
   note: string;
   voidedAt: string;
+  refundedAt: string;
+  refundReason: string;
+  refundCashflowTransactionId: string;
 };
 
 export type EventExpense = {
@@ -99,6 +102,10 @@ function friendly(message: string) {
   if (message.includes("not authorized")) return "Недостаточно прав для этого действия.";
   if (message.includes("event is not open")) return "Запись на это мероприятие уже закрыта.";
   if (message.includes("event unavailable for branch")) return "Это мероприятие недоступно для вашего филиала.";
+  if (message.includes("event has active payments")) return "Сначала оформите возврат всех оплат по мероприятию, затем его можно отменить.";
+  if (message.includes("refund reason required")) return "Укажите причину возврата.";
+  if (message.includes("payment not found")) return "Оплата не найдена или уже отменена.";
+  if (message.includes("Мероприятие отменено")) return "Мероприятие отменено. Новую оплату принять нельзя.";
   if (message.includes("invalid amount")) return "Проверьте сумму.";
   if (message.includes("invalid fee")) return "Проверьте стоимость участия.";
   if (message.includes("title required")) return "Укажите название мероприятия.";
@@ -168,6 +175,9 @@ function mapPayment(row: any): EventPayment {
     receivedAt: row.received_at || "",
     note: row.note || "",
     voidedAt: row.voided_at || "",
+    refundedAt: row.refunded_at || "",
+    refundReason: row.refund_reason || "",
+    refundCashflowTransactionId: row.refund_cashflow_transaction_id || "",
   };
 }
 
@@ -282,6 +292,15 @@ export async function confirmEventPayment(input: {
   }, token);
 }
 
+export async function refundEventPayment(paymentId: string, reason: string, refundedAt?: string) {
+  const token = await staffToken();
+  return rpc<string>("owner_refund_event_payment", {
+    p_payment_id: paymentId,
+    p_refunded_at: refundedAt || null,
+    p_reason: reason,
+  }, token);
+}
+
 export async function addEventExpense(input: {
   eventId: string;
   category: EventExpenseCategory;
@@ -306,13 +325,18 @@ export async function fetchOwnerEventSummary(eventId: string) {
 
 export async function fetchParentEvents(childId: string) {
   const token = await parentToken();
-  const [eventRows, participantRows, paymentRows] = await Promise.all([
-    rest<any[]>("events?select=*&status=in.(open,completed)&order=starts_at.asc", token),
+  const [participantRows, paymentRows] = await Promise.all([
     rest<any[]>(`event_participants?select=*&child_id=eq.${encodeURIComponent(childId)}&order=created_at.desc`, token),
     rest<any[]>(`event_payments?select=*&child_id=eq.${encodeURIComponent(childId)}&order=received_at.desc`, token),
   ]);
   const participants = participantRows.map(mapParticipant);
   const payments = paymentRows.map(mapPayment);
+  const participatedEventIds = Array.from(new Set(participants.map((row) => row.eventId).filter(Boolean)));
+  const eventFilter = participatedEventIds.length
+    ? `or=(status.eq.open,id.in.(${participatedEventIds.map(encodeURIComponent).join(",")}))`
+    : "status=eq.open";
+  const eventRows = await rest<any[]>(`events?select=*&${eventFilter}&order=starts_at.asc`, token);
+
   return eventRows.map(mapEvent).map((event) => ({
     event,
     participant: participants.find((row) => row.eventId === event.id) || null,
