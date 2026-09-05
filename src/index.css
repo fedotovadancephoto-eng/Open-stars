@@ -26,3 +26,14 @@
     scrollbar-width: none;
   }
 }
+
+/* Mobile admin quick-actions can exceed the viewport as new sections are added.
+   Keep the fixed menu itself scrollable so lower actions (including Payments) stay reachable. */
+@media (max-width: 640px) {
+  .fixed.left-4.right-4.z-\[66\].mx-auto.max-w-xl {
+    max-height: calc(100dvh - 10rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+}
