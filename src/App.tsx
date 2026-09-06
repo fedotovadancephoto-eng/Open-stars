@@ -9,6 +9,7 @@ import {
   CreditCard,
   MessageCircle,
   Newspaper,
+  PartyPopper,
   TrendingUp,
 } from "lucide-react";
 
@@ -69,7 +70,7 @@ const parentTabs: TabConfig[] = [
   { id: "schedule", label: "Расписание", icon: CalendarDays, iconBox: "bg-[#5F6338]/12", iconColor: "text-[#4D512E]", hoverBg: "hover:bg-[#5F6338]/[0.055]" },
   { id: "news", label: "Новости", icon: Newspaper, iconBox: "bg-[#D96A24]/12", iconColor: "text-[#C95320]", hoverBg: "hover:bg-[#D96A24]/[0.055]" },
   { id: "payments", label: "Оплата", icon: CreditCard, iconBox: "bg-[#5F6338]/12", iconColor: "text-[#4D512E]", hoverBg: "hover:bg-[#5F6338]/[0.055]" },
-  { id: "events", label: "Мероприятия", icon: CalendarDays, iconBox: "bg-[#D96A24]/12", iconColor: "text-[#C95320]", hoverBg: "hover:bg-[#D96A24]/[0.055]" },
+  { id: "events", label: "Мероприятия", icon: PartyPopper, iconBox: "bg-[#D96A24]/12", iconColor: "text-[#C95320]", hoverBg: "hover:bg-[#D96A24]/[0.055]" },
   { id: "photos", label: "Фотосессии", icon: Camera, iconBox: "bg-[#D96A24]/12", iconColor: "text-[#C95320]", hoverBg: "hover:bg-[#D96A24]/[0.055]" },
 ];
 

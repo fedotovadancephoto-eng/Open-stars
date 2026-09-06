@@ -12,6 +12,7 @@ import {
   Menu,
   MessageCircle,
   Newspaper,
+  PartyPopper,
   TrendingUp,
   X,
 } from "lucide-react";
@@ -36,6 +37,7 @@ const menuItems = [
   { id: "schedule", label: "Расписание", icon: CalendarDays },
   { id: "news", label: "Новости", icon: Newspaper },
   { id: "payments", label: "Оплата", icon: CreditCard },
+  { id: "events", label: "Мероприятия", icon: PartyPopper },
   { id: "documents", label: "Документы", icon: FileCheck2 },
   { id: "photos", label: "Фотосессии", icon: Camera },
 ];
@@ -89,7 +91,9 @@ export function Header({ onNavigate, onLogout }: HeaderProps) {
       try {
         await markParentNotificationRead(item.id);
         setNotifications((current) => current.map((row) => row.id === item.id ? { ...row, isRead: true } : row));
-      } catch {}
+      } catch {
+        // Переход остаётся доступным, даже если отметку о прочтении временно не удалось сохранить.
+      }
     }
     if (item.target === "news") navigate("news");
     if (item.target === "photos") navigate("photos");
