@@ -148,7 +148,7 @@ export function AdminCrmManager() {
       setMarketingRows(await fetchCrmMarketingSummary(marketingFrom, marketingTo, nextBranch));
       return;
     }
-    const branch = role === "admin" ? staffBranch : nextBranch;
+    const branch = role === "admin" ? staffBranch : "";
     const [nextLeads, nextTasks] = await Promise.all([fetchCrmLeads(branch), fetchCrmTasks()]);
     setLeads(nextLeads); setTasks(nextTasks);
   }
@@ -164,16 +164,35 @@ export function AdminCrmManager() {
 
   const selected = useMemo(() => leads.find((lead) => lead.id === selectedId) || null, [leads, selectedId]);
   const selectedTasks = useMemo(() => tasks.filter((task) => task.leadId === selectedId && task.status === "open"), [tasks, selectedId]);
-  const overdueCount = useMemo(() => leads.filter((lead) => !lead.isLost && lead.stage !== "student" && new Date(lead.nextContactAt).getTime() < Date.now()).length, [leads]);
   const visible = useMemo(() => {
     const text = query.trim().toLowerCase();
     return leads.filter((lead) => {
+      if (branchFilter && lead.branch !== branchFilter) return false;
       if (filter === "lost" && !lead.isLost) return false;
       if (filter === "overdue" && (lead.isLost || lead.stage === "student" || new Date(lead.nextContactAt).getTime() >= Date.now())) return false;
       if (stages.includes(filter as CrmStage) && (lead.isLost || lead.stage !== filter)) return false;
       return !text || [lead.childName, lead.parentName, lead.parentPhone, lead.source].join(" ").toLowerCase().includes(text);
     });
-  }, [leads, filter, query]);
+  }, [leads, branchFilter, filter, query]);
+
+  const overviewBranches = role === "admin" && staffBranch ? [staffBranch] : branches;
+  const branchOverview = overviewBranches.map((branch) => {
+    const branchLeads = leads.filter((lead) => lead.branch === branch);
+    return {
+      branch,
+      applications: branchLeads.filter((lead) => !lead.isLost && lead.stage === "new").length,
+      trials: branchLeads.filter((lead) => !lead.isLost && lead.stage === "trial_booked").length,
+      thinking: branchLeads.filter((lead) => !lead.isLost && lead.stage === "thinking").length,
+      lost: branchLeads.filter((lead) => lead.isLost).length,
+    };
+  });
+
+  function selectOverview(branch: string, nextFilter: "new" | "trial_booked" | "thinking" | "lost" = "trial_booked") {
+    setBranchFilter(branch);
+    setFilter(nextFilter);
+    setQuery("");
+    setSelectedId("");
+  }
 
   function openLead(lead: CrmLead) {
     setSelectedId(lead.id);
@@ -272,19 +291,27 @@ export function AdminCrmManager() {
       {error && <div className="mt-4 flex gap-2 rounded-[18px] border border-red-200 bg-red-50 p-4 text-sm text-red-700"><AlertCircle size={18}/>{error}</div>}
       {success && <div className="mt-4 rounded-[18px] bg-[#5F6338]/10 p-4 text-sm text-[#4D512E]">{success}</div>}
 
-      {globalRole && <section className="mt-4 rounded-[20px] bg-white p-4"><label className="text-xs font-semibold text-black/50">Филиал<select className={inputClass} value={branchFilter} onChange={e=>void changeBranch(e.target.value)}><option value="">Все филиалы</option>{branches.map(branch=><option key={branch} value={branch}>{branch}</option>)}</select></label></section>}
+      {role === "marketer" && <section className="mt-4 rounded-[20px] bg-white p-4"><label className="text-xs font-semibold text-black/50">Филиал<select className={inputClass} value={branchFilter} onChange={e=>void changeBranch(e.target.value)}><option value="">Все филиалы</option>{branches.map(branch=><option key={branch} value={branch}>{branch}</option>)}</select></label></section>}
 
       {role === "marketer" ? <>
         <section className="mt-5 rounded-[22px] bg-white p-4"><div className="grid gap-3 sm:grid-cols-3"><label className="text-xs font-semibold text-black/50">С даты<input type="date" className={inputClass} value={marketingFrom} onChange={e=>setMarketingFrom(e.target.value)}/></label><label className="text-xs font-semibold text-black/50">По дату<input type="date" className={inputClass} value={marketingTo} onChange={e=>setMarketingTo(e.target.value)}/></label><button onClick={()=>void refresh()} className="mt-auto rounded-[15px] bg-[#171717] py-3 text-sm font-semibold text-white">Обновить</button></div></section>
         <section className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-5">{[["Лиды",marketingTotals.leads],["Пробные",marketingTotals.trials],["Оплатили",marketingTotals.paid],["Ученики",marketingTotals.students],["Потеряно",marketingTotals.lost]].map(([label,value])=><div key={String(label)} className="rounded-[20px] bg-white p-4"><p className="text-xs text-black/40">{label}</p><p className="mt-2 text-3xl font-semibold">{value}</p></div>)}</section>
         <section className="mt-4 rounded-[22px] bg-white p-4"><h2 className="font-semibold">Источники</h2><div className="mt-3 space-y-2">{marketingRows.map(row=><div key={`${row.branch}-${row.source}`} className="flex justify-between rounded-[14px] bg-[#F7F5EF] p-3"><div><b>{row.source}</b><p className="text-xs text-black/40">{row.branch}</p></div><p className="text-right text-xs">{row.leads} лидов · {row.trials} пробных ({percent(row.trials,row.leads)}%)<br/>{row.students} учеников ({percent(row.students,row.leads)}%)</p></div>)}</div><p className="mt-4 text-xs leading-5 text-black/35">Телефоны родителей, детские карточки, ДДС и зарплаты маркетологу не показываются.</p></section>
       </> : <>
-        <section className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4"><button onClick={()=>setFilter("all")} className="rounded-[20px] bg-[#171717] p-4 text-left text-white"><p className="text-xs text-white/50">Активные</p><p className="mt-2 text-3xl font-semibold">{leads.filter(l=>!l.isLost).length}</p></button><button onClick={()=>setFilter("overdue")} className="rounded-[20px] bg-[#FFF2E8] p-4 text-left"><p className="text-xs text-[#C95320]">Просрочено</p><p className="mt-2 text-3xl font-semibold text-[#C95320]">{overdueCount}</p></button><button onClick={()=>setFilter("trial_booked")} className="rounded-[20px] bg-white p-4 text-left"><p className="text-xs text-black/40">На пробное</p><p className="mt-2 text-3xl font-semibold">{leads.filter(l=>!l.isLost&&l.stage==="trial_booked").length}</p></button><button onClick={()=>setFilter("lost")} className="rounded-[20px] bg-white p-4 text-left"><p className="text-xs text-black/40">Потерянные</p><p className="mt-2 text-3xl font-semibold">{leads.filter(l=>l.isLost).length}</p></button></section>
+        <section className="mt-5">
+          <div className="mb-3 flex items-end justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[0.14em] text-[#D96A24]">Сводка по округам</p><h2 className="mt-1 text-xl font-semibold">Продажи сейчас</h2></div>{branchFilter&&globalRole&&<button onClick={()=>{setBranchFilter("");setFilter("all");setQuery("");}} className="shrink-0 rounded-full bg-white px-3 py-2 text-xs font-semibold text-black/50">Все округа</button>}</div>
+          <div className="grid gap-3 lg:grid-cols-3">{branchOverview.map((item)=><article key={item.branch} className={`rounded-[22px] border p-4 transition ${branchFilter===item.branch?"border-[#D96A24]/35 bg-[#FFF8F2]":"border-black/[0.04] bg-white"}`}>
+            <button onClick={()=>selectOverview(item.branch)} className="flex w-full items-center justify-between text-left"><span className="text-lg font-semibold">{item.branch}</span><span className="flex items-center gap-1 text-xs font-semibold text-[#D96A24]">На пробное <ChevronRight size={16}/></span></button>
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              {([['Заявки',item.applications,'new'],['На пробное',item.trials,'trial_booked'],['Думают',item.thinking,'thinking'],['Потеряно',item.lost,'lost']] as const).map(([label,value,nextFilter])=><button key={label} onClick={()=>selectOverview(item.branch,nextFilter)} className={`rounded-[15px] p-3 text-left ${branchFilter===item.branch&&filter===nextFilter?"bg-[#171717] text-white":"bg-[#F7F5EF]"}`}><p className={`text-[11px] ${branchFilter===item.branch&&filter===nextFilter?"text-white/55":"text-black/40"}`}>{label}</p><p className="mt-1 text-2xl font-semibold">{value}</p></button>)}
+            </div>
+          </article>)}</div>
+        </section>
 
         <button onClick={()=>setShowCreate(v=>!v)} className="mt-4 flex w-full items-center justify-center gap-2 rounded-[16px] bg-[#D96A24] py-3.5 text-sm font-semibold text-white"><UserRoundPlus size={18}/>Новый лид</button>
         {showCreate && <section className="mt-4 rounded-[22px] bg-white p-4"><div className="grid gap-3 sm:grid-cols-2"><label className="text-xs font-semibold text-black/50">Ребёнок<input className={inputClass} value={childName} onChange={e=>setChildName(e.target.value)} placeholder="Имя Фамилия"/></label><label className="text-xs font-semibold text-black/50">Дата рождения<input type="date" className={inputClass} value={childBirthDate} onChange={e=>setChildBirthDate(e.target.value)}/></label><label className="text-xs font-semibold text-black/50">Родитель<input className={inputClass} value={parentName} onChange={e=>setParentName(e.target.value)}/></label><label className="text-xs font-semibold text-black/50">Телефон<input inputMode="tel" className={inputClass} value={parentPhone} onChange={e=>setParentPhone(e.target.value)}/></label><label className="text-xs font-semibold text-black/50">Филиал<select disabled={role==="admin"} className={inputClass} value={role==="admin"?staffBranch:newBranch} onChange={e=>setNewBranch(e.target.value)}>{branches.map(branch=><option key={branch}>{branch}</option>)}</select></label><label className="text-xs font-semibold text-black/50">Источник<select className={inputClass} value={source} onChange={e=>setSource(e.target.value)}>{sources.map(item=><option key={item}>{item}</option>)}</select></label>{source==="Другое"&&<label className="text-xs font-semibold text-black/50">Уточнение<input className={inputClass} value={sourceNote} onChange={e=>setSourceNote(e.target.value)}/></label>}<label className="text-xs font-semibold text-black/50">Кампания / реклама<input className={inputClass} value={campaign} onChange={e=>setCampaign(e.target.value)} placeholder="необязательно"/></label><label className="text-xs font-semibold text-black/50">Пробное<input type="datetime-local" className={inputClass} value={trialAt} onChange={e=>setTrialAt(e.target.value)}/></label><label className="text-xs font-semibold text-black/50">Следующий контакт *<input type="datetime-local" className={inputClass} value={nextContactAt} onChange={e=>setNextContactAt(e.target.value)}/></label><label className="text-xs font-semibold text-black/50 sm:col-span-2">Комментарий<textarea className={`${inputClass} min-h-20`} value={createComment} onChange={e=>setCreateComment(e.target.value)}/></label></div><button disabled={saving} onClick={()=>void saveNewLead()} className="mt-4 flex w-full items-center justify-center gap-2 rounded-[15px] bg-[#171717] py-3 text-sm font-semibold text-white disabled:opacity-50">{saving?<LoaderCircle className="animate-spin" size={16}/>:<CirclePlus size={16}/>}Добавить лид</button></section>}
 
-        <section className="mt-4 rounded-[22px] bg-white p-4"><div className="flex items-center gap-2 rounded-[15px] bg-[#F7F5EF] px-4"><Search size={17} className="text-black/30"/><input className="w-full bg-transparent py-3 outline-none" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Имя, телефон, источник"/></div><div className="mt-3 flex gap-2 overflow-x-auto pb-1">{(["all",...stages,"overdue","lost"] as const).map(item=><button key={item} onClick={()=>setFilter(item)} className={`whitespace-nowrap rounded-full px-3 py-2 text-xs font-semibold ${filter===item?"bg-[#171717] text-white":"bg-[#F7F5EF] text-black/50"}`}>{item==="all"?"Все":item==="overdue"?"Просрочено":item==="lost"?"Потерянные":stageLabels[item]}</button>)}</div><div className="mt-3 space-y-2">{visible.map(lead=><button key={lead.id} onClick={()=>openLead(lead)} className="flex w-full items-center gap-3 rounded-[16px] border border-black/[0.05] p-3 text-left"><div className="min-w-0 flex-1"><p className="truncate font-semibold">{lead.childName}</p><p className="truncate text-xs text-black/40">{lead.parentName} · {lead.parentPhone}</p><p className="mt-1 text-xs font-medium text-[#5F6338]">{lead.isLost?lostLabels[lead.lostReason as CrmLostReason]:stageLabels[lead.stage]} · {lead.branch}</p></div><ChevronRight size={18} className="text-black/25"/></button>)}{visible.length===0&&<p className="py-10 text-center text-sm text-black/35">Лидов по этому фильтру пока нет.</p>}</div></section>
+        <section className="mt-4 rounded-[22px] bg-white p-4"><div className="mb-3"><p className="text-xs font-bold uppercase tracking-[0.12em] text-[#D96A24]">{branchFilter||"Все округа"}</p><h2 className="mt-1 text-lg font-semibold">{filter==="all"?"Все лиды":filter==="overdue"?"Просроченные":filter==="lost"?"Потерянные":stageLabels[filter]}</h2></div><div className="flex items-center gap-2 rounded-[15px] bg-[#F7F5EF] px-4"><Search size={17} className="text-black/30"/><input className="w-full bg-transparent py-3 outline-none" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Имя, телефон, источник"/></div><div className="mt-3 flex flex-wrap gap-2">{(["all",...stages,"overdue","lost"] as const).map(item=><button key={item} onClick={()=>setFilter(item)} className={`rounded-full px-3 py-2 text-xs font-semibold ${filter===item?"bg-[#171717] text-white":"bg-[#F7F5EF] text-black/50"}`}>{item==="all"?"Все":item==="overdue"?"Просрочено":item==="lost"?"Потерянные":stageLabels[item]}</button>)}</div><div className="mt-3 space-y-2">{visible.map(lead=><button key={lead.id} onClick={()=>openLead(lead)} className="flex w-full items-center gap-3 rounded-[16px] border border-black/[0.05] p-3 text-left"><div className="min-w-0 flex-1"><p className="truncate font-semibold">{lead.childName}</p><p className="truncate text-xs text-black/40">{lead.parentName} · {lead.parentPhone}</p><p className="mt-1 text-xs font-medium text-[#5F6338]">{lead.isLost?lostLabels[lead.lostReason as CrmLostReason]:stageLabels[lead.stage]} · {lead.branch}</p>{lead.trialAt&&<p className="mt-1 text-xs text-black/40">Пробное: {shortDate(lead.trialAt)}</p>}</div><ChevronRight size={18} className="text-black/25"/></button>)}{visible.length===0&&<p className="py-10 text-center text-sm text-black/35">По выбранному округу и статусу записей пока нет.</p>}</div></section>
       </>}
     </div>
 
