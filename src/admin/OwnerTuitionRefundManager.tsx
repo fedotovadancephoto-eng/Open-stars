@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowRight, LoaderCircle, RefreshCw, RotateCcw, Search, WalletCards, X } from "lucide-react";
 
 import { fetchStaffIdentity } from "@/admin/adminApi";
-import { notifyAdminDataUpdated, openAdminSection } from "@/admin/adminNavigation";
+import { notifyAdminDataUpdated, onAdminSection, openAdminSection } from "@/admin/adminNavigation";
 import {
   fetchRefundableTuitionReceipts,
   RefundableTuitionReceipt,
@@ -73,7 +73,7 @@ export function OwnerTuitionRefundManager() {
     };
   }, []);
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
@@ -83,25 +83,27 @@ export function OwnerTuitionRefundManager() {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
-  async function openManager() {
+  const openManager = useCallback(async () => {
     setOpen(true);
     setSuccess("");
     await load();
-  }
+  }, [load]);
+
+  useEffect(() => onAdminSection("tuition-refund", () => { void openManager(); }), [openManager]);
 
   async function refund(row: RefundableTuitionReceipt) {
     const reason = window.prompt(
-      `Причина возврата ${money(row.amount)} · ${row.childName}?`,
+      `Причина уже произведённого возврата ${money(row.amount)} · ${row.childName}?`,
       "Прекращение обучения"
     );
     if (reason === null) return;
     if (!reason.trim()) return setError("Укажите причину возврата.");
 
     const confirmed = window.confirm(
-      `Оформить реальный возврат ${money(row.amount)} родителю?\n\n` +
-      "Сумма уйдёт из собранных оплат. В ДДС появится отдельный расход «Возврат обучения», а исходная оплата останется в истории."
+      `Зафиксировать возврат ${money(row.amount)} родителю?\n\n` +
+      "Приложение не переводит деньги через банк. Сумма уйдёт из собранных оплат, в ДДС появится расход «Возврат обучения», а исходная оплата останется в истории."
     );
     if (!confirmed) return;
 
@@ -112,7 +114,7 @@ export function OwnerTuitionRefundManager() {
       await refundTuitionReceipt(row.receiptId, reason);
       await load();
       notifyAdminDataUpdated({ source: "tuition-refund", childId: row.childId });
-      setSuccess(`${row.childName}: возврат ${money(row.amount)} оформлен. Выручка и ДДС пересчитаны.`);
+      setSuccess(`${row.childName}: возврат ${money(row.amount)} зафиксирован. Выручка и ДДС пересчитаны.`);
     } catch (reasonValue) {
       setError(reasonValue instanceof Error ? reasonValue.message : "Не удалось оформить возврат.");
     } finally {
@@ -140,7 +142,7 @@ export function OwnerTuitionRefundManager() {
         onClick={() => void openManager()}
         className="fixed bottom-[25.2rem] right-4 z-40 flex items-center gap-2 rounded-full bg-white px-4 py-3 text-sm font-semibold text-[#171717] shadow-[0_10px_30px_rgba(0,0,0,0.18)] ring-1 ring-black/[0.06] sm:right-6"
       >
-        <RotateCcw size={17} className="text-red-600" /> Возврат оплаты
+        <RotateCcw size={17} className="text-red-600" /> Зафиксировать возврат
       </button>
 
       {open && (
@@ -155,9 +157,9 @@ export function OwnerTuitionRefundManager() {
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-red-600">OPEN STARS · РУКОВОДИТЕЛЬ</p>
-                <h2 className="mt-1 text-2xl font-semibold tracking-[-0.03em]">Возврат оплаты за обучение</h2>
+                <h2 className="mt-1 text-2xl font-semibold tracking-[-0.03em]">Зафиксировать возврат оплаты</h2>
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-black/45">
-                  Только для денег, которые реально возвращаются родителю. Ошибочно внесённую оплату по-прежнему исправляем в разделе «Оплата».
+                  Сначала верните деньги через банк или кассу, затем зафиксируйте операцию здесь. Ошибочно внесённую оплату исправляйте в разделе «Оплата».
                 </p>
               </div>
               <div className="flex gap-2">
@@ -171,7 +173,7 @@ export function OwnerTuitionRefundManager() {
             </div>
 
             <div className="mt-5 rounded-[18px] border border-red-100 bg-red-50 px-4 py-3 text-xs leading-5 text-red-700">
-              Возврат не удаляет исходное поступление. Система сохраняет историю, исключает сумму из текущих собранных оплат и создаёт расход возврата в ДДС того же округа.
+              Эта кнопка не отправляет деньги родителю. Она сохраняет историю, исключает уже возвращённую сумму из собранных оплат и создаёт расход возврата в ДДС того же округа.
             </div>
 
             {error && <div className="mt-4 rounded-[15px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
@@ -222,7 +224,7 @@ export function OwnerTuitionRefundManager() {
                           className="mt-2 flex min-h-[40px] items-center justify-center gap-2 rounded-[12px] bg-red-600 px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50 sm:ml-auto"
                         >
                           {busyId === row.receiptId ? <LoaderCircle className="animate-spin" size={15} /> : <RotateCcw size={15} />}
-                          Вернуть деньги
+                          Зафиксировать возврат
                         </button>
                       </div>
                     </div>
