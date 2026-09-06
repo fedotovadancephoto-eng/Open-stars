@@ -75,11 +75,15 @@ function splitChildName(value: string) {
 }
 function percent(value: number, base: number) { return base > 0 ? Math.round((value / base) * 100) : 0; }
 function money(value: number) { return new Intl.NumberFormat("ru-RU", { style: "currency", currency: "RUB", maximumFractionDigits: 0 }).format(value || 0); }
+function count(value: number) { return new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 }).format(value || 0); }
+function returnOnMarketingInvestment(revenue: number, budget: number) { return budget > 0 ? ((revenue - budget) / budget) * 100 : null; }
+function signedPercent(value: number | null) { return value == null ? "—" : `${value > 0 ? "+" : ""}${Math.round(value)}%`; }
 function numeric(value: string) { return Number(value.replace(/\s/g, "").replace(",", ".")); }
 
 export function AdminCrmManager() {
   const [open, setOpen] = useState(false);
   const [role, setRole] = useState<CrmRole | null>(null);
+  const [workspace, setWorkspace] = useState<"sales" | "marketing">("sales");
   const [staffBranch, setStaffBranch] = useState("");
   const [branchFilter, setBranchFilter] = useState("");
   const [leads, setLeads] = useState<CrmLead[]>([]);
@@ -134,6 +138,7 @@ export function AdminCrmManager() {
   const [extraExpense, setExtraExpense] = useState("");
   const [extraExpenseDate, setExtraExpenseDate] = useState(dateOnly());
   const [extraExpenseNote, setExtraExpenseNote] = useState("");
+  const marketingMode = role === "marketer" || workspace === "marketing";
 
   useEffect(() => onAdminSection("crm", () => { setOpen(true); void load(); }), []);
 
@@ -161,7 +166,7 @@ export function AdminCrmManager() {
   }
 
   async function refresh(nextBranch = branchFilter) {
-    if (role === "marketer") {
+    if (marketingMode) {
       const [rows, catalog] = await Promise.all([fetchCrmMarketingSummary(marketingFrom, marketingTo, nextBranch), fetchCrmCampaignCatalog(nextBranch)]);
       setMarketingRows(rows); setCampaigns(catalog);
       if (!catalog.some(item => item.id === expenseCampaignId)) setExpenseCampaignId(catalog[0]?.id || "");
@@ -170,6 +175,22 @@ export function AdminCrmManager() {
     const branch = role === "admin" ? staffBranch : "";
     const [nextLeads, nextTasks] = await Promise.all([fetchCrmLeads(branch), fetchCrmTasks()]);
     setLeads(nextLeads); setTasks(nextTasks);
+  }
+
+  async function changeWorkspace(nextWorkspace: "sales" | "marketing") {
+    if (nextWorkspace === workspace) return;
+    setLoading(true); setError(""); setSuccess(""); setBranchFilter(""); setSelectedId("");
+    try {
+      if (nextWorkspace === "marketing") {
+        const [rows, catalog] = await Promise.all([fetchCrmMarketingSummary(marketingFrom, marketingTo, ""), fetchCrmCampaignCatalog()]);
+        setMarketingRows(rows); setCampaigns(catalog); setExpenseCampaignId(current => catalog.some(item => item.id === current) ? current : catalog[0]?.id || "");
+      } else {
+        const [nextLeads, nextTasks, catalog] = await Promise.all([fetchCrmLeads(), fetchCrmTasks(), fetchCrmCampaignCatalog()]);
+        setLeads(nextLeads); setTasks(nextTasks); setCampaigns(catalog);
+      }
+      setWorkspace(nextWorkspace);
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Не удалось сменить раздел CRM."); }
+    finally { setLoading(false); }
   }
 
   async function changeBranch(value: string) {
@@ -324,12 +345,15 @@ export function AdminCrmManager() {
 
   if (!open) return null;
   const marketingTotals = marketingRows.reduce((a, r) => ({ budget:a.budget+r.budget, reach:a.reach+r.reach, leads:a.leads+r.leads, trials:a.trials+r.trials, paid:a.paid+r.paid, lost:a.lost+r.lost, revenue:a.revenue+r.revenue }), {budget:0,reach:0,leads:0,trials:0,paid:0,lost:0,revenue:0});
+  const marketingNet = marketingTotals.revenue - marketingTotals.budget;
+  const marketingRomi = returnOnMarketingInvestment(marketingTotals.revenue, marketingTotals.budget);
+  const marketingRowsByRevenue = [...marketingRows].sort((left, right) => right.revenue - left.revenue || right.paid - left.paid || right.leads - left.leads);
   const globalRole = role !== "admin";
 
   return <div className="fixed inset-0 z-[82] overflow-y-auto bg-[#F7F5EF]">
     <div className="mx-auto max-w-5xl px-4 pb-24 pt-[calc(env(safe-area-inset-top,0px)+1rem)] sm:px-6">
       <header className="sticky top-0 z-10 -mx-4 flex items-start justify-between border-b border-black/[0.05] bg-[#F7F5EF]/95 px-4 py-4 backdrop-blur sm:-mx-6 sm:px-6">
-        <div><p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#D96A24]">OPEN STARS · CRM</p><h1 className="mt-1 text-3xl font-semibold tracking-[-0.04em]">{role === "marketer" ? "Маркетинг" : "Лиды и продажи"}</h1></div>
+        <div><p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#D96A24]">OPEN STARS · CRM</p><h1 className="mt-1 text-3xl font-semibold tracking-[-0.04em]">{marketingMode ? "Маркетинг" : "Лиды и продажи"}</h1></div>
         <button onClick={() => setOpen(false)} className="grid h-12 w-12 place-items-center rounded-full bg-white shadow-sm"><X size={22}/></button>
       </header>
 
@@ -337,9 +361,11 @@ export function AdminCrmManager() {
       {error && <div className="mt-4 flex gap-2 rounded-[18px] border border-red-200 bg-red-50 p-4 text-sm text-red-700"><AlertCircle size={18}/>{error}</div>}
       {success && <div className="mt-4 rounded-[18px] bg-[#5F6338]/10 p-4 text-sm text-[#4D512E]">{success}</div>}
 
-      {role === "marketer" && <section className="mt-4 rounded-[20px] bg-white p-4"><label className="text-xs font-semibold text-black/50">Филиал<select className={inputClass} value={branchFilter} onChange={e=>void changeBranch(e.target.value)}><option value="">Все филиалы</option>{branches.map(branch=><option key={branch} value={branch}>{branch}</option>)}</select></label></section>}
+      {(role === "owner" || role === "project_director" || role === "manager") && <nav aria-label="Раздел CRM" className="mt-4 grid grid-cols-2 gap-2 rounded-[18px] bg-white p-2"><button type="button" onClick={()=>void changeWorkspace("sales")} className={`rounded-[13px] px-4 py-3 text-sm font-semibold ${workspace==="sales"?"bg-[#171717] text-white":"text-black/45"}`}>Продажи</button><button type="button" onClick={()=>void changeWorkspace("marketing")} className={`rounded-[13px] px-4 py-3 text-sm font-semibold ${workspace==="marketing"?"bg-[#D96A24] text-white":"text-black/45"}`}>Маркетинг</button></nav>}
 
-      {role === "marketer" ? <>
+      {marketingMode && <section className="mt-4 rounded-[20px] bg-white p-4"><label className="text-xs font-semibold text-black/50">Филиал<select className={inputClass} value={branchFilter} onChange={e=>void changeBranch(e.target.value)}><option value="">Все филиалы</option>{branches.map(branch=><option key={branch} value={branch}>{branch}</option>)}</select></label></section>}
+
+      {marketingMode ? <>
         <section className="mt-5 rounded-[22px] bg-white p-4"><div className="grid gap-3 sm:grid-cols-3"><label className="text-xs font-semibold text-black/50">С даты<input type="date" className={inputClass} value={marketingFrom} onChange={e=>setMarketingFrom(e.target.value)}/></label><label className="text-xs font-semibold text-black/50">По дату<input type="date" className={inputClass} value={marketingTo} onChange={e=>setMarketingTo(e.target.value)}/></label><button onClick={()=>void refresh()} className="mt-auto rounded-[15px] bg-[#171717] py-3 text-sm font-semibold text-white">Обновить</button></div></section>
         <section className="mt-4 rounded-[22px] bg-white p-4">
           <div><p className="text-xs font-bold uppercase tracking-[0.14em] text-[#D96A24]">Новая реклама</p><h2 className="mt-1 text-lg font-semibold">Создать кампанию</h2></div>
@@ -359,8 +385,28 @@ export function AdminCrmManager() {
           <button disabled={saving} onClick={()=>void saveExtraExpense()} className="mt-3 w-full rounded-[14px] bg-[#171717] py-3 text-sm font-semibold text-white disabled:opacity-50">Провести расход в ДДС</button>
         </section>}
 
-        <section className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">{[["Бюджет ДДС",money(marketingTotals.budget)],["Охват",marketingTotals.reach],["Лиды",marketingTotals.leads],["На пробное",marketingTotals.trials],["Оплаты",marketingTotals.paid],["Отказы",marketingTotals.lost],["Выручка",money(marketingTotals.revenue)]].map(([label,value])=><div key={String(label)} className="rounded-[20px] bg-white p-4"><p className="text-xs text-black/40">{label}</p><p className="mt-2 text-xl font-semibold">{value}</p></div>)}</section>
-        <section className="mt-4 rounded-[22px] bg-white p-4"><h2 className="font-semibold">Результат по рекламным кампаниям</h2><div className="mt-3 space-y-3">{marketingRows.map(row=><article key={row.campaignId||"unattributed"} className="rounded-[16px] bg-[#F7F5EF] p-4"><div className="flex flex-wrap items-start justify-between gap-2"><div><b>{row.campaignName}</b><p className="text-xs text-black/40">{row.campaignBranch||"Все округа"}</p></div><div className="text-right"><p className="font-semibold">{money(row.budget)} расход ДДС</p><p className="text-xs text-black/40">{money(row.revenue)} фактическая выручка</p></div></div><div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-5"><div><p className="text-[10px] text-black/35">Охват</p><b>{row.reach}</b></div><div><p className="text-[10px] text-black/35">Лиды</p><b>{row.leads}</b></div><div><p className="text-[10px] text-black/35">На пробное</p><b>{row.trials}</b></div><div><p className="text-[10px] text-black/35">Оплаты</p><b>{row.paid}</b></div><div><p className="text-[10px] text-black/35">Отказы</p><b>{row.lost}</b></div></div><p className="mt-3 text-[11px] text-black/40">Лид → пробное: {percent(row.trials,row.leads)}% · лид → оплата: {percent(row.paid,row.leads)}%{row.leads>0?` · цена лида: ${money(row.budget/row.leads)}`:""}</p></article>)}{marketingRows.length===0&&<p className="py-8 text-center text-sm text-black/35">За выбранный период рекламных кампаний пока нет.</p>}</div><p className="mt-4 text-xs leading-5 text-black/35">Бюджет берётся из фактических расходов ДДС. Выручка считается по реальным оплатам связанных учеников; возвраты и аннулированные платежи исключены. Персональные данные родителей и детей маркетологу не показываются.</p></section>
+        <section className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">{[["Бюджет ДДС",money(marketingTotals.budget)],["Охват",count(marketingTotals.reach)],["Лиды",count(marketingTotals.leads)],["На пробное",count(marketingTotals.trials)],["Оплаты",count(marketingTotals.paid)],["Отказы",count(marketingTotals.lost)],["Выручка",money(marketingTotals.revenue)]].map(([label,value])=><div key={String(label)} className="rounded-[20px] bg-white p-4"><p className="text-xs text-black/40">{label}</p><p className="mt-2 text-xl font-semibold">{value}</p></div>)}</section>
+
+        <section className="mt-4 rounded-[22px] bg-[#171717] p-4 text-white">
+          <div><p className="text-xs font-bold uppercase tracking-[0.14em] text-[#F09A5F]">Эффективность рекламы</p><h2 className="mt-1 text-lg font-semibold">Что принёс рекламный бюджет</h2></div>
+          <div className="mt-4 grid grid-cols-2 gap-2 lg:grid-cols-4">
+            <div className="rounded-[16px] bg-white/10 p-3"><p className="text-[11px] text-white/50">Результат после рекламы</p><p className={`mt-1 text-lg font-semibold ${marketingNet < 0 ? "text-[#FFB6A0]" : "text-[#D8E6A5]"}`}>{marketingNet > 0 ? "+" : ""}{money(marketingNet)}</p></div>
+            <div className="rounded-[16px] bg-white/10 p-3"><p className="text-[11px] text-white/50">Цена одного лида</p><p className="mt-1 text-lg font-semibold">{marketingTotals.leads > 0 ? money(marketingTotals.budget / marketingTotals.leads) : "—"}</p></div>
+            <div className="rounded-[16px] bg-white/10 p-3"><p className="text-[11px] text-white/50">Цена одной оплаты</p><p className="mt-1 text-lg font-semibold">{marketingTotals.paid > 0 ? money(marketingTotals.budget / marketingTotals.paid) : "—"}</p></div>
+            <div className="rounded-[16px] bg-white/10 p-3"><p className="text-[11px] text-white/50">Окупаемость рекламы</p><p className={`mt-1 text-lg font-semibold ${marketingRomi != null && marketingRomi < 0 ? "text-[#FFB6A0]" : "text-[#D8E6A5]"}`}>{signedPercent(marketingRomi)}</p></div>
+          </div>
+          <p className="mt-3 text-[11px] leading-5 text-white/45">Окупаемость показывает, на сколько процентов фактическая выручка выше или ниже рекламных расходов. Зарплаты и другие расходы школы сюда не входят.</p>
+        </section>
+
+        <section className="mt-4 rounded-[22px] bg-white p-4">
+          <h2 className="font-semibold">Воронка рекламы</h2>
+          <div className="mt-4 grid gap-2 sm:grid-cols-3">
+            {[["Лиды",marketingTotals.leads,100],["Записались на пробное",marketingTotals.trials,percent(marketingTotals.trials,marketingTotals.leads)],["Оплатили",marketingTotals.paid,percent(marketingTotals.paid,marketingTotals.leads)]].map(([label,value,conversion])=><div key={String(label)} className="overflow-hidden rounded-[16px] bg-[#F7F5EF] p-3"><div className="flex items-end justify-between gap-2"><div><p className="text-[11px] text-black/40">{label}</p><p className="mt-1 text-2xl font-semibold">{count(Number(value))}</p></div><p className="text-sm font-semibold text-[#5F6338]">{conversion}%</p></div><div className="mt-3 h-2 overflow-hidden rounded-full bg-black/[0.06]"><div className="h-full rounded-full bg-[#D96A24]" style={{width:`${Math.max(0,Math.min(100,Number(conversion)))}%`}}/></div></div>)}
+          </div>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-[15px] bg-red-50 px-4 py-3"><p className="text-xs font-medium text-red-800">Отказы: {count(marketingTotals.lost)}</p><p className="text-xs text-red-700/70">{percent(marketingTotals.lost,marketingTotals.leads)}% от всех лидов</p></div>
+        </section>
+
+        <section className="mt-4 rounded-[22px] bg-white p-4"><h2 className="font-semibold">Результат по рекламным кампаниям</h2><div className="mt-3 space-y-3">{marketingRowsByRevenue.map(row=>{const net=row.revenue-row.budget;const romi=returnOnMarketingInvestment(row.revenue,row.budget);return <article key={row.campaignId||"unattributed"} className="rounded-[16px] bg-[#F7F5EF] p-4"><div className="flex flex-wrap items-start justify-between gap-2"><div><b>{row.campaignName}</b><p className="text-xs text-black/40">{row.campaignBranch||"Все округа"}</p></div><div className="text-right"><p className="font-semibold">{money(row.budget)} расход ДДС</p><p className="text-xs text-black/40">{money(row.revenue)} фактическая выручка</p></div></div><div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-5"><div><p className="text-[10px] text-black/35">Охват</p><b>{count(row.reach)}</b></div><div><p className="text-[10px] text-black/35">Лиды</p><b>{count(row.leads)}</b></div><div><p className="text-[10px] text-black/35">На пробное</p><b>{count(row.trials)}</b></div><div><p className="text-[10px] text-black/35">Оплаты</p><b>{count(row.paid)}</b></div><div><p className="text-[10px] text-black/35">Отказы</p><b>{count(row.lost)}</b></div></div><div className="mt-3 grid grid-cols-2 gap-2 border-t border-black/[0.06] pt-3 sm:grid-cols-4"><div><p className="text-[10px] text-black/35">Цена лида</p><b className="text-sm">{row.leads>0?money(row.budget/row.leads):"—"}</b></div><div><p className="text-[10px] text-black/35">Цена оплаты</p><b className="text-sm">{row.paid>0?money(row.budget/row.paid):"—"}</b></div><div><p className="text-[10px] text-black/35">Результат</p><b className={`text-sm ${net<0?"text-red-700":"text-[#4D512E]"}`}>{net>0?"+":""}{money(net)}</b></div><div><p className="text-[10px] text-black/35">Окупаемость</p><b className={`text-sm ${romi!=null&&romi<0?"text-red-700":"text-[#4D512E]"}`}>{signedPercent(romi)}</b></div></div><p className="mt-3 text-[11px] text-black/40">Лид → пробное: {percent(row.trials,row.leads)}% · лид → оплата: {percent(row.paid,row.leads)}%</p></article>})}{marketingRows.length===0&&<p className="py-8 text-center text-sm text-black/35">За выбранный период рекламных кампаний пока нет.</p>}</div><p className="mt-4 text-xs leading-5 text-black/35">Бюджет берётся из фактических расходов ДДС. Выручка считается по реальным оплатам связанных учеников; возвраты и аннулированные платежи исключены. Персональные данные родителей и детей маркетологу не показываются.</p></section>
       </> : <>
         <section className="mt-5">
           <div className="mb-3 flex items-end justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[0.14em] text-[#D96A24]">Сводка по округам</p><h2 className="mt-1 text-xl font-semibold">Продажи сейчас</h2></div>{branchFilter&&globalRole&&<button onClick={()=>{setBranchFilter("");setFilter("all");setQuery("");}} className="shrink-0 rounded-full bg-white px-3 py-2 text-xs font-semibold text-black/50">Все округа</button>}</div>
