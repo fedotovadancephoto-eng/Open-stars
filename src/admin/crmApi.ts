@@ -17,6 +17,7 @@ export type CrmLead = {
   source: string;
   sourceNote: string;
   campaign: string;
+  campaignId: string;
   stage: CrmStage;
   isLost: boolean;
   lostReason: CrmLostReason | "";
@@ -40,14 +41,19 @@ export type CrmTask = {
   completedAt: string;
 };
 
+export type CrmCampaignCatalogItem = { id: string; name: string; branch: string };
+
 export type CrmMarketingRow = {
-  branch: string;
-  source: string;
+  campaignId: string;
+  campaignName: string;
+  campaignBranch: string;
+  budget: number;
+  reach: number;
   leads: number;
   trials: number;
   paid: number;
-  students: number;
   lost: number;
+  revenue: number;
 };
 
 export type CrmStudentConversionInput = {
@@ -173,6 +179,7 @@ function mapLead(row: any): CrmLead {
     source: row.source || "",
     sourceNote: row.source_note || "",
     campaign: row.campaign || "",
+    campaignId: row.campaign_id || "",
     stage: row.stage,
     isLost: Boolean(row.is_lost),
     lostReason: row.lost_reason || "",
@@ -277,14 +284,41 @@ export async function convertCrmLeadToStudent(input: CrmStudentConversionInput) 
 }
 
 export async function fetchCrmMarketingSummary(from: string, to: string, branch = "") {
-  const rows = await rpc<any[]>("crm_marketing_summary", { p_from: from, p_to: to, p_branch: branch || null });
+  const rows = await rpc<any[]>("crm_marketing_campaign_summary", { p_from: from, p_to: to, p_branch: branch || null });
   return rows.map((row) => ({
-    branch: row.branch || "",
-    source: row.source || "",
+    campaignId: row.campaign_id || "",
+    campaignName: row.campaign_name || "Без рекламной кампании",
+    campaignBranch: row.campaign_branch || "",
+    budget: Number(row.budget || 0),
+    reach: Number(row.reach || 0),
     leads: Number(row.leads || 0),
     trials: Number(row.trials || 0),
     paid: Number(row.paid || 0),
-    students: Number(row.students || 0),
     lost: Number(row.lost || 0),
+    revenue: Number(row.revenue || 0),
   })) as CrmMarketingRow[];
+}
+
+export async function fetchCrmCampaignCatalog(branch = "") {
+  const rows = await rpc<any[]>("crm_campaign_catalog", { p_branch: branch || null });
+  return rows.map((row) => ({ id: row.id, name: row.name || "", branch: row.branch || "" })) as CrmCampaignCatalogItem[];
+}
+
+export async function createCrmAdCampaign(input: { name: string; reach: number; budget: number; branch?: string; expenseDate: string }) {
+  return rpc<string>("crm_create_ad_campaign", {
+    p_name: input.name.trim(),
+    p_reach: input.reach,
+    p_budget: input.budget,
+    p_branch: input.branch || null,
+    p_expense_date: input.expenseDate,
+  });
+}
+
+export async function recordCrmCampaignExpense(campaignId: string, amount: number, expenseDate: string, description = "") {
+  return rpc<string>("crm_record_campaign_expense", {
+    p_campaign_id: campaignId,
+    p_amount: amount,
+    p_expense_date: expenseDate,
+    p_description: description.trim() || null,
+  });
 }
