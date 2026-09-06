@@ -21,6 +21,7 @@ import { ChildPhotoUpload } from "@/admin/ChildPhotoUpload";
 import { CrmAccessManager } from "@/admin/CrmAccessManager";
 import { OwnerBusinessDashboard } from "@/admin/OwnerBusinessDashboard";
 import { OwnerHomeLanding } from "@/admin/OwnerHomeLanding";
+import { OwnerTuitionRefundManager } from "@/admin/OwnerTuitionRefundManager";
 import { StaffModeSwitch } from "@/admin/StaffModeSwitch";
 
 export default function AdminWorkspace() {
@@ -39,6 +40,7 @@ export default function AdminWorkspace() {
       <AdminCoinManager />
       <AdminNewsManager />
       <AdminPaymentManager />
+      <OwnerTuitionRefundManager />
       <AdminEventsManager />
       <AdminPhotoSessionManager />
       <AdminStaffManager />
