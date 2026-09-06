@@ -1,0 +1,9 @@
+-- Manual rollback-only invariant test used before release.
+-- The production transaction test verifies:
+-- 1) refund marks payment_receipts.refunded_at;
+-- 2) creates exactly one cashflow row with source_type='tuition_refund';
+-- 3) staff_payment_overview.collectedAmount decreases by the refund amount;
+-- 4) owner_cashflow_month_summary branch revenue decreases by the refund amount;
+-- 5) branch expense increases by the refund amount;
+-- 6) net DDS decreases by the refund amount;
+-- 7) the test transaction is rolled back, leaving production data unchanged.

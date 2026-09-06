@@ -11,14 +11,10 @@ import {
   rejectExpense,
 } from "@/admin/businessApi";
 import { BranchGoal, fetchOwnerBranchGoals, setOwnerBranchTarget } from "@/admin/businessGoalsApi";
+import { fetchOwnerCashflowMonthSummary, OwnerCashflowMonthSummary } from "@/admin/cashflowSummaryApi";
 
 function money(value: number) {
   return new Intl.NumberFormat("ru-RU", { style: "currency", currency: "RUB", maximumFractionDigits: 0 }).format(value || 0);
-}
-
-function monthStartIso() {
-  const date = new Date();
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-01`;
 }
 
 function dateLabel(value: string) {
@@ -111,6 +107,7 @@ export function OwnerBusinessDashboard() {
   const [open, setOpen] = useState(false);
   const [context, setContext] = useState<BusinessExpenseContext | null>(null);
   const [goals, setGoals] = useState<BranchGoal[]>([]);
+  const [summary, setSummary] = useState<OwnerCashflowMonthSummary | null>(null);
   const [branchFilter, setBranchFilter] = useState("Все филиалы");
   const [loading, setLoading] = useState(false);
   const [busyId, setBusyId] = useState("");
@@ -119,10 +116,15 @@ export function OwnerBusinessDashboard() {
   const [success, setSuccess] = useState("");
 
   async function refresh() {
-    const [next, nextGoals] = await Promise.all([fetchBusinessExpenseContext(), fetchOwnerBranchGoals()]);
+    const [next, nextGoals, nextSummary] = await Promise.all([
+      fetchBusinessExpenseContext(),
+      fetchOwnerBranchGoals(),
+      fetchOwnerCashflowMonthSummary(),
+    ]);
     if (next.role !== "owner") throw new Error("Бизнес-финансы доступны только владельцу.");
     setContext(next);
     setGoals(nextGoals);
+    setSummary(nextSummary);
     return next;
   }
 
@@ -138,10 +140,15 @@ export function OwnerBusinessDashboard() {
   const cashflow = useMemo(() => (context?.cashflow || []).filter((item) => branchFilter === "Все филиалы" || item.branchName === branchFilter), [context, branchFilter]);
   const pending = useMemo(() => requests.filter((item) => item.status === "submitted"), [requests]);
   const pendingAmount = useMemo(() => pending.reduce((sum, item) => sum + item.amount, 0), [pending]);
-  const monthStart = monthStartIso();
-  const incomeThisMonth = useMemo(() => cashflow.filter((item) => item.direction === "income" && item.transactionDate >= monthStart).reduce((sum, item) => sum + item.amount, 0), [cashflow, monthStart]);
-  const expenseThisMonth = useMemo(() => cashflow.filter((item) => item.direction === "expense" && item.transactionDate >= monthStart).reduce((sum, item) => sum + item.amount, 0), [cashflow, monthStart]);
-  const netCashflow = incomeThisMonth - expenseThisMonth;
+  const selectedSummary = useMemo(() => {
+    if (!summary) return null;
+    if (branchFilter === "Все филиалы") return summary;
+    return summary.branches.find((item) => item.branch === branchFilter) || null;
+  }, [summary, branchFilter]);
+  const revenueThisMonth = selectedSummary?.revenue || 0;
+  const refundsThisMonth = selectedSummary?.refunds || 0;
+  const expenseThisMonth = selectedSummary?.expenses || 0;
+  const netCashflow = selectedSummary?.netCashflow || 0;
 
   async function processApprove(expense: ExpenseRequest, accountId: string, comment: string) {
     setBusyId(expense.id);
@@ -229,9 +236,9 @@ export function OwnerBusinessDashboard() {
             </div>
 
             <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <div className="rounded-[22px] border border-black/[0.05] bg-white p-5"><div className="flex items-center gap-2 text-[#4D512E]"><TrendingUp size={16} /><p className="text-xs font-semibold">Поступления за месяц</p></div><p className="mt-2 text-3xl font-semibold tracking-[-0.05em]">{money(incomeThisMonth)}</p><p className="mt-2 text-xs text-black/35">{branchFilter}</p></div>
-              <div className="rounded-[22px] border border-black/[0.05] bg-white p-5"><div className="flex items-center gap-2 text-red-600"><TrendingDown size={16} /><p className="text-xs font-semibold">Расходы за месяц</p></div><p className="mt-2 text-3xl font-semibold tracking-[-0.05em]">{money(expenseThisMonth)}</p><p className="mt-2 text-xs text-black/35">подтверждённые операции</p></div>
-              <div className="rounded-[22px] border border-black/[0.05] bg-[#171717] p-5 text-white"><div className="flex items-center gap-2 text-white/55"><WalletCards size={16} /><p className="text-xs font-semibold">Денежный поток месяца</p></div><p className="mt-2 text-3xl font-semibold tracking-[-0.05em]">{money(netCashflow)}</p><p className="mt-2 text-xs text-white/40">поступления − расходы, не бухгалтерская прибыль</p></div>
+              <div className="rounded-[22px] border border-black/[0.05] bg-white p-5"><div className="flex items-center gap-2 text-[#4D512E]"><TrendingUp size={16} /><p className="text-xs font-semibold">Выручка за месяц</p></div><p className="mt-2 text-3xl font-semibold tracking-[-0.05em]">{money(revenueThisMonth)}</p><p className="mt-2 text-xs text-black/35">{branchFilter}{refundsThisMonth > 0 ? ` · возвраты ${money(refundsThisMonth)}` : ""}</p></div>
+              <div className="rounded-[22px] border border-black/[0.05] bg-white p-5"><div className="flex items-center gap-2 text-red-600"><TrendingDown size={16} /><p className="text-xs font-semibold">Расходы за месяц</p></div><p className="mt-2 text-3xl font-semibold tracking-[-0.05em]">{money(expenseThisMonth)}</p><p className="mt-2 text-xs text-black/35">{refundsThisMonth > 0 ? "включая возвраты" : "подтверждённые операции"}</p></div>
+              <div className="rounded-[22px] border border-black/[0.05] bg-[#171717] p-5 text-white"><div className="flex items-center gap-2 text-white/55"><WalletCards size={16} /><p className="text-xs font-semibold">Денежный поток месяца</p></div><p className="mt-2 text-3xl font-semibold tracking-[-0.05em]">{money(netCashflow)}</p><p className="mt-2 text-xs text-white/40">реальные поступления − все выплаты</p></div>
               <div className="rounded-[22px] border border-black/[0.05] bg-white p-5"><p className="text-xs font-semibold text-black/40">Ожидает подтверждения</p><p className="mt-2 text-3xl font-semibold tracking-[-0.05em]">{money(pendingAmount)}</p><p className="mt-2 text-xs text-[#C95320]">{pending.length} {pending.length === 1 ? "расход" : "расходов"}</p></div>
             </div>
 
