@@ -182,12 +182,12 @@ export function AdminCrmManager() {
       branch,
       applications: branchLeads.filter((lead) => !lead.isLost && lead.stage === "new").length,
       trials: branchLeads.filter((lead) => !lead.isLost && lead.stage === "trial_booked").length,
-      thinking: branchLeads.filter((lead) => !lead.isLost && lead.stage === "thinking").length,
+      awaitingPayment: branchLeads.filter((lead) => !lead.isLost && lead.stage === "awaiting_payment").length,
       lost: branchLeads.filter((lead) => lead.isLost).length,
     };
   });
 
-  function selectOverview(branch: string, nextFilter: "new" | "trial_booked" | "thinking" | "lost" = "trial_booked") {
+  function selectOverview(branch: string, nextFilter: "new" | "trial_booked" | "awaiting_payment" | "lost" = "trial_booked") {
     setBranchFilter(branch);
     setFilter(nextFilter);
     setQuery("");
@@ -303,7 +303,7 @@ export function AdminCrmManager() {
           <div className="grid gap-3 lg:grid-cols-3">{branchOverview.map((item)=><article key={item.branch} className={`rounded-[22px] border p-4 transition ${branchFilter===item.branch?"border-[#D96A24]/35 bg-[#FFF8F2]":"border-black/[0.04] bg-white"}`}>
             <button onClick={()=>selectOverview(item.branch)} className="flex w-full items-center justify-between text-left"><span className="text-lg font-semibold">{item.branch}</span><span className="flex items-center gap-1 text-xs font-semibold text-[#D96A24]">На пробное <ChevronRight size={16}/></span></button>
             <div className="mt-4 grid grid-cols-2 gap-2">
-              {([['Заявки',item.applications,'new'],['На пробное',item.trials,'trial_booked'],['Думают',item.thinking,'thinking'],['Потеряно',item.lost,'lost']] as const).map(([label,value,nextFilter])=><button key={label} onClick={()=>selectOverview(item.branch,nextFilter)} className={`rounded-[15px] p-3 text-left ${branchFilter===item.branch&&filter===nextFilter?"bg-[#171717] text-white":"bg-[#F7F5EF]"}`}><p className={`text-[11px] ${branchFilter===item.branch&&filter===nextFilter?"text-white/55":"text-black/40"}`}>{label}</p><p className="mt-1 text-2xl font-semibold">{value}</p></button>)}
+              {([['Заявки',item.applications,'new'],['На пробное',item.trials,'trial_booked'],['Ждём оплату',item.awaitingPayment,'awaiting_payment'],['Потеряно',item.lost,'lost']] as const).map(([label,value,nextFilter])=><button key={label} onClick={()=>selectOverview(item.branch,nextFilter)} className={`rounded-[15px] p-3 text-left ${branchFilter===item.branch&&filter===nextFilter?"bg-[#171717] text-white":"bg-[#F7F5EF]"}`}><p className={`text-[11px] ${branchFilter===item.branch&&filter===nextFilter?"text-white/55":"text-black/40"}`}>{label}</p><p className="mt-1 text-2xl font-semibold">{value}</p></button>)}
             </div>
           </article>)}</div>
         </section>
