@@ -185,8 +185,9 @@ export function AdminPaymentManager() {
     });
   }, [overview, overviewFilter, query]);
 
-  const activeReceipts = useMemo(() => receipts.filter((receipt) => !receipt.voidedAt), [receipts]);
+  const activeReceipts = useMemo(() => receipts.filter((receipt) => !receipt.voidedAt && !receipt.refundedAt), [receipts]);
   const cancelledReceipts = useMemo(() => receipts.filter((receipt) => Boolean(receipt.voidedAt)), [receipts]);
+  const refundedReceipts = useMemo(() => receipts.filter((receipt) => Boolean(receipt.refundedAt)), [receipts]);
 
   async function refreshOverview(nextMonth = month, nextBranch = branchFilter) {
     const branch = role === "admin" ? staffBranch : nextBranch;
@@ -310,6 +311,7 @@ export function AdminPaymentManager() {
 
   async function saveReceipt() {
     if (!selected) return setError("Выберите ребёнка.");
+    if (!selected.chargeSet) return setError("Сначала сохраните индивидуальное начисление за выбранный месяц.");
     const numericAmount = numericInput(amount);
     if (!Number.isFinite(numericAmount) || numericAmount <= 0) return setError("Введите сумму фактической оплаты.");
     setSaving(true);
@@ -501,13 +503,13 @@ export function AdminPaymentManager() {
 
                       <div className="mt-4 rounded-[18px] bg-[#F7F5EF] p-4">
                         <div className="flex items-center gap-2"><CreditCard size={17} className="text-[#D96A24]" /><div><p className="text-sm font-semibold">Добавить фактическое поступление</p><p className="mt-0.5 text-[11px] text-black/40">Реально полученные деньги. Можно вносить частями.</p></div></div>
-                        {!selected.chargeSet && <div className="mt-3 rounded-[12px] bg-amber-50 px-3 py-2 text-[11px] leading-5 text-amber-800">Оплату можно принять сейчас, но долг и остаток появятся только после того, как вы зададите начисление.</div>}
+                        {!selected.chargeSet && <div className="mt-3 rounded-[12px] bg-amber-50 px-3 py-2 text-[11px] leading-5 text-amber-800">Сначала сохраните индивидуальное начисление выше. После этого можно подтвердить поступление и корректно посчитать остаток.</div>}
                         <div className="mt-3 grid gap-3 sm:grid-cols-2">
                           <label className="text-xs font-semibold text-black/55">Сумма, ₽<input inputMode="decimal" className={inputClass} value={amount} onChange={(event) => setAmount(event.target.value)} placeholder={selected.remainingAmount > 0 ? String(selected.remainingAmount) : "5500"} /></label>
                           <label className="text-xs font-semibold text-black/55">Способ оплаты<select className={inputClass} value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value as PaymentMethod)}><option value="online">Онлайн · Точка</option><option value="cash">Наличные</option><option value="bank_transfer">Перевод на счёт</option><option value="other">Другое</option></select></label>
                         </div>
                         <label className="mt-3 block text-xs font-semibold text-black/55">Комментарий<input className={inputClass} value={note} onChange={(event) => setNote(event.target.value)} placeholder="Необязательно" /></label>
-                        <button onClick={() => void saveReceipt()} disabled={saving} className="mt-4 flex w-full items-center justify-center gap-2 rounded-[14px] bg-[#171717] px-5 py-3.5 text-sm font-semibold text-white disabled:opacity-50">{saving ? <LoaderCircle className="animate-spin" size={17} /> : <CreditCard size={17} />}Подтвердить поступление</button>
+                        <button onClick={() => void saveReceipt()} disabled={saving || !selected.chargeSet} className="mt-4 flex w-full items-center justify-center gap-2 rounded-[14px] bg-[#171717] px-5 py-3.5 text-sm font-semibold text-white disabled:opacity-40">{saving ? <LoaderCircle className="animate-spin" size={17} /> : <CreditCard size={17} />}Подтвердить поступление</button>
                       </div>
                     </>
                   ) : <div className="grid min-h-[230px] place-items-center text-center text-sm text-black/40"><div><CreditCard className="mx-auto text-black/15" size={28} /><p className="mt-3">Выберите ребёнка в реестре слева.</p></div></div>}
@@ -542,6 +544,7 @@ export function AdminPaymentManager() {
                     <button type="button" onClick={() => setServiceHistoryOpen((current) => !current)} className="flex w-full items-center justify-between gap-3 text-left"><div className="flex items-center gap-2"><History size={16} className="text-black/35" /><div><p className="text-sm font-semibold">Служебная история</p><p className="mt-0.5 text-xs text-black/35">Старые статусы и отменённые операции</p></div></div><ChevronDown size={18} className={`text-black/30 transition ${serviceHistoryOpen ? "rotate-180" : ""}`} /></button>
                     {serviceHistoryOpen && <div className="mt-4 space-y-5">
                       {cancelledReceipts.length > 0 && <div><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-black/30">Отменённые поступления</p><div className="mt-2 divide-y divide-black/[0.06]">{cancelledReceipts.map((receipt) => <div key={receipt.id} className="py-3 opacity-55"><p className="text-sm font-semibold line-through">{money(receipt.amount)} · {methodLabels[receipt.paymentMethod]}</p><p className="mt-1 text-[11px] text-red-600">Отменено: {receipt.voidReason}</p></div>)}</div></div>}
+                      {refundedReceipts.length > 0 && <div><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-black/30">Возвращённые оплаты</p><div className="mt-2 divide-y divide-black/[0.06]">{refundedReceipts.map((receipt) => <div key={receipt.id} className="py-3 opacity-65"><p className="text-sm font-semibold">{money(receipt.amount)} · {methodLabels[receipt.paymentMethod]}</p><p className="mt-1 text-[11px] text-red-600">Возврат зафиксирован: {receipt.refundReason || "причина не указана"}</p></div>)}</div></div>}
                       <div><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-black/30">История старых статусов</p>{history.length === 0 ? <p className="mt-2 text-sm text-black/35">Изменений нет.</p> : <div className="mt-2 divide-y divide-black/[0.06]">{history.map((item) => <div key={item.id} className="py-3"><div className="flex items-center gap-2">{item.newStatus === "paid" ? <CheckCircle2 size={15} className="text-[#5F6338]" /> : <Clock3 size={15} className={item.newStatus === "overdue" ? "text-red-500" : "text-[#D96A24]"} />}<p className="text-sm font-semibold">{monthLabel(item.month)} · {labels[item.newStatus]}</p></div><p className="mt-1 pl-6 text-[11px] text-black/35">{dateLabel(item.changedAt)} · {item.changedByName}</p></div>)}</div>}</div>
                     </div>}
                   </section>

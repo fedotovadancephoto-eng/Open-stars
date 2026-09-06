@@ -27,6 +27,8 @@ export type PaymentReceipt = {
   confirmedByName: string;
   voidedAt: string;
   voidReason: string;
+  refundedAt: string;
+  refundReason: string;
 };
 export type PaymentOverviewStudent = {
   childId: string;
@@ -73,6 +75,41 @@ export type PaymentLink = { branch: string; paymentUrl: string; enabled: boolean
 export type PaymentLinkContext = { role: string; staffBranch: string; links: PaymentLink[] };
 
 type ApiError = { message?: string; details?: string };
+type PaymentContextResponse = {
+  role?: string;
+  staffBranch?: string;
+  children?: Array<Partial<PaymentChild>>;
+};
+type PaymentOverviewResponse = Partial<Omit<PaymentOverview, "students">> & {
+  students?: Array<Partial<PaymentOverviewStudent>>;
+};
+type PaymentHistoryResponse = {
+  id: string;
+  month?: string;
+  old_status?: string;
+  new_status?: string;
+  changed_at?: string;
+  changed_by_name?: string;
+};
+type PaymentReceiptResponse = {
+  id: string;
+  payment_id?: string;
+  month?: string;
+  amount?: number | string;
+  payment_method?: PaymentMethod;
+  received_at?: string;
+  note?: string;
+  confirmed_by_name?: string;
+  voided_at?: string;
+  void_reason?: string;
+  refunded_at?: string;
+  refund_reason?: string;
+};
+type PaymentLinkContextResponse = {
+  role?: string;
+  staffBranch?: string;
+  links?: Array<Partial<PaymentLink>>;
+};
 
 async function rpc<T>(name: string, body: Record<string, unknown> = {}) {
   const session = await getValidStaffSession();
@@ -104,6 +141,8 @@ async function rpc<T>(name: string, body: Record<string, unknown> = {}) {
     if (message.includes("void reason required")) message = "Укажите причину отмены оплаты.";
     if (message.includes("receipt not found")) message = "Эта оплата уже отменена или не найдена.";
     if (message.includes("payment receipt required")) message = "Чтобы поставить «Оплачено», подтвердите фактическую сумму и способ оплаты.";
+    if (message.includes("monthly charge required before payment receipt")) message = "Сначала сохраните индивидуальное начисление за выбранный месяц.";
+    if (message.includes("receipt already refunded")) message = "Возвращённую оплату нельзя исправить или отменить повторно.";
     if (message.includes("void receipt first")) message = "Сначала отмените подтверждённое поступление в блоке «Фактические поступления». После этого можно изменить статус.";
     throw new Error(message);
   }
@@ -112,12 +151,12 @@ async function rpc<T>(name: string, body: Record<string, unknown> = {}) {
 }
 
 export async function fetchPaymentContext() {
-  const data: any = await rpc("staff_payment_context");
+  const data = await rpc<PaymentContextResponse>("staff_payment_context");
   return {
     role: data.role || "",
     staffBranch: data.staffBranch || "",
-    children: (Array.isArray(data.children) ? data.children : []).map((child: any) => ({
-      id: child.id,
+    children: (Array.isArray(data.children) ? data.children : []).map((child) => ({
+      id: child.id || "",
       name: child.name || "Ученик",
       branch: child.branch || "",
       groupName: child.groupName || "",
@@ -127,7 +166,7 @@ export async function fetchPaymentContext() {
 }
 
 export async function fetchPaymentOverview(month: string, branch = ""): Promise<PaymentOverview> {
-  const data: any = await rpc("staff_payment_overview", {
+  const data = await rpc<PaymentOverviewResponse>("staff_payment_overview", {
     p_month: `${month}-01`,
     p_branch: branch.trim() || null,
   });
@@ -151,7 +190,7 @@ export async function fetchPaymentOverview(month: string, branch = ""): Promise<
     chargedAmount: Number(data.chargedAmount || 0),
     remainingAmount: Number(data.remainingAmount || 0),
     overpaidAmount: Number(data.overpaidAmount || 0),
-    students: (Array.isArray(data.students) ? data.students : []).map((item: any) => ({
+    students: (Array.isArray(data.students) ? data.students : []).map((item) => ({
       childId: item.childId || "",
       name: item.name || "Ученик",
       branch: item.branch || "",
@@ -206,8 +245,8 @@ export async function setPaymentStatus(childId: string, month: string, status: P
 }
 
 export async function fetchPaymentHistory(childId: string) {
-  const rows: any[] = await rpc("staff_payment_history", { p_child_id: childId });
-  return (rows || []).map((row: any) => ({
+  const rows = await rpc<PaymentHistoryResponse[]>("staff_payment_history", { p_child_id: childId });
+  return (rows || []).map((row) => ({
     id: row.id,
     month: row.month || "",
     oldStatus: row.old_status || "",
@@ -243,18 +282,20 @@ export async function confirmPaymentReceipt(input: {
 }
 
 export async function fetchPaymentReceipts(childId: string) {
-  const rows: any[] = await rpc("staff_payment_receipts_v2", { p_child_id: childId });
-  return (rows || []).map((row: any) => ({
+  const rows = await rpc<PaymentReceiptResponse[]>("staff_payment_receipts_v2", { p_child_id: childId });
+  return (rows || []).map((row) => ({
     id: row.id,
     paymentId: row.payment_id || "",
     month: row.month || "",
     amount: Number(row.amount || 0),
-    paymentMethod: row.payment_method as PaymentMethod,
+    paymentMethod: row.payment_method || "other",
     receivedAt: row.received_at || "",
     note: row.note || "",
     confirmedByName: row.confirmed_by_name || "Сотрудник OPEN STARS",
     voidedAt: row.voided_at || "",
     voidReason: row.void_reason || "",
+    refundedAt: row.refunded_at || "",
+    refundReason: row.refund_reason || "",
   })) as PaymentReceipt[];
 }
 
@@ -291,11 +332,11 @@ export async function voidPaymentReceipt(receiptId: string, reason: string) {
 }
 
 export async function fetchPaymentLinkContext(): Promise<PaymentLinkContext> {
-  const data: any = await rpc("staff_payment_link_context");
+  const data = await rpc<PaymentLinkContextResponse>("staff_payment_link_context");
   return {
     role: data.role || "",
     staffBranch: data.staffBranch || "",
-    links: (Array.isArray(data.links) ? data.links : []).map((item: any) => ({
+    links: (Array.isArray(data.links) ? data.links : []).map((item) => ({
       branch: item.branch || "",
       paymentUrl: item.paymentUrl || "",
       enabled: Boolean(item.enabled),
@@ -306,7 +347,7 @@ export async function fetchPaymentLinkContext(): Promise<PaymentLinkContext> {
 
 export async function savePaymentLink(branch: string, paymentUrl: string) {
   const url = paymentUrl.trim();
-  const data: any = await rpc("staff_set_payment_link", {
+  const data = await rpc<Partial<PaymentLink>>("staff_set_payment_link", {
     p_branch: branch,
     p_payment_url: url,
     p_enabled: Boolean(url),
