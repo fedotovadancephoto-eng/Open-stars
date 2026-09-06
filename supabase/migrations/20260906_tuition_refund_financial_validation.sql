@@ -1,0 +1,10 @@
+-- Validation note kept with migrations:
+-- A real tuition refund must preserve the original income row and add a tuition_refund expense row.
+-- staff_payment_overview excludes refunded receipts from collectedAmount.
+-- owner_cashflow_month_summary subtracts refund expenses from displayed revenue and includes them in DDS expenses.
+-- Rollback-only production E2E on 2026-09-06 verified a 5000 RUB refund changed:
+-- collected 136500 -> 131500,
+-- branch revenue 136500 -> 131500,
+-- expenses 0 -> 5000,
+-- net DDS 136500 -> 131500,
+-- with the test transaction rolled back afterwards.
