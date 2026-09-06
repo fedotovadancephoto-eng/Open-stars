@@ -243,7 +243,7 @@ export function AdminPayrollManager() {
             <button type="button" disabled={saving || loading || !context?.teachers.length} onClick={() => void save()} className="mt-4 flex w-full items-center justify-center gap-2 rounded-[16px] bg-[#D96A24] px-4 py-3.5 text-sm font-semibold text-white shadow-sm disabled:opacity-50">
               {saving ? <LoaderCircle size={18} className="animate-spin"/> : <Banknote size={18}/>} {editing ? "Сохранить исправление" : "Записать выплату"}
             </button>
-            {!context?.teachers.length && <p className="mt-3 text-xs leading-5 text-black/45">В вашем филиале пока нет активных аккаунтов с ролью «Педагог».</p>}
+            {!context?.teachers.length && <p className="mt-3 text-xs leading-5 text-black/45">В вашем филиале пока нет сотрудников с ролью «Педагог» или назначенными предметами.</p>}
           </section>
 
           <section className="rounded-[24px] border border-black/[0.06] bg-white p-4 sm:p-5">
