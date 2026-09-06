@@ -74,6 +74,7 @@ function friendlyApiMessage(message: string) {
   if (message.includes("wrong branch")) return "Администратор может работать только со своим филиалом.";
   if (message.includes("not authorized")) return "У вас нет доступа к этой группе или предмету.";
   if (message.includes("invalid grade")) return "Оценка должна быть от 1 до 5.";
+  if (message.includes("wrong lesson date")) return "Дата не совпадает с днём занятий этой группы. Выберите правильную дату и загрузите группу заново.";
   if (message.includes("title and subject")) return "Укажите предмет и название задания.";
   if (message.toLowerCase().includes("row-level security")) return "У вас нет доступа к этой записи.";
   return message;
