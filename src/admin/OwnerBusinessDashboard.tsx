@@ -108,6 +108,8 @@ export function OwnerBusinessDashboard() {
   const [context, setContext] = useState<BusinessExpenseContext | null>(null);
   const [goals, setGoals] = useState<BranchGoal[]>([]);
   const [summary, setSummary] = useState<OwnerCashflowMonthSummary | null>(null);
+  const [month, setMonth] = useState(() => new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Irkutsk" }).format(new Date()).slice(0, 7));
+  const [summaryError, setSummaryError] = useState("");
   const [branchFilter, setBranchFilter] = useState("Все филиалы");
   const [loading, setLoading] = useState(false);
   const [busyId, setBusyId] = useState("");
@@ -116,15 +118,13 @@ export function OwnerBusinessDashboard() {
   const [success, setSuccess] = useState("");
 
   async function refresh() {
-    const [next, nextGoals, nextSummary] = await Promise.all([
+    const [next, nextGoals] = await Promise.all([
       fetchBusinessExpenseContext(),
       fetchOwnerBranchGoals(),
-      fetchOwnerCashflowMonthSummary(),
     ]);
     if (next.role !== "owner") throw new Error("Бизнес-финансы доступны только владельцу.");
     setContext(next);
     setGoals(nextGoals);
-    setSummary(nextSummary);
     return next;
   }
 
@@ -136,15 +136,34 @@ export function OwnerBusinessDashboard() {
     void refresh().catch((reason) => setError(reason instanceof Error ? reason.message : "Не удалось открыть бизнес-панель.")).finally(() => setLoading(false));
   }), []);
 
+  useEffect(() => {
+    if (!open || !context) return;
+    let cancelled = false;
+    setSummary(null);
+    setSummaryError("");
+    void fetchOwnerCashflowMonthSummary(month).then((next) => {
+      if (!cancelled) setSummary(next);
+    }).catch((reason) => {
+      if (!cancelled) setSummaryError(reason instanceof Error ? reason.message : "Не удалось загрузить выручку.");
+    });
+    return () => { cancelled = true; };
+  }, [open, month, context]);
+
   const requests = useMemo(() => (context?.requests || []).filter((item) => branchFilter === "Все филиалы" || item.branchName === branchFilter), [context, branchFilter]);
   const cashflow = useMemo(() => (context?.cashflow || []).filter((item) => branchFilter === "Все филиалы" || item.branchName === branchFilter), [context, branchFilter]);
   const pending = useMemo(() => requests.filter((item) => item.status === "submitted"), [requests]);
   const pendingAmount = useMemo(() => pending.reduce((sum, item) => sum + item.amount, 0), [pending]);
   const selectedSummary = useMemo(() => {
-    if (!summary) return null;
+    if (!summary || summary.month.slice(0, 7) !== month) return null;
     if (branchFilter === "Все филиалы") return summary;
     return summary.branches.find((item) => item.branch === branchFilter) || null;
-  }, [summary, branchFilter]);
+  }, [summary, branchFilter, month]);
+  const summaryReady = summary?.month.slice(0, 7) === month;
+  const breakdown = selectedSummary?.revenueBreakdown || [];
+  const channelTotal = (channel: string, category?: string) => breakdown
+    .filter((item) => item.channel === channel && (!category || item.category === category))
+    .reduce((sum, item) => sum + item.amount, 0);
+  const hasUnknown = breakdown.some((item) => item.channel === "unknown");
   const revenueThisMonth = selectedSummary?.revenue || 0;
   const refundsThisMonth = selectedSummary?.refunds || 0;
   const expenseThisMonth = selectedSummary?.expenses || 0;
@@ -235,12 +254,36 @@ export function OwnerBusinessDashboard() {
               {branchOptions.map((branch) => <button key={branch} type="button" onClick={() => setBranchFilter(branch)} className={`rounded-full px-3.5 py-2 text-xs font-semibold transition ${branchFilter === branch ? "bg-[#171717] text-white" : "bg-white text-black/50"}`}>{branch}</button>)}
             </div>
 
-            <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <label className="mt-5 block text-sm font-semibold">Месяц финансового итога
+              <input type="month" value={month} onChange={(event) => { if (/^\d{4}-\d{2}$/.test(event.target.value)) setMonth(event.target.value); }} className="mt-2 block rounded-xl border border-black/10 bg-white px-4 py-3" />
+            </label>
+            {summaryError && <p role="alert" className="mt-3 text-sm text-red-700">{summaryError}</p>}
+            {!summaryReady ? <p className="mt-4 text-sm text-black/50">{summaryError ? "Финансовый итог недоступен. Нажмите обновление, чтобы повторить." : "Загружаем финансовый итог…"}</p> : <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <div className="rounded-[22px] border border-black/[0.05] bg-white p-5"><div className="flex items-center gap-2 text-[#4D512E]"><TrendingUp size={16} /><p className="text-xs font-semibold">Выручка за месяц</p></div><p className="mt-2 text-3xl font-semibold tracking-[-0.05em]">{money(revenueThisMonth)}</p><p className="mt-2 text-xs text-black/35">{branchFilter}{refundsThisMonth > 0 ? ` · возвраты ${money(refundsThisMonth)}` : ""}</p></div>
               <div className="rounded-[22px] border border-black/[0.05] bg-white p-5"><div className="flex items-center gap-2 text-red-600"><TrendingDown size={16} /><p className="text-xs font-semibold">Расходы за месяц</p></div><p className="mt-2 text-3xl font-semibold tracking-[-0.05em]">{money(expenseThisMonth)}</p><p className="mt-2 text-xs text-black/35">{refundsThisMonth > 0 ? "включая возвраты" : "подтверждённые операции"}</p></div>
               <div className="rounded-[22px] border border-black/[0.05] bg-[#171717] p-5 text-white"><div className="flex items-center gap-2 text-white/55"><WalletCards size={16} /><p className="text-xs font-semibold">Денежный поток месяца</p></div><p className="mt-2 text-3xl font-semibold tracking-[-0.05em]">{money(netCashflow)}</p><p className="mt-2 text-xs text-white/40">реальные поступления − все выплаты</p></div>
               <div className="rounded-[22px] border border-black/[0.05] bg-white p-5"><p className="text-xs font-semibold text-black/40">Ожидает подтверждения</p><p className="mt-2 text-3xl font-semibold tracking-[-0.05em]">{money(pendingAmount)}</p><p className="mt-2 text-xs text-[#C95320]">{pending.length} {pending.length === 1 ? "расход" : "расходов"}</p></div>
-            </div>
+            </div>}
+
+            {summaryReady && <section className="mt-5 rounded-[22px] bg-white p-5">
+              <h3 className="text-xl font-semibold">Выручка по способам оплаты</h3>
+              <p className="mt-2 text-sm text-black/50">Переводы на карту, QR и онлайн-оплата — безналичные. Возвраты вычтены из способа исходной оплаты в месяце возврата.</p>
+              <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                {([["cash", "Наличные"], ["noncash", "Безналичные"], ...(hasUnknown ? [["unknown", "Способ не указан"]] : [])]).map(([channel, label]) =>
+                  <div key={channel} className="rounded-2xl bg-[#F7F5EF] p-4"><p className="text-sm text-black/50">{label}</p><p className="mt-2 text-2xl font-semibold">{money(channelTotal(channel))}</p></div>
+                )}
+              </div>
+              <div className="mt-4 overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead><tr className="text-black/50"><th className="p-2">Выручка</th><th className="p-2">Наличные</th><th className="p-2">Безналичные</th>{hasUnknown && <th className="p-2">Не указан</th>}<th className="p-2">Итого</th></tr></thead>
+                  <tbody>{([["tuition", "Обучение"], ["events", "Мероприятия"], ["other", "Прочее"]]).map(([category, label]) =>
+                    <tr key={category} className="border-t border-black/5"><th className="p-2 font-medium">{label}</th><td className="whitespace-nowrap p-2">{money(channelTotal("cash", category))}</td><td className="whitespace-nowrap p-2">{money(channelTotal("noncash", category))}</td>{hasUnknown && <td className="whitespace-nowrap p-2">{money(channelTotal("unknown", category))}</td>}<td className="whitespace-nowrap p-2 font-semibold">{money(breakdown.filter((item) => item.category === category).reduce((sum, item) => sum + item.amount, 0))}</td></tr>
+                  )}</tbody>
+                  <tfoot><tr className="border-t font-semibold"><th className="p-2">Всего</th><td className="whitespace-nowrap p-2">{money(channelTotal("cash"))}</td><td className="whitespace-nowrap p-2">{money(channelTotal("noncash"))}</td>{hasUnknown && <td className="whitespace-nowrap p-2">{money(channelTotal("unknown"))}</td>}<td className="whitespace-nowrap p-2">{money(revenueThisMonth)}</td></tr></tfoot>
+                </table>
+              </div>
+              {hasUnknown && <p className="mt-3 text-xs text-black/50">Операции без известного способа оплаты включены в общий итог отдельно.</p>}
+            </section>}
 
             <section className="mt-6">
               <div className="flex items-center gap-2"><Target size={18} className="text-[#D96A24]" /><div><p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#D96A24]">Наполняемость</p><h3 className="mt-0.5 text-xl font-semibold">Цель по ученикам</h3></div></div>
