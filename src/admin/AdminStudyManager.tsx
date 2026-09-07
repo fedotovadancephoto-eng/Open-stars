@@ -1,3 +1,4 @@
+import { groupLabel } from "@/groupLabels";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Award, BookOpenCheck, CheckCircle2, ClipboardCheck, LoaderCircle, MessageCircle, Save, UsersRound, X } from "lucide-react";
 
@@ -262,7 +263,7 @@ export function AdminStudyManager() {
             <div className="mt-6 rounded-[24px] border border-black/[0.06] bg-white p-5 sm:p-6">
               <fieldset disabled={saving} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
                 <label className="text-xs font-semibold text-black/55">Филиал<select className={inputClass} value={branch} disabled={branchLocked && Boolean(staffBranch)} onChange={(e) => { setBranch(e.target.value as AcademicBranch); clearLoadedRoster(); }}>{branches.map((v) => <option key={v}>{v}</option>)}</select></label>
-                <label className="text-xs font-semibold text-black/55">Группа<select className={inputClass} value={groupName} onChange={(e) => { setGroupName(e.target.value as AcademicGroup); clearLoadedRoster(); }}>{groups.map((v) => <option key={v}>{v}</option>)}</select></label>
+                <label className="text-xs font-semibold text-black/55">Группа<select className={inputClass} value={groupName} onChange={(e) => { setGroupName(e.target.value as AcademicGroup); clearLoadedRoster(); }}>{groups.map((v) => <option key={v} value={v}>{groupLabel(v, branch, lessonDate, stream)}</option>)}</select></label>
                 <label className="text-xs font-semibold text-black/55">Поток<select className={inputClass} value={stream} onChange={(e) => { setStream(e.target.value as AcademicStream); clearLoadedRoster(); }}>{streams.map((v) => <option key={v}>{v}</option>)}</select></label>
                 <label className="text-xs font-semibold text-black/55">Дата<input type="date" className={inputClass} value={lessonDate} onChange={(e) => { setLessonDate(e.target.value); clearLoadedRoster(); }} /></label>
                 <div>
@@ -303,7 +304,7 @@ export function AdminStudyManager() {
                   {commentAudience === "individual" ? (
                     <label className="mt-3 block text-xs font-semibold text-black/55">Ребёнок<select className={inputClass} value={personalChild} onChange={(e)=>setPersonalChild(e.target.value)}><option value="">Выберите ребёнка</option>{roster.map((r)=><option key={r.childId} value={r.childId}>{r.childName}</option>)}</select></label>
                   ) : (
-                    <div className="mt-3 rounded-[13px] bg-[#5F6338]/[0.07] px-3.5 py-3 text-xs leading-5 text-[#4D512E]">Получатели: <strong>{branch} · {groupName} · {stream}</strong>. После загрузки группы комментарий получат все {roster.length || 0} ученик(ов) этого потока.</div>
+                    <div className="mt-3 rounded-[13px] bg-[#5F6338]/[0.07] px-3.5 py-3 text-xs leading-5 text-[#4D512E]">Получатели: <strong>{branch} · {groupLabel(groupName, branch, lessonDate, stream)} · {stream}</strong>. После загрузки группы комментарий получат все {roster.length || 0} ученик(ов) этого потока.</div>
                   )}
                   <input className={inputClass} value={commentTitle} onChange={(e)=>setCommentTitle(e.target.value)} placeholder="Заголовок — необязательно"/>
                   <textarea className={`${inputClass} min-h-[95px] resize-y`} value={commentText} onChange={(e)=>setCommentText(e.target.value)} placeholder={commentAudience === "group" ? "Например: Сегодня отлично отработали проходку и повороты..." : "Что получилось, над чем поработать..."}/>
