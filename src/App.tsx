@@ -1,3 +1,4 @@
+import { groupLabel } from "@/groupLabels";
 import { useEffect, useRef, useState } from "react";
 
 import {
@@ -144,7 +145,7 @@ function ChildSwitcher({
         {children.map((item) => {
           const active = item.id === activeId;
           const initials = (item.firstName || item.name || "Р").slice(0, 1).toUpperCase();
-          const meta = [item.groupName, item.lessonDay, item.lessonTime].filter(Boolean).join(" · ");
+          const meta = [groupLabel(item.groupName, item.branch, item.lessonDay, item.lessonTime), item.lessonDay, item.lessonTime].filter(Boolean).join(" · ");
           return (
             <button
               key={item.id}
