@@ -12,6 +12,9 @@ export type CrmLead = {
   branch: string;
   childName: string;
   childBirthDate: string;
+  plannedGroupName: "Базовый" | "Продвинутый" | "PRO" | "";
+  plannedLessonDay: string;
+  plannedLessonTime: string;
   parentName: string;
   parentPhone: string;
   source: string;
@@ -117,6 +120,9 @@ async function rest<T>(path: string) {
 }
 
 function friendly(message: string) {
+  if (message.includes("birth date in future")) return "Дата рождения не может быть в будущем.";
+  if (message.includes("invalid lesson day")) return "Выберите субботу или воскресенье.";
+  if (message.includes("invalid stream")) return "Выберите время занятий: 11:00, 13:00 или 16:00.";
   if (message.includes("duplicate phone") || message.includes("crm_leads_active_child_phone_unique")) return "Карточка ребёнка с таким именем и телефоном родителя уже есть в активной CRM. Для другого ребёнка укажите его имя; телефон мамы можно оставить тем же.";
   if (message.includes("next contact required")) return "Укажите дату следующего контакта.";
   if (message.includes("invalid phone")) return "Проверьте телефон родителя.";
@@ -174,6 +180,9 @@ function mapLead(row: any): CrmLead {
     branch: row.branch || "",
     childName: row.child_name || "",
     childBirthDate: row.child_birth_date || "",
+    plannedGroupName: row.planned_group_name || "",
+    plannedLessonDay: row.planned_lesson_day || "",
+    plannedLessonTime: (row.planned_lesson_time || "").slice(0, 5),
     parentName: row.parent_name || "",
     parentPhone: row.parent_phone || "",
     source: row.source || "",
@@ -243,6 +252,10 @@ export async function createCrmLead(input: {
 }
 
 export async function updateCrmLead(input: {
+  birthDate: string;
+  groupName: string;
+  lessonDay: string;
+  lessonTime: string;
   leadId: string;
   stage: CrmStage;
   trialAt?: string;
@@ -251,7 +264,11 @@ export async function updateCrmLead(input: {
   isLost?: boolean;
   lostReason?: CrmLostReason | "";
 }) {
-  return rpc("crm_update_lead", {
+  return rpc("crm_update_lead_with_enrollment", {
+    p_birth_date: input.birthDate || null,
+    p_group_name: input.groupName || null,
+    p_lesson_day: input.lessonDay || null,
+    p_lesson_time: input.lessonTime || null,
     p_lead_id: input.leadId,
     p_stage: input.stage,
     p_trial_at: input.trialAt || null,
