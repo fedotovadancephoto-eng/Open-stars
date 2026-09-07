@@ -117,7 +117,7 @@ async function rest<T>(path: string) {
 }
 
 function friendly(message: string) {
-  if (message.includes("duplicate phone")) return "Клиент с таким телефоном уже есть в активной CRM. Откройте существующую карточку, чтобы не создать дубль.";
+  if (message.includes("duplicate phone") || message.includes("crm_leads_active_child_phone_unique")) return "Карточка ребёнка с таким именем и телефоном родителя уже есть в активной CRM. Для другого ребёнка укажите его имя; телефон мамы можно оставить тем же.";
   if (message.includes("next contact required")) return "Укажите дату следующего контакта.";
   if (message.includes("invalid phone")) return "Проверьте телефон родителя.";
   if (message.includes("source required")) return "Выберите источник клиента.";
