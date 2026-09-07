@@ -1,3 +1,4 @@
+import { groupLabel } from "@/groupLabels";
 import type { XlsxSheet } from "@/admin/xlsxExport";
 import { ReportContext, ReportFilters, childName, filterChildren, inPeriod, reportRestSelect } from "@/admin/reportExportShared";
 
@@ -37,7 +38,7 @@ export async function buildAcademicSheets(filters: ReportFilters, context: Repor
       columns: context.teacherView
         ? [{ key: "name", label: "Ученик", width: 28 }, { key: "branch", label: "Филиал", width: 18 }, { key: "group", label: "Группа", width: 18 }, { key: "stream", label: "Поток", width: 12 }]
         : [{ key: "name", label: "Ученик", width: 28 }, { key: "birthDate", label: "Дата рождения", width: 16 }, { key: "branch", label: "Филиал", width: 18 }, { key: "group", label: "Группа", width: 18 }, { key: "lessonDay", label: "День", width: 14 }, { key: "stream", label: "Поток", width: 12 }],
-      rows: children.map((child) => ({ name: child.fullName, birthDate: child.birthDate, branch: child.branch, group: child.groupName, lessonDay: child.lessonDay, stream: child.lessonTime?.slice(0, 5) || "" })),
+      rows: children.map((child) => ({ name: child.fullName, birthDate: child.birthDate, branch: child.branch, group: groupLabel(child.groupName, child.branch, child.lessonDay, child.lessonTime), lessonDay: child.lessonDay, stream: child.lessonTime?.slice(0, 5) || "" })),
     },
     {
       name: "Оценки",
