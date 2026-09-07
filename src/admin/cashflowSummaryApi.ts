@@ -3,6 +3,12 @@ import { getValidStaffSession } from "@/admin/adminApi";
 const SUPABASE_URL = "https://yiwiykbuaggyslfyhlfo.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_1MORh5rY7uMDVYLYVX5VAA_cyoph4-7";
 
+export type RevenueBreakdown = {
+  category: "tuition" | "events" | "other";
+  channel: "cash" | "noncash" | "unknown";
+  amount: number;
+};
+
 export type OwnerCashflowBranchSummary = {
   branchId: string;
   branch: string;
@@ -11,6 +17,7 @@ export type OwnerCashflowBranchSummary = {
   revenue: number;
   expenses: number;
   netCashflow: number;
+  revenueBreakdown: RevenueBreakdown[];
 };
 
 export type OwnerCashflowMonthSummary = {
@@ -21,6 +28,7 @@ export type OwnerCashflowMonthSummary = {
   expenses: number;
   netCashflow: number;
   branches: OwnerCashflowBranchSummary[];
+  revenueBreakdown: RevenueBreakdown[];
 };
 
 type ApiError = { message?: string; details?: string; hint?: string };
@@ -52,6 +60,10 @@ export async function fetchOwnerCashflowMonthSummary(month?: string): Promise<Ow
   }
 
   const data: any = await response.json();
+  const mapBreakdown = (items: any): RevenueBreakdown[] =>
+    (Array.isArray(items) ? items : []).map((item) => ({
+      category: item.category, channel: item.channel, amount: Number(item.amount || 0),
+    }));
   const mapBranch = (item: any): OwnerCashflowBranchSummary => ({
     branchId: item.branchId || "",
     branch: item.branch || "",
@@ -60,6 +72,7 @@ export async function fetchOwnerCashflowMonthSummary(month?: string): Promise<Ow
     revenue: Number(item.revenue || 0),
     expenses: Number(item.expenses || 0),
     netCashflow: Number(item.netCashflow || 0),
+    revenueBreakdown: mapBreakdown(item.revenueBreakdown),
   });
 
   return {
@@ -70,5 +83,6 @@ export async function fetchOwnerCashflowMonthSummary(month?: string): Promise<Ow
     expenses: Number(data.expenses || 0),
     netCashflow: Number(data.netCashflow || 0),
     branches: (Array.isArray(data.branches) ? data.branches : []).map(mapBranch),
+    revenueBreakdown: mapBreakdown(data.revenueBreakdown),
   };
 }
