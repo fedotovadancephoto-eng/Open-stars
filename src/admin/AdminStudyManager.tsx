@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Award, BookOpenCheck, CheckCircle2, ClipboardCheck, LoaderCircle, MessageCircle, Save, UsersRound, X } from "lucide-react";
 
 import {
@@ -46,6 +46,7 @@ export function AdminStudyManager() {
   const [subjectChoice, setSubjectChoice] = useState("Дефиле");
   const [subject, setSubject] = useState("Дефиле");
   const [roster, setRoster] = useState<AcademicRosterRow[]>([]);
+  const rosterRequest = useRef(0);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -109,6 +110,8 @@ export function AdminStudyManager() {
   const selectedStudent = useMemo(() => roster.find((row) => row.childId === personalChild) || null, [roster, personalChild]);
 
   function clearLoadedRoster() {
+    rosterRequest.current += 1;
+    setLoading(false);
     setRoster([]);
     setPersonalChild("");
     setSuccess("");
@@ -122,18 +125,24 @@ export function AdminStudyManager() {
 
   async function loadRoster() {
     if (!subject.trim()) return setError("Укажите предмет.");
+    if (!lessonDate) return setError("Выберите дату занятия.");
+    const request = ++rosterRequest.current;
+    setRoster([]);
+    setPersonalChild("");
     setLoading(true);
     setError("");
     setSuccess("");
     try {
       const rows = await fetchAcademicRoster({ branch, groupName, stream, lessonDate, subject });
+      if (request !== rosterRequest.current) return;
       setRoster(rows);
       setPersonalChild(rows[0]?.childId || "");
       if (!rows.length) setSuccess("В выбранной группе пока нет учеников.");
     } catch (err) {
+      if (request !== rosterRequest.current) return;
       setError(err instanceof Error ? err.message : "Не удалось загрузить группу.");
     } finally {
-      setLoading(false);
+      if (request === rosterRequest.current) setLoading(false);
     }
   }
 
@@ -167,6 +176,7 @@ export function AdminStudyManager() {
   }
 
   async function publishHomework() {
+    if (!roster.length || loading) return setError("Сначала загрузите группу на выбранную дату.");
     if (!homeworkTitle.trim()) return setError("Введите название домашнего задания.");
     setSaving(true);
     setError("");
@@ -250,7 +260,7 @@ export function AdminStudyManager() {
             </div>
 
             <div className="mt-6 rounded-[24px] border border-black/[0.06] bg-white p-5 sm:p-6">
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+              <fieldset disabled={saving} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
                 <label className="text-xs font-semibold text-black/55">Филиал<select className={inputClass} value={branch} disabled={branchLocked && Boolean(staffBranch)} onChange={(e) => { setBranch(e.target.value as AcademicBranch); clearLoadedRoster(); }}>{branches.map((v) => <option key={v}>{v}</option>)}</select></label>
                 <label className="text-xs font-semibold text-black/55">Группа<select className={inputClass} value={groupName} onChange={(e) => { setGroupName(e.target.value as AcademicGroup); clearLoadedRoster(); }}>{groups.map((v) => <option key={v}>{v}</option>)}</select></label>
                 <label className="text-xs font-semibold text-black/55">Поток<select className={inputClass} value={stream} onChange={(e) => { setStream(e.target.value as AcademicStream); clearLoadedRoster(); }}>{streams.map((v) => <option key={v}>{v}</option>)}</select></label>
@@ -259,9 +269,10 @@ export function AdminStudyManager() {
                   <label className="text-xs font-semibold text-black/55">Предмет<select className={inputClass} value={subjectChoice} onChange={(e) => changeSubjectChoice(e.target.value)}>{subjectOptions.length === 0 && <option value="">Нет назначенных предметов</option>}{subjectOptions.map((v) => <option key={v} value={v}>{v}</option>)}{role !== "teacher" && <option value={CUSTOM_SUBJECT}>Мастер-класс / другой предмет…</option>}</select></label>
                   {role !== "teacher" && subjectChoice === CUSTOM_SUBJECT && <input autoFocus className={inputClass} value={subject} onChange={(e) => { setSubject(e.target.value); clearLoadedRoster(); }} placeholder="Например: Мастер-класс по визажу" />}
                 </div>
-              </div>
+              </fieldset>
+              {lessonDate && <p className="mt-3 text-sm font-semibold text-[#4D512E]">День занятий: {new Intl.DateTimeFormat("ru-RU", { weekday: "long" }).format(new Date(lessonDate + "T12:00:00"))}. Список детей и домашнее задание — только для этого дня.</p>}
               {role === "teacher" && assignedSubjects.length > 0 && <p className="mt-3 text-xs leading-5 text-black/40">Показаны только предметы, назначенные этому педагогу. Разовый мастер-класс появится здесь после добавления его точного названия в карточке сотрудника.</p>}
-              <button type="button" onClick={loadRoster} disabled={loading || !subject.trim()} className="mt-4 flex items-center gap-2 rounded-[14px] bg-[#171717] px-4 py-3 text-sm font-semibold text-white disabled:opacity-50">{loading ? <LoaderCircle className="animate-spin" size={17} /> : <UsersRound size={17} />} Загрузить группу</button>
+              <button type="button" onClick={loadRoster} disabled={saving || loading || !subject.trim() || !lessonDate} className="mt-4 flex items-center gap-2 rounded-[14px] bg-[#171717] px-4 py-3 text-sm font-semibold text-white disabled:opacity-50">{loading ? <LoaderCircle className="animate-spin" size={17} /> : <UsersRound size={17} />} Загрузить группу</button>
             </div>
 
             {error && <div className="mt-4 rounded-[15px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
