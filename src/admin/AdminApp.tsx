@@ -1,3 +1,4 @@
+import { groupLabel } from "@/groupLabels";
 import { useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
@@ -282,7 +283,7 @@ function StudentDetails({
 
             <div className="rounded-[24px] border border-black/[0.06] bg-white p-5">
               <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-black/35">Обучение</p>
-              <label className="mt-4 block text-xs font-semibold text-black/55">Группа<select className={inputClass} value={form.groupName} onChange={(e) => field("groupName", e.target.value)}><option value="">Выберите группу</option>{groupOptions.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
+              <label className="mt-4 block text-xs font-semibold text-black/55">Группа<select className={inputClass} value={form.groupName} onChange={(e) => field("groupName", e.target.value)}><option value="">Выберите группу</option>{groupOptions.map((item) => <option key={item} value={item}>{groupLabel(item, form.branch, form.lessonDay, form.lessonTime)}</option>)}</select></label>
               <label className="mt-3 block text-xs font-semibold text-black/55">Филиал<select className={inputClass} value={form.branch} onChange={(e) => chooseBranch(e.target.value)}><option value="">Выберите филиал</option>{branchOptions.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
               <div className="mt-3 grid grid-cols-2 gap-3">
                 <label className="text-xs font-semibold text-black/55">День<input className={inputClass} value={form.lessonDay} onChange={(e) => field("lessonDay", e.target.value)} placeholder="Суббота" /></label>
@@ -309,7 +310,7 @@ function StudentDetails({
             <div className="mt-6 rounded-[26px] border border-black/[0.06] bg-white p-5 shadow-[0_12px_35px_rgba(0,0,0,0.05)]">
               <div className="flex items-center gap-4">
                 {child.photoUrl ? <img src={child.photoUrl} alt={child.fullName} className="h-20 w-20 rounded-[22px] object-cover" /> : <div className="grid h-20 w-20 place-items-center rounded-[22px] bg-[#F0EEE5] text-xl font-bold text-[#5F6338]">{initials(child)}</div>}
-                <div className="min-w-0 flex-1"><p className="text-lg font-semibold text-[#171717]">{child.groupName || "Группа не указана"}</p><p className="mt-1 text-sm text-black/45">{child.branch || "Филиал не указан"}</p><p className="mt-1 text-sm text-black/45">{[child.lessonDay, child.lessonTime].filter(Boolean).join(" · ") || "Время занятий не указано"}</p>{!teacherView && child.birthDate && <p className="mt-1 text-sm text-black/45">Дата рождения: {child.birthDate}</p>}</div>
+                <div className="min-w-0 flex-1"><p className="text-lg font-semibold text-[#171717]">{groupLabel(child.groupName, child.branch, child.lessonDay, child.lessonTime) || "Группа не указана"}</p><p className="mt-1 text-sm text-black/45">{child.branch || "Филиал не указан"}</p><p className="mt-1 text-sm text-black/45">{[child.lessonDay, child.lessonTime].filter(Boolean).join(" · ") || "Время занятий не указано"}</p>{!teacherView && child.birthDate && <p className="mt-1 text-sm text-black/45">Дата рождения: {child.birthDate}</p>}</div>
               </div>
               {!teacherView && <button type="button" onClick={openPhotoUpload} className="mt-4 flex w-full items-center justify-center gap-2 rounded-[14px] bg-[#F6F5F1] px-4 py-3 text-sm font-semibold text-[#171717]"><ImagePlus size={17} />{child.photoUrl ? "Изменить фото" : "Загрузить фото"}</button>}
             </div>
@@ -494,7 +495,7 @@ export default function AdminApp() {
                 const missing = teacherView ? [] : missingFields(child);
                 return <button key={child.id} type="button" onClick={() => setSelectedChild(child)} className="flex w-full items-center gap-3 rounded-[18px] border border-black/[0.055] px-3.5 py-3 text-left transition hover:border-[#D96A24]/20 hover:bg-[#FAF9F5] sm:gap-4 sm:px-4">
                   {child.photoUrl ? <img src={child.photoUrl} alt={child.fullName} className="h-12 w-12 shrink-0 rounded-[15px] object-cover" /> : <div className="grid h-12 w-12 shrink-0 place-items-center rounded-[15px] bg-[#F0EEE5] text-sm font-bold text-[#5F6338]">{initials(child)}</div>}
-                  <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-x-2 gap-y-1"><p className="truncate font-semibold text-[#171717]">{child.fullName}</p>{child.groupName && <span className="rounded-full bg-[#5F6338]/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#4D512E]">{child.groupName}</span>}{missing.length > 0 && <span className="rounded-full bg-[#D96A24]/10 px-2 py-0.5 text-[10px] font-bold text-[#C95320]">Заполнить · {missing.length}</span>}</div><p className="mt-1 truncate text-xs text-black/40">{[child.branch, child.lessonDay, child.lessonTime].filter(Boolean).join(" · ") || "Данные группы не заполнены"}</p>{!teacherView && <p className="mt-1 truncate text-xs text-black/35">{child.parentName || child.parentPhone || activationLabels[child.activationStatus]}</p>}{missing.length > 0 && <p className="mt-1 truncate text-[11px] text-[#C95320]">Нет: {missing.join(", ")}</p>}</div>
+                  <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-x-2 gap-y-1"><p className="truncate font-semibold text-[#171717]">{child.fullName}</p>{child.groupName && <span className="rounded-full bg-[#5F6338]/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#4D512E]">{groupLabel(child.groupName, child.branch, child.lessonDay, child.lessonTime)}</span>}{missing.length > 0 && <span className="rounded-full bg-[#D96A24]/10 px-2 py-0.5 text-[10px] font-bold text-[#C95320]">Заполнить · {missing.length}</span>}</div><p className="mt-1 truncate text-xs text-black/40">{[child.branch, child.lessonDay, child.lessonTime].filter(Boolean).join(" · ") || "Данные группы не заполнены"}</p>{!teacherView && <p className="mt-1 truncate text-xs text-black/35">{child.parentName || child.parentPhone || activationLabels[child.activationStatus]}</p>}{missing.length > 0 && <p className="mt-1 truncate text-[11px] text-[#C95320]">Нет: {missing.join(", ")}</p>}</div>
                   <ChevronRight className="h-5 w-5 shrink-0 text-black/20" />
                 </button>;
               })}

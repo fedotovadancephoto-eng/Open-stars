@@ -1,3 +1,4 @@
+import { groupLabel } from "@/groupLabels";
 import { useEffect, useMemo, useState } from "react";
 import { CalendarDays, CheckCircle2, Clock3, LoaderCircle, Pencil, Plus, Save, Trash2, UsersRound, X } from "lucide-react";
 
@@ -206,7 +207,7 @@ export function AdminScheduleManager() {
   }
 
   async function remove(schedule: GroupSchedule) {
-    if (!window.confirm(`Удалить расписание ${schedule.branch} · ${schedule.groupName} · ${formatDate(schedule.lessonDate)}?`)) return;
+    if (!window.confirm(`Удалить расписание ${schedule.branch} · ${groupLabel(schedule.groupName, schedule.branch, schedule.lessonDate, schedule.streamStart)} · ${formatDate(schedule.lessonDate)}?`)) return;
     setBusyId(schedule.id);
     setError("");
     try {
@@ -240,7 +241,7 @@ export function AdminScheduleManager() {
               <div className="mt-6 rounded-[24px] border border-black/[0.06] bg-white p-5 sm:p-6">
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
                   <label className="text-xs font-semibold text-black/55">Филиал<select className={inputClass} value={branch} disabled={adminLocked} onChange={(event) => setBranch(event.target.value as ScheduleBranch)}>{branches.map((item) => <option key={item}>{item}</option>)}</select></label>
-                  <label className="text-xs font-semibold text-black/55">Группа<select className={inputClass} value={groupName} onChange={(event) => setGroupName(event.target.value as ScheduleGroup)}>{groups.map((item) => <option key={item}>{item}</option>)}</select></label>
+                  <label className="text-xs font-semibold text-black/55">Группа<select className={inputClass} value={groupName} onChange={(event) => setGroupName(event.target.value as ScheduleGroup)}>{groups.map((item) => <option key={item} value={item}>{groupLabel(item, branch, firstDate, stream)}</option>)}</select></label>
                   <label className="text-xs font-semibold text-black/55">Поток<select className={inputClass} value={stream} onChange={(event) => setStream(event.target.value as ScheduleStream)}>{streams.map((item) => <option key={item}>{item}</option>)}</select></label>
                   <label className="text-xs font-semibold text-black/55">Первое занятие<input type="date" className={inputClass} value={firstDate} onChange={(event) => setFirstDate(event.target.value)} /></label>
                   <label className="text-xs font-semibold text-black/55">Повторять<select className={inputClass} value={weeks} onChange={(event) => setWeeks(Number(event.target.value))}>{[1,2,3,4,5,6,7,8].map((item) => <option key={item} value={item}>{item} нед.</option>)}</select></label>
@@ -271,7 +272,7 @@ export function AdminScheduleManager() {
                   {schedules.map((schedule) => (
                     <div key={schedule.id} className="rounded-[20px] border border-black/[0.055] bg-white p-4 sm:p-5">
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                        <div><div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-[#5F6338]/10 px-2.5 py-1 text-[11px] font-bold text-[#4D512E]">{schedule.groupName}</span><span className="text-sm font-semibold">{schedule.branch}</span><span className="text-sm text-black/40">{formatDate(schedule.lessonDate)} · {schedule.streamStart}</span></div><div className="mt-2 flex items-center gap-1.5 text-xs text-black/40"><UsersRound size={14} />{schedule.studentsCount} ученик(ов)</div></div>
+                        <div><div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-[#5F6338]/10 px-2.5 py-1 text-[11px] font-bold text-[#4D512E]">{groupLabel(schedule.groupName, schedule.branch, schedule.lessonDate, schedule.streamStart)}</span><span className="text-sm font-semibold">{schedule.branch}</span><span className="text-sm text-black/40">{formatDate(schedule.lessonDate)} · {schedule.streamStart}</span></div><div className="mt-2 flex items-center gap-1.5 text-xs text-black/40"><UsersRound size={14} />{schedule.studentsCount} ученик(ов)</div></div>
                         {canManage && <div className="flex gap-2"><button type="button" disabled={Boolean(busyId)} onClick={() => startEdit(schedule)} className="flex items-center gap-1.5 rounded-[11px] bg-[#5F6338]/10 px-3 py-2 text-xs font-semibold text-[#4D512E] disabled:opacity-50"><Pencil size={14} />Изменить</button><button type="button" disabled={busyId === schedule.id} onClick={() => remove(schedule)} className="flex items-center gap-1.5 rounded-[11px] bg-red-50 px-3 py-2 text-xs font-semibold text-red-600 disabled:opacity-50">{busyId === schedule.id ? <LoaderCircle className="animate-spin" size={14} /> : <Trash2 size={14} />}Удалить</button></div>}
                       </div>
 

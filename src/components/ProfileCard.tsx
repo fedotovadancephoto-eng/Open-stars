@@ -1,3 +1,4 @@
+import { groupLabel } from "@/groupLabels";
 import {
   Building2,
   Clock3,
@@ -21,7 +22,7 @@ export function ProfileCard() {
   const scheduleTime = firstLesson?.time ? `${firstLesson.time}${lastLesson?.endTime ? `–${lastLesson.endTime}` : ""}` : "";
   const lessonTime = valueOrFallback(child.lessonTime || scheduleTime, "Время уточняется");
   const administrator = valueOrFallback(child.administrator || child.mentorName, "Администратор не указан");
-  const group = valueOrFallback(child.groupName || child.group, "OPEN STARS");
+  const group = valueOrFallback(groupLabel(child.groupName || child.group, child.branch, child.lessonDay, child.lessonTime), "OPEN STARS");
   const initials = [child.firstName, child.lastName].filter(Boolean).map((part) => part.charAt(0).toUpperCase()).join("").slice(0, 2) || "OS";
 
   return (

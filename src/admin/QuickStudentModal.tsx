@@ -1,3 +1,4 @@
+import { groupLabel } from "@/groupLabels";
 import { useEffect, useState } from "react";
 import { LoaderCircle, Plus, Save, X } from "lucide-react";
 
@@ -124,7 +125,7 @@ export function QuickStudentModal({
             </select>
             {fixedBranch && <span className="mt-1.5 block text-[11px] font-normal leading-5 text-black/35">Ваш филиал закреплён за аккаунтом.</span>}
           </label>
-          <label className="text-xs font-semibold text-black/55">Группа *<select className={inputClass} value={form.groupName} onChange={(e) => field("groupName", e.target.value as GroupName | "")}><option value="">Выберите группу</option>{groups.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
+          <label className="text-xs font-semibold text-black/55">Группа *<select className={inputClass} value={form.groupName} onChange={(e) => field("groupName", e.target.value as GroupName | "")}><option value="">Выберите группу</option>{groups.map((item) => <option key={item} value={item}>{groupLabel(item, form.branch, form.lessonDay, form.lessonTime)}</option>)}</select></label>
           <label className="text-xs font-semibold text-black/55">День занятий<select className={inputClass} value={form.lessonDay} onChange={(e) => field("lessonDay", e.target.value)}><option value="">Заполнить позже</option>{days.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
           <label className="text-xs font-semibold text-black/55">Время группы<select className={inputClass} value={form.lessonTime} onChange={(e) => field("lessonTime", e.target.value)}><option value="">Заполнить позже</option>{times.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
           <label className="text-xs font-semibold text-black/55">Дата рождения<input type="date" className={inputClass} value={form.birthDate} onChange={(e) => field("birthDate", e.target.value)} /></label>

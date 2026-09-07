@@ -1,3 +1,4 @@
+import { groupLabel } from "@/groupLabels";
 import { useEffect, useMemo, useState } from "react";
 import { AlertCircle, CalendarClock, Check, ChevronRight, CirclePlus, LoaderCircle, Search, UserRoundPlus, X } from "lucide-react";
 
@@ -122,7 +123,7 @@ export function AdminCrmManager() {
   const [studentFirstName, setStudentFirstName] = useState("");
   const [studentLastName, setStudentLastName] = useState("");
   const [studentBirthDate, setStudentBirthDate] = useState("");
-  const [studentGroup, setStudentGroup] = useState<(typeof groups)[number]>("Базовый");
+  const [studentGroup, setStudentGroup] = useState<(typeof groups)[number] | "">("");
   const [studentLessonDay, setStudentLessonDay] = useState("");
   const [studentLessonTime, setStudentLessonTime] = useState("");
 
@@ -247,9 +248,9 @@ export function AdminCrmManager() {
     setStudentFirstName(split.firstName);
     setStudentLastName(split.lastName);
     setStudentBirthDate(lead.childBirthDate || "");
-    setStudentGroup("Базовый");
-    setStudentLessonDay("");
-    setStudentLessonTime("");
+    setStudentGroup(lead.plannedGroupName);
+    setStudentLessonDay(lead.plannedLessonDay);
+    setStudentLessonTime(lead.plannedLessonTime);
   }
 
   async function saveNewLead() {
@@ -302,7 +303,7 @@ export function AdminCrmManager() {
     if (!editLost && editStage !== "student" && !editNextContactAt) return setError("Укажите следующий контакт.");
     setSaving(true); setError("");
     try {
-      await updateCrmLead({ leadId: selected.id, stage: editStage, trialAt: toIso(editTrialAt), nextContactAt: editStage === "student" ? undefined : toIso(editNextContactAt), comment: editComment, isLost: editLost, lostReason: editLost ? editLostReason : "" });
+      await updateCrmLead({ birthDate: studentBirthDate, groupName: studentGroup, lessonDay: studentLessonDay, lessonTime: studentLessonTime, leadId: selected.id, stage: editStage, trialAt: toIso(editTrialAt), nextContactAt: editStage === "student" ? undefined : toIso(editNextContactAt), comment: editComment, isLost: editLost, lostReason: editLost ? editLostReason : "" });
       await refresh(); setSuccess("Карточка лида обновлена.");
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Не удалось обновить лид."); }
     finally { setSaving(false); }
@@ -325,6 +326,7 @@ export function AdminCrmManager() {
 
   async function convertStudent() {
     if (!selected) return;
+    if (!studentGroup) return setError("Выберите группу ребёнка.");
     if (!studentFirstName.trim() || !studentLastName.trim()) return setError("Укажите имя и фамилию ребёнка.");
     setSaving(true); setError(""); setSuccess("");
     try {
@@ -427,9 +429,23 @@ export function AdminCrmManager() {
 
     {selected && role !== "marketer" && <div className="fixed inset-0 z-[84] overflow-y-auto bg-black/20 p-3 backdrop-blur-sm"><div className="mx-auto max-w-xl rounded-[26px] bg-[#FAF9F5] p-5"><div className="flex justify-between"><div><p className="text-xs font-bold uppercase tracking-[0.16em] text-[#D96A24]">Карточка лида</p><h2 className="mt-1 text-2xl font-semibold">{selected.childName}</h2><p className="text-sm text-black/40">{selected.parentName} · {selected.parentPhone}</p><p className="mt-1 text-xs text-black/35">{selected.source}{selected.campaign?` · ${selected.campaign}`:""} · {selected.branch}</p></div><button onClick={()=>setSelectedId("")} className="grid h-11 w-11 place-items-center rounded-full bg-white"><X size={20}/></button></div><div className="mt-4 grid gap-3 sm:grid-cols-2"><label className="text-xs font-semibold text-black/50">Этап<select className={inputClass} value={editStage} onChange={e=>setEditStage(e.target.value as CrmStage)}>{stages.map(stage=><option key={stage} value={stage}>{stageLabels[stage]}</option>)}</select></label><label className="text-xs font-semibold text-black/50">Пробное<input type="datetime-local" className={inputClass} value={editTrialAt} onChange={e=>setEditTrialAt(e.target.value)}/></label><label className="text-xs font-semibold text-black/50 sm:col-span-2">Следующий контакт<input type="datetime-local" className={inputClass} value={editNextContactAt} onChange={e=>setEditNextContactAt(e.target.value)}/></label><label className="text-xs font-semibold text-black/50 sm:col-span-2">Комментарий<textarea className={`${inputClass} min-h-20`} value={editComment} onChange={e=>setEditComment(e.target.value)}/></label></div><label className="mt-3 flex items-center gap-3 rounded-[14px] bg-white p-3 text-sm font-semibold"><input type="checkbox" className="h-5 w-5" checked={editLost} onChange={e=>setEditLost(e.target.checked)}/>Потерянный лид — не удалять</label>{editLost&&<label className="mt-3 block text-xs font-semibold text-black/50">Причина<select className={inputClass} value={editLostReason} onChange={e=>setEditLostReason(e.target.value as CrmLostReason)}>{Object.entries(lostLabels).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label>}<button disabled={saving} onClick={()=>void saveLead()} className="mt-4 flex w-full items-center justify-center gap-2 rounded-[15px] bg-[#D96A24] py-3 text-sm font-semibold text-white disabled:opacity-50"><Check size={16}/>Сохранить карточку</button>
 
+      {error && <p role="alert" className="mt-3 rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+      {success && <p role="status" className="mt-3 rounded-xl bg-green-50 p-3 text-sm text-green-800">{success}</p>}
+      {!selected.convertedChildId && <section className="mt-4 rounded-[18px] bg-white p-4">
+        <h3 className="font-semibold">Данные ребёнка и группа</h3>
+        <p className="mt-1 text-xs text-black/45">Можно заполнить до оплаты. Данные сохраняются кнопкой «Сохранить карточку» и подставятся при оформлении ученика.</p>
+        <fieldset disabled={saving} className="mt-3 grid gap-3 sm:grid-cols-2">
+          <label className="text-xs font-semibold text-black/50">Дата рождения<input type="date" className={inputClass} value={studentBirthDate} onChange={e=>setStudentBirthDate(e.target.value)}/></label>
+          <label className="text-xs font-semibold text-black/50">День занятий<select className={inputClass} value={studentLessonDay} onChange={e=>setStudentLessonDay(e.target.value)}><option value="">Не выбран</option><option>Суббота</option><option>Воскресенье</option></select></label>
+          <label className="text-xs font-semibold text-black/50">Время<select className={inputClass} value={studentLessonTime} onChange={e=>setStudentLessonTime(e.target.value)}><option value="">Не выбрано</option>{["11:00","13:00","16:00"].map(time=><option key={time}>{time}</option>)}</select></label>
+          <label className="text-xs font-semibold text-black/50">Группа<select className={inputClass} value={studentGroup} onChange={e=>setStudentGroup(e.target.value as (typeof groups)[number] | "")}><option value="">Не выбрана</option>{groups.map(group=><option key={group} value={group}>{groupLabel(group,selected.branch,studentLessonDay,studentLessonTime)}</option>)}</select></label>
+        </fieldset>
+        <button disabled={saving} onClick={()=>void saveLead()} className="mt-4 w-full rounded-[13px] bg-[#D96A24] py-3 text-sm font-semibold text-white disabled:opacity-50">Сохранить карточку</button>
+      </section>}
+
       <section className="mt-4 rounded-[18px] bg-white p-4"><div className="flex items-center gap-2"><CalendarClock size={17} className="text-[#5F6338]"/><h3 className="font-semibold">Задачи</h3></div><div className="mt-3 space-y-2">{selectedTasks.map(task=><div key={task.id} className="flex gap-3 rounded-[13px] bg-[#F7F5EF] p-3"><button onClick={()=>void doneTask(task.id)} className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white text-[#5F6338]"><Check size={14}/></button><div><p className="text-sm font-medium">{task.title}</p><p className="text-xs text-black/40">{shortDate(task.dueAt)}</p></div></div>)}{selectedTasks.length===0&&<p className="text-xs text-black/35">Открытых задач нет.</p>}</div><input className={inputClass} value={taskTitle} onChange={e=>setTaskTitle(e.target.value)} placeholder="Новая задача"/><input type="datetime-local" className={inputClass} value={taskDueAt} onChange={e=>setTaskDueAt(e.target.value)}/><button onClick={()=>void addTask()} className="mt-2 w-full rounded-[13px] bg-[#5F6338] py-3 text-sm font-semibold text-white">Добавить задачу</button></section>
 
-      {selected.convertedChildId ? <div className="mt-4 rounded-[16px] bg-[#5F6338]/10 p-4"><p className="font-semibold text-[#4D512E]">Ученик уже оформлен</p><p className="mt-1 text-xs text-black/45">CRM-лид связан с карточкой ребёнка.</p></div> : selected.stage === "paid" ? <section className="mt-4 rounded-[18px] border border-[#D96A24]/20 bg-[#FFF2E8] p-4"><p className="font-semibold">Оформить ученика</p><p className="mt-1 text-xs leading-5 text-black/45">Данные родителя и телефона повторно вводить не нужно. Проверьте данные ребёнка и группу.</p><div className="mt-3 grid gap-3 sm:grid-cols-2"><label className="text-xs font-semibold text-black/50">Имя<input className={inputClass} value={studentFirstName} onChange={e=>setStudentFirstName(e.target.value)}/></label><label className="text-xs font-semibold text-black/50">Фамилия<input className={inputClass} value={studentLastName} onChange={e=>setStudentLastName(e.target.value)}/></label><label className="text-xs font-semibold text-black/50">Дата рождения<input type="date" className={inputClass} value={studentBirthDate} onChange={e=>setStudentBirthDate(e.target.value)}/></label><label className="text-xs font-semibold text-black/50">Группа<select className={inputClass} value={studentGroup} onChange={e=>setStudentGroup(e.target.value as (typeof groups)[number])}>{groups.map(group=><option key={group}>{group}</option>)}</select></label><label className="text-xs font-semibold text-black/50">День занятий<input className={inputClass} value={studentLessonDay} onChange={e=>setStudentLessonDay(e.target.value)} placeholder="необязательно"/></label><label className="text-xs font-semibold text-black/50">Время<input type="time" className={inputClass} value={studentLessonTime} onChange={e=>setStudentLessonTime(e.target.value)}/></label></div><button disabled={saving} onClick={()=>void convertStudent()} className="mt-4 flex w-full items-center justify-center gap-2 rounded-[15px] bg-[#171717] py-3 text-sm font-semibold text-white disabled:opacity-50">{saving?<LoaderCircle className="animate-spin" size={16}/>:<UserRoundPlus size={16}/>}Оформить ученика</button></section> : editStage === "paid" ? <div className="mt-4 rounded-[16px] bg-[#FFF2E8] p-4"><p className="font-semibold">Сначала сохраните этап «Оплатил»</p><p className="mt-1 text-xs leading-5 text-black/45">После сохранения здесь появится кнопка «Оформить ученика».</p></div> : null}
+      {selected.convertedChildId ? <div className="mt-4 rounded-[16px] bg-[#5F6338]/10 p-4"><p className="font-semibold text-[#4D512E]">Ученик уже оформлен</p><p className="mt-1 text-xs text-black/45">CRM-лид связан с карточкой ребёнка.</p></div> : selected.stage === "paid" ? <section className="mt-4 rounded-[18px] border border-[#D96A24]/20 bg-[#FFF2E8] p-4"><p className="font-semibold">Оформить ученика</p><p className="mt-1 text-xs leading-5 text-black/45">Данные родителя и телефона повторно вводить не нужно. Проверьте данные ребёнка и группу.</p><div className="mt-3 grid gap-3 sm:grid-cols-2"><label className="text-xs font-semibold text-black/50">Имя<input className={inputClass} value={studentFirstName} onChange={e=>setStudentFirstName(e.target.value)}/></label><label className="text-xs font-semibold text-black/50">Фамилия<input className={inputClass} value={studentLastName} onChange={e=>setStudentLastName(e.target.value)}/></label></div><button disabled={saving} onClick={()=>void convertStudent()} className="mt-4 flex w-full items-center justify-center gap-2 rounded-[15px] bg-[#171717] py-3 text-sm font-semibold text-white disabled:opacity-50">{saving?<LoaderCircle className="animate-spin" size={16}/>:<UserRoundPlus size={16}/>}Оформить ученика</button></section> : editStage === "paid" ? <div className="mt-4 rounded-[16px] bg-[#FFF2E8] p-4"><p className="font-semibold">Сначала сохраните этап «Оплатил»</p><p className="mt-1 text-xs leading-5 text-black/45">После сохранения здесь появится кнопка «Оформить ученика».</p></div> : null}
     </div></div>}
   </div>;
 }

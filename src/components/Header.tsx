@@ -1,3 +1,4 @@
+import { groupLabel } from "@/groupLabels";
 import { useEffect, useState } from "react";
 import {
   Award,
@@ -142,7 +143,7 @@ export function Header({ onNavigate, onLogout }: HeaderProps) {
 
       {panel === "profile" && (
         <div className="absolute right-4 top-[calc(100%+8px)] w-[min(340px,calc(100vw-32px))] rounded-[24px] border border-black/[0.06] bg-white p-5 shadow-[0_18px_50px_rgba(0,0,0,0.14)] sm:right-6">
-          <div className="flex items-center gap-3">{child.photo ? <img src={child.photo} alt={child.name || "Ученик OPEN STARS"} className="h-12 w-12 rounded-full object-cover" /> : <div className="grid h-12 w-12 place-items-center rounded-full bg-[#F3F0E7] text-sm font-bold text-[#5F6338]">{initials}</div>}<div className="min-w-0"><p className="truncate font-semibold text-[#171717]">{child.name || "Ученик OPEN STARS"}</p><p className="mt-0.5 text-xs text-black/40">{child.groupName || child.group || "OPEN STARS"}</p></div></div>
+          <div className="flex items-center gap-3">{child.photo ? <img src={child.photo} alt={child.name || "Ученик OPEN STARS"} className="h-12 w-12 rounded-full object-cover" /> : <div className="grid h-12 w-12 place-items-center rounded-full bg-[#F3F0E7] text-sm font-bold text-[#5F6338]">{initials}</div>}<div className="min-w-0"><p className="truncate font-semibold text-[#171717]">{child.name || "Ученик OPEN STARS"}</p><p className="mt-0.5 text-xs text-black/40">{groupLabel(child.groupName || child.group, child.branch, child.lessonDay, child.lessonTime) || "OPEN STARS"}</p></div></div>
           <button type="button" onClick={() => { setPanel(null); onLogout?.(); }} className="mt-4 flex w-full items-center justify-center gap-2 rounded-[16px] bg-[#171717] px-4 py-3 text-sm font-semibold text-white transition-opacity hover:opacity-90 active:scale-[0.99]"><LogOut className="h-4 w-4" />Выйти из кабинета</button>
         </div>
       )}
