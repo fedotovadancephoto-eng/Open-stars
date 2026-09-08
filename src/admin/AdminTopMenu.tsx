@@ -33,7 +33,7 @@ const items: Array<{
   roles: StaffRole[];
   teacherVisible?: boolean;
 }> = [
-  { section: "team-work", label: "Общий план и задачи", icon: Target, accent: "orange", roles: ["owner", "project_director", "admin", "manager", "teacher"], teacherVisible: true },
+  { section: "team-work", label: "Общий план и задачи", icon: Target, accent: "orange", roles: ["owner", "admin", "manager", "teacher"], teacherVisible: true },
   { section: "business", label: "Бизнес", icon: WalletCards, accent: "orange", roles: ["owner"] },
   { section: "crm", label: "CRM · Продажи", icon: Target, accent: "orange", roles: ["owner", "project_director", "admin", "manager"] },
   { section: "payments", label: "Оплаты родителей", icon: CreditCard, accent: "olive", roles: ["owner", "project_director", "admin", "manager"] },
