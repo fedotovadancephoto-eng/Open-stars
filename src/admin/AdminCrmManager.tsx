@@ -370,6 +370,8 @@ export function AdminCrmManager() {
 
       {marketingMode && <section className="mt-4 rounded-[20px] bg-white p-4"><label className="text-xs font-semibold text-black/50">Филиал<select className={inputClass} value={branchFilter} onChange={e=>void changeBranch(e.target.value)}><option value="">Все филиалы</option>{branches.map(branch=><option key={branch} value={branch}>{branch}</option>)}</select></label></section>}
 
+      {!marketingMode&&role!=="project_director"&&<MarketingGroupNeeds/>}
+
       {marketingMode ? <>
         {role!=="project_director"&&<MarketingGroupNeeds/>}
         <MarketingStudentSources branch={branchFilter}/>
