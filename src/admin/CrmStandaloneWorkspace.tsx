@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { Eye, EyeOff, KeyRound, LockKeyhole, LogOut, Phone, Target } from "lucide-react";
 
 import { AdminCrmManager } from "@/admin/AdminCrmManager";
+import { TeamWorkBoard } from "@/admin/TeamWorkBoard";
 import { clearStaffSession, getValidStaffSession } from "@/admin/adminApi";
 import { openAdminSection } from "@/admin/adminNavigation";
 import { CrmRole, fetchCrmContext } from "@/admin/crmApi";
@@ -168,9 +169,11 @@ export default function CrmStandaloneWorkspace() {
     <div className="mx-auto max-w-lg rounded-[26px] bg-white p-6 shadow-sm">
       <Logo/>
       <div className="mt-7 flex items-center justify-between gap-3"><div><p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#D96A24]">OPEN STARS · CRM</p><h1 className="mt-1 text-2xl font-semibold">{role?roleLabels[role]:"CRM"}</h1></div><Target className="text-[#D96A24]"/></div>
+      <button onClick={()=>openAdminSection("team-work")} className="mt-6 w-full rounded-[16px] bg-[#5F6338] py-3.5 text-sm font-semibold text-white">Общий план и задачи</button>
       <button onClick={()=>openAdminSection("crm")} className="mt-6 w-full rounded-[16px] bg-[#D96A24] py-3.5 text-sm font-semibold text-white">Открыть CRM</button>
       <button onClick={()=>{clearStaffSession();setRole(null);setState("guest");}} className="mt-3 flex w-full items-center justify-center gap-2 rounded-[16px] bg-[#F6F5F1] py-3 text-sm font-semibold text-black/55"><LogOut size={17}/>Выйти</button>
     </div>
     <AdminCrmManager/>
+    <TeamWorkBoard/>
   </div>;
 }
