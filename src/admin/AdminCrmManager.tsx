@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { AlertCircle, CalendarClock, Check, ChevronRight, CirclePlus, LoaderCircle, Search, UserRoundPlus, X } from "lucide-react";
 
 import { onAdminSection, openAdminSection } from "@/admin/adminNavigation";
+import { MarketingGroupNeeds } from "@/admin/GroupOccupancyBoard";
 import { MarketingStudentSources } from "@/admin/MarketingStudentSources";
 import {
   completeCrmTask,
@@ -359,7 +360,7 @@ export function AdminCrmManager() {
         <div><p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#D96A24]">OPEN STARS · CRM</p><h1 className="mt-1 text-3xl font-semibold tracking-[-0.04em]">{marketingMode ? "Маркетинг" : "Лиды и продажи"}</h1></div>
         <button onClick={() => setOpen(false)} className="grid h-12 w-12 place-items-center rounded-full bg-white shadow-sm"><X size={22}/></button>
       </header>
-      <button type="button" onClick={()=>openAdminSection("team-work")} className="mt-4 w-full rounded-[16px] bg-[#5F6338] px-4 py-3 text-sm font-semibold text-white">Общий план и задачи</button>
+      {role!=="project_director"&&<button type="button" onClick={()=>openAdminSection("team-work")} className="mt-4 w-full rounded-[16px] bg-[#5F6338] px-4 py-3 text-sm font-semibold text-white">Общий план и задачи</button>}
 
       {loading && <div className="mt-6 flex items-center gap-2 rounded-[20px] bg-white p-4 text-sm text-black/45"><LoaderCircle className="animate-spin" size={17}/>Загружаю CRM…</div>}
       {error && <div className="mt-4 flex gap-2 rounded-[18px] border border-red-200 bg-red-50 p-4 text-sm text-red-700"><AlertCircle size={18}/>{error}</div>}
@@ -369,7 +370,10 @@ export function AdminCrmManager() {
 
       {marketingMode && <section className="mt-4 rounded-[20px] bg-white p-4"><label className="text-xs font-semibold text-black/50">Филиал<select className={inputClass} value={branchFilter} onChange={e=>void changeBranch(e.target.value)}><option value="">Все филиалы</option>{branches.map(branch=><option key={branch} value={branch}>{branch}</option>)}</select></label></section>}
 
+      {!marketingMode&&role!=="project_director"&&<MarketingGroupNeeds/>}
+
       {marketingMode ? <>
+        {role!=="project_director"&&<MarketingGroupNeeds/>}
         <MarketingStudentSources branch={branchFilter}/>
         <section className="mt-5 rounded-[22px] bg-white p-4"><div className="grid gap-3 sm:grid-cols-3"><label className="text-xs font-semibold text-black/50">С даты<input type="date" className={inputClass} value={marketingFrom} onChange={e=>setMarketingFrom(e.target.value)}/></label><label className="text-xs font-semibold text-black/50">По дату<input type="date" className={inputClass} value={marketingTo} onChange={e=>setMarketingTo(e.target.value)}/></label><button onClick={()=>void refresh()} className="mt-auto rounded-[15px] bg-[#171717] py-3 text-sm font-semibold text-white">Обновить</button></div></section>
         <section className="mt-4 rounded-[22px] bg-white p-4">
