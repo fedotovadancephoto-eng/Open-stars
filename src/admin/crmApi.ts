@@ -30,6 +30,7 @@ export type CrmLead = {
   responsibleProfileId: string;
   comment: string;
   convertedChildId: string;
+  linkedExistingChildId: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -63,7 +64,7 @@ export type CrmStudentConversionInput = {
   leadId: string;
   firstName: string;
   lastName: string;
-  groupName: "Базовый" | "Продвинутый" | "PRO";
+  groupName: "" | "Базовый" | "Продвинутый" | "PRO";
   birthDate?: string;
   lessonDay?: string;
   lessonTime?: string;
@@ -198,6 +199,7 @@ function mapLead(row: any): CrmLead {
     responsibleProfileId: row.responsible_profile_id || "",
     comment: row.comment || "",
     convertedChildId: row.converted_child_id || "",
+    linkedExistingChildId: row.linked_existing_child_id || "",
     createdAt: row.created_at || "",
     updatedAt: row.updated_at || "",
   };
