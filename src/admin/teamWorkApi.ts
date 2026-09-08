@@ -3,7 +3,7 @@ import { getValidStaffSession } from "@/admin/adminApi";
 export type WorkMetric = "none" | "calls" | "leads" | "enrollment" | "branch_report";
 export type WorkStatus = "todo" | "in_progress" | "submitted" | "accepted" | "returned" | "cancelled";
 export type CrmDay = { leads: number; trials: number; paid: number; students: number };
-export type GroupOccupancy = { branch:string;ageFrom:number|null;ageTo:number|null;day:string;time:string;group:string;actual:number;target:number|null;missing:number|null };
+export type GroupOccupancy = { branch:string;ageFrom:number|null;ageTo:number|null;day:string;time:string;group:string;actual:number|null;updatedAt?:string|null;manual?:boolean;target:number|null;missing:number|null };
 export type WorkEvent = {
  id: string; action: string; actor_id: string; created_at: string;
  payload: { actual?: number | null; reached?: number | null; outcome?: string; nextStep?: string;
@@ -37,6 +37,7 @@ export async function workRpc<T>(name: string,body: Record<string,unknown>): Pro
    "invalid branch figures":"Оплатившие и ожидающие оплату вместе не могут превышать факт учеников.",
    "invalid group plan":"Укажите округ, день недели, время, группу и план от 0 до 1000.",
    "branch report fixed":"Для этой задачи заполняется отчёт округа. Цель берётся из общего плана.",
+   "invalid stream counts":"Проверьте количество детей и возраст: используйте целые неотрицательные числа.",
    "not authorized":"Нет доступа к этому действию.",
    "task changed":"Задача уже изменена. Обновите список и повторите.",
    "task locked":"План задачи уже отправлен на проверку. Его нельзя менять.",
@@ -54,5 +55,6 @@ export async function workRpc<T>(name: string,body: Record<string,unknown>): Pro
  return response.json();
 }
 export function teamAction<T>(action: string,payload:Record<string,unknown>={}) {
+ if(action==="stream_day")return workRpc<T>("save_stream_day",{p_branch:payload.branch,p_day:payload.day,p_rows:payload.rows});
  return workRpc<T>("team_work",{p_action:action,p_payload:payload});
 }
