@@ -1,4 +1,5 @@
 import AdminApp from "@/admin/AdminApp";
+import { TeamWorkBoard } from "@/admin/TeamWorkBoard";
 import { AdminCoinManager } from "@/admin/AdminCoinManager";
 import { AdminCrmManager } from "@/admin/AdminCrmManager";
 import { AdminDocumentsManager } from "@/admin/AdminDocumentsManager";
@@ -47,6 +48,7 @@ export default function AdminWorkspace() {
       <AdminStaffManager />
       <AdminReportExport />
       <AttendanceOverviewModal />
+      <TeamWorkBoard />
       <AdminExpenseManager />
       <AdminPayrollManager />
       <AdminDocumentsManager />
