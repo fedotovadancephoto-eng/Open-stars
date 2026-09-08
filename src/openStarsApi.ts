@@ -471,6 +471,7 @@ export async function fetchParentDashboard() {
       amount: Number(row.coins_awarded || 0),
     })),
     news: newsRows.map((row) => ({
+      photoPaths: Array.isArray(row.photo_paths)?row.photo_paths:[],
       id: row.id,
       title: row.title,
       description: row.body || "",
