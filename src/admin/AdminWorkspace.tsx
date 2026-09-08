@@ -12,6 +12,7 @@ import { AdminPaymentManager } from "@/admin/AdminPaymentManager";
 import { AdminPayrollManager } from "@/admin/AdminPayrollManager";
 import { AdminPhotoSessionManager } from "@/admin/AdminPhotoSessionManager";
 import { AdminReportExport } from "@/admin/AdminReportExport";
+import { AttendanceOverviewModal } from "@/admin/AttendanceOverview";
 import { AdminScheduleManager } from "@/admin/AdminScheduleManager";
 import { AdminStaffManager } from "@/admin/AdminStaffManager";
 import { AdminStudentOperations } from "@/admin/AdminStudentOperations";
@@ -45,6 +46,7 @@ export default function AdminWorkspace() {
       <AdminPhotoSessionManager />
       <AdminStaffManager />
       <AdminReportExport />
+      <AttendanceOverviewModal />
       <AdminExpenseManager />
       <AdminPayrollManager />
       <AdminDocumentsManager />

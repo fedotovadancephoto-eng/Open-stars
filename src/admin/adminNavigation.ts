@@ -1,4 +1,5 @@
 export type AdminSection =
+  | "attendance-overview"
   | "students"
   | "add-student"
   | "archive"
