@@ -1,5 +1,6 @@
 import { Bell, Clock, Megaphone } from "lucide-react";
 
+import { NewsPhotoGallery } from "@/components/NewsPhotoGallery";
 import { Card } from "@/components/Card";
 import { news } from "@/data/demoData";
 
@@ -58,9 +59,10 @@ export function NewsTab() {
                 <h3 className="mt-3 text-lg font-semibold tracking-[-0.02em] text-[#171717]">
                   {item.title}
                 </h3>
-                <p className="mt-2 text-sm leading-7 text-black/55">
+                <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-black/55">
                   {item.body || item.description || item.excerpt}
                 </p>
+                <NewsPhotoGallery paths={item.photoPaths||[]} title={item.title}/>
               </div>
             </div>
           </Card>
