@@ -23,6 +23,8 @@ const roleLabels: Record<string, string> = {
   manager: "Управляющий",
   admin: "Администратор филиала",
   teacher: "Педагог",
+  marketer: "Маркетолог",
+  sales: "Продажник",
 };
 const inputClass = "mt-1.5 w-full rounded-[13px] border border-black/[0.08] bg-white px-3.5 py-3 text-sm text-[#171717] outline-none focus:border-[#D96A24]/45 focus:ring-4 focus:ring-[#D96A24]/[0.06]";
 
@@ -132,9 +134,10 @@ export function AdminStaffManager() {
     setSuccess("");
     setCreated(null);
     try {
-      const next = await createStaffInvite({ fullName, phone, roleName, branch, teachingSubject });
+      const isCrmRole = roleName === "marketer" || roleName === "sales";
+      const next = await createStaffInvite({ fullName, phone, roleName, branch: isCrmRole ? "" : branch, teachingSubject: isCrmRole ? "" : teachingSubject });
       setCreated(next);
-      setSuccess("Код создан. Передайте сотруднику телефон, код и ссылку /admin. Код показывается только сейчас.");
+      setSuccess(`Код создан. Передайте сотруднику телефон, код и ссылку ${isCrmRole ? "/admin/crm" : "/admin"}. Код показывается только сейчас.`);
       setFullName("");
       setPhone("");
       await refresh();
@@ -264,7 +267,8 @@ export function AdminStaffManager() {
   }
 
   if (!enabled) return null;
-  const needsBranch = roleName !== "project_director";
+  const isCrmRole = roleName === "marketer" || roleName === "sales";
+  const needsBranch = roleName !== "project_director" && !isCrmRole;
   const canChooseProjectDirector = actorRole === "owner";
 
   return (
@@ -281,9 +285,9 @@ export function AdminStaffManager() {
               <div className="flex items-center gap-2"><UserPlus size={19} className="text-[#D96A24]" /><h3 className="font-semibold">Новый доступ</h3></div>
               <label className="mt-4 block text-xs font-semibold text-black/55">Имя и фамилия<input className={inputClass} value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Белова Марина" /></label>
               <label className="mt-3 block text-xs font-semibold text-black/55">Рабочий телефон<input className={inputClass} value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+7 999 123-45-67" inputMode="tel" /></label>
-              <label className="mt-3 block text-xs font-semibold text-black/55">Основная роль<select className={inputClass} value={roleName} onChange={(e) => setRoleName(e.target.value)}><option value="teacher">Педагог</option><option value="admin">Администратор филиала</option><option value="manager">Управляющий</option>{canChooseProjectDirector && <option value="project_director">Директор по проекту</option>}</select></label>
+              <label className="mt-3 block text-xs font-semibold text-black/55">Основная роль<select className={inputClass} value={roleName} onChange={(e) => setRoleName(e.target.value)}><option value="teacher">Педагог</option><option value="admin">Администратор филиала</option><option value="manager">Управляющий</option><option value="marketer">Маркетолог</option><option value="sales">Продажник</option>{canChooseProjectDirector && <option value="project_director">Директор по проекту</option>}</select></label>
               {needsBranch && <label className="mt-3 block text-xs font-semibold text-black/55">Филиал<select className={inputClass} value={branch} onChange={(e) => setBranch(e.target.value)}>{branches.map((item) => <option key={item}>{item}</option>)}</select></label>}
-              {roleName !== "project_director" && <div className="mt-3">
+              {needsBranch && <div className="mt-3">
                 <label className="block text-xs font-semibold text-black/55">Педагогический предмет {roleName === "teacher" ? "· обязательно" : "· необязательно"}
                   <select className={inputClass} value={subjectChoice} onChange={(e) => changeSubjectChoice(e.target.value)}>
                     {roleName !== "teacher" && <option value="">Без педагогического предмета</option>}
@@ -293,7 +297,7 @@ export function AdminStaffManager() {
                 </label>
                 {subjectChoice === CUSTOM_SUBJECT && <label className="mt-2 block text-xs font-semibold text-black/55">Название мастер-класса / предмета<input autoFocus className={inputClass} value={teachingSubject} onChange={(e) => setTeachingSubject(e.target.value)} placeholder="Например: Мастер-класс по визажу" /></label>}
               </div>}
-              <p className="mt-3 rounded-[14px] bg-[#FAF9F5] px-3.5 py-3 text-xs leading-5 text-black/45">Для администратора или управляющего педагогический предмет добавляется только если вы выбрали его явно. Для разового мастер-класса выберите «Мастер-класс / другой предмет» и впишите название вручную.</p>
+              <p className="mt-3 rounded-[14px] bg-[#FAF9F5] px-3.5 py-3 text-xs leading-5 text-black/45">{isCrmRole ? "Маркетолог и продажник работают через кабинет CRM. Филиал и педагогический предмет для этого доступа не нужны. После создания передайте сотруднику код и ссылку /admin/crm." : "Для администратора или управляющего педагогический предмет добавляется только если вы выбрали его явно. Для разового мастер-класса выберите «Мастер-класс / другой предмет» и впишите название вручную."}</p>
               <button type="button" onClick={() => void create()} disabled={saving || bulkBusy} className="mt-5 flex w-full items-center justify-center gap-2 rounded-[14px] bg-[#171717] px-5 py-3.5 text-sm font-semibold text-white disabled:opacity-50">{saving ? <LoaderCircle className="animate-spin" size={17} /> : <KeyRound size={17} />} Создать код на 7 дней</button>
 
               {created && <div className="mt-5 rounded-[20px] border border-[#D96A24]/20 bg-[#FFF8F1] p-4"><p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#C95320]">Код активации</p><div className="mt-2 flex items-center gap-3"><span className="font-mono text-3xl font-bold tracking-[0.18em] text-[#171717]">{created.activationCode}</span><button type="button" onClick={() => void copyCode()} className="grid h-10 w-10 place-items-center rounded-xl bg-white text-black/50 shadow-sm" aria-label="Скопировать код"><Copy size={17} /></button></div><p className="mt-2 text-xs leading-5 text-black/45">{created.fullName} · {created.phone}<br />Действует до {fmt(created.expiresAt)}.</p></div>}
