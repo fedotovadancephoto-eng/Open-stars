@@ -6,6 +6,7 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_1MORh5rY7uMDVYLYVX5VAA_cyoph4-7
 export type NewsScope = "all_school" | "branch" | "group";
 export type NewsItem = {
   id: string;
+  photoPaths: string[];
   title: string;
   body: string;
   category: string;
@@ -49,12 +50,13 @@ async function rpc<T>(name: string, body: Record<string, unknown> = {}): Promise
 }
 
 export async function fetchNewsContext(): Promise<NewsContext> {
-  const data: any = await rpc("staff_news_context");
+  const data: any = await rpc("staff_news_context_photos");
   return {
     role: data.role || "",
     staffBranch: data.staffBranch || "",
     news: Array.isArray(data.news) ? data.news.map((item: any) => ({
       id: item.id,
+      photoPaths: Array.isArray(item.photoPaths)?item.photoPaths:[],
       title: item.title || "",
       body: item.body || "",
       category: item.category || "OPEN STARS",
@@ -75,8 +77,12 @@ export async function publishNews(input: {
   audienceScope: NewsScope;
   branch?: string;
   groupName?: string;
+  photoPaths?:string[];
+  requestId:string;
 }) {
-  const rows: Array<{ news_id: string; recipient_count: number }> = await rpc("staff_publish_news", {
+  const rows: Array<{ news_id: string; recipient_count: number }> = await rpc("staff_publish_news_photos", {
+    p_paths:input.photoPaths||[],
+    p_request:input.requestId,
     p_title: input.title.trim(),
     p_body: input.body.trim() || null,
     p_category: input.category.trim() || "OPEN STARS",
