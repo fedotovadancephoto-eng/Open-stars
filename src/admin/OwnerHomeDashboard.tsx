@@ -245,6 +245,7 @@ export function OwnerHomeDashboard({ children, onOpenStudents, onOpenPayments, o
       </div>
 
       <div className="mt-5 flex gap-2 overflow-x-auto pb-1">
+        <button type="button" onClick={() => openAdminSection("team-work")} className="shrink-0 rounded-full bg-[#D96A24] px-4 py-2 text-xs font-semibold text-white">Общий план и задачи</button>
         <button type="button" onClick={() => openAdminSection("attendance-overview")} className="shrink-0 rounded-full bg-[#5F6338] px-4 py-2 text-xs font-semibold text-white">Фактическая посещаемость</button>
         {branchOptions.map((branch) => (
           <button key={branch} type="button" onClick={() => setBranchFilter(branch)} className={`shrink-0 rounded-full px-3.5 py-2 text-xs font-semibold transition ${branchFilter === branch ? "bg-[#171717] text-white" : "bg-white text-black/50"}`}>
