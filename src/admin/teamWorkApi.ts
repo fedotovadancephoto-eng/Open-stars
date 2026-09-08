@@ -1,15 +1,17 @@
 import { getValidStaffSession } from "@/admin/adminApi";
 
-export type WorkMetric = "none" | "calls" | "leads" | "enrollment";
+export type WorkMetric = "none" | "calls" | "leads" | "enrollment" | "branch_report";
 export type WorkStatus = "todo" | "in_progress" | "submitted" | "accepted" | "returned" | "cancelled";
 export type CrmDay = { leads: number; trials: number; paid: number; students: number };
+export type GroupOccupancy = { branch:string;ageFrom:number|null;ageTo:number|null;day:string;time:string;group:string;actual:number;target:number|null;missing:number|null };
 export type WorkEvent = {
  id: string; action: string; actor_id: string; created_at: string;
  payload: { actual?: number | null; reached?: number | null; outcome?: string; nextStep?: string;
+   paidStudents?:number|null;dueStudents?:number|null;paymentMonth?:string|null;missingStudents?:number|null;groups?:GroupOccupancy[]|null;
    comment?: string; crm?: CrmDay | null; plan?: number | null };
 };
 export type WorkTask = {
- id: string; assignee_id: string; assigneeName: string; branch: string | null; title: string;
+ id: string; assigneeRole:string; branchTarget:number|null; routine_key:string|null; assignee_id: string; assigneeName: string; branch: string | null; title: string;
  description: string; due_date: string; priority: "normal" | "high"; metric: WorkMetric;
  planned_amount: number | null; status: WorkStatus; version: number; events: WorkEvent[];
 };
@@ -18,7 +20,7 @@ export type WorkContext = {
  goal: { title: string; starts_on: string; due_on: string };
  branches: { branch: string; target: number; active: number }[];
  staff: { id: string; name: string; role: string; branch: string | null }[];
- tasks: WorkTask[]; crm: CrmDay | null;
+ groups:GroupOccupancy[]; tasks: WorkTask[]; crm: CrmDay | null;
 };
 export const workRoles: Record<string,string> = { owner:"Руководитель",project_director:"Директор проекта",manager:"Управляющий",admin:"Администратор",sales:"Продажник",marketer:"Маркетолог",teacher:"Педагог" };
 export async function workRpc<T>(name: string,body: Record<string,unknown>): Promise<T> {
@@ -31,6 +33,10 @@ export async function workRpc<T>(name: string,body: Record<string,unknown>): Pro
   let message="Не удалось выполнить действие.";
   try { const error=await response.json();message=error.message||message; } catch { /* retain fallback */ }
   const errors: Record<string,string>={
+   "branch figures required":"Заполните факт учеников, оплативших, ожидающих оплату и месяц.",
+   "invalid branch figures":"Оплатившие и ожидающие оплату вместе не могут превышать факт учеников.",
+   "invalid group plan":"Укажите округ, день недели, время, группу и план от 0 до 1000.",
+   "branch report fixed":"Для этой задачи заполняется отчёт округа. Цель берётся из общего плана.",
    "not authorized":"Нет доступа к этому действию.",
    "task changed":"Задача уже изменена. Обновите список и повторите.",
    "task locked":"План задачи уже отправлен на проверку. Его нельзя менять.",
