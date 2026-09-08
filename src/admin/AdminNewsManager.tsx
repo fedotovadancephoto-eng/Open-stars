@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { Bell, CheckCircle2, LoaderCircle, Newspaper, Send, Trash2, X } from "lucide-react";
 
+import { NewsPhotoGallery } from "@/components/NewsPhotoGallery";
+import { uploadNewsPhoto, removeNewsDraftPhotos } from "@/admin/newsPhotosApi";
 import { NewsItem, NewsScope, deleteNews, fetchNewsContext, publishNews, setNewsActive } from "@/admin/newsApi";
 
 const branches = ["Свердловский", "НЛО", "Октябрьский"];
@@ -19,6 +21,7 @@ function audience(item: NewsItem) {
   return `${item.branch} · ${item.groupName}`;
 }
 
+function FilePreview({file}:{file:File}){const [url,setUrl]=useState("");useEffect(()=>{const u=URL.createObjectURL(file);setUrl(u);return()=>URL.revokeObjectURL(u);},[file]);return <img src={url} alt={file.name} className="h-28 w-full rounded-xl object-cover"/>;}
 export function AdminNewsManager() {
   const [enabled, setEnabled] = useState(false);
   const [open, setOpen] = useState(false);
@@ -31,6 +34,9 @@ export function AdminNewsManager() {
   const [scope, setScope] = useState<NewsScope>("all_school");
   const [branch, setBranch] = useState("Октябрьский");
   const [groupName, setGroupName] = useState("PRO");
+  const [photos,setPhotos]=useState<{id:string;file:File;path?:string}[]>([]);
+  const [requestId,setRequestId]=useState(()=>crypto.randomUUID());
+  const [progress,setProgress]=useState("");
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -56,10 +62,14 @@ export function AdminNewsManager() {
     if (!title.trim()) return setError("Введите заголовок новости.");
     setSaving(true); setError(""); setSuccess("");
     try {
-      const result = await publishNews({ title, body, category, audienceScope: scope, branch, groupName });
+      const paths:string[]=[];
+      for(let i=0;i<photos.length;i++){setProgress(`Загружаем фото ${i+1} из ${photos.length}…`);const photo=photos[i];const path=photo.path||await uploadNewsPhoto(photo.file);paths.push(path);setPhotos(v=>v.map(p=>p.id===photo.id?{...p,path}:p));}
+      setProgress("Публикуем новость…");
+      const result = await publishNews({ title, body, category, audienceScope: scope, branch, groupName,photoPaths:paths,requestId });
       setSuccess(`Новость опубликована. Уведомлений создано: ${Number(result.recipient_count || 0)}.`);
-      setTitle(""); setBody(""); await refresh();
-    } catch(e){setError(e instanceof Error?e.message:"Не удалось опубликовать новость.")} finally {setSaving(false)}
+      setTitle(""); setBody("");setPhotos([]);setRequestId(crypto.randomUUID());
+      try{await refresh();}catch{setError("Новость опубликована, но список не обновился. Откройте раздел заново.");}
+    } catch(e){setError(e instanceof Error?e.message:"Не удалось опубликовать новость.")} finally {setSaving(false);setProgress("")}
   }
 
   async function toggle(item: NewsItem) {
@@ -95,24 +105,30 @@ export function AdminNewsManager() {
     <button type="button" onClick={openManager} className="fixed bottom-[24.7rem] right-4 z-40 flex items-center gap-2 rounded-full bg-[#171717] px-4 py-3 text-sm font-semibold text-white shadow-[0_10px_30px_rgba(0,0,0,0.18)] sm:right-6"><Newspaper size={17}/> Новости</button>
     {open && <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/30 backdrop-blur-[2px] sm:items-center sm:p-5" onClick={()=>!saving&&setOpen(false)}>
       <div className="max-h-[96vh] w-full max-w-5xl overflow-y-auto rounded-t-[28px] bg-[#FAF9F5] p-5 shadow-2xl sm:rounded-[28px] sm:p-7" onClick={e=>e.stopPropagation()}>
-        <div className="flex items-start justify-between gap-4"><div><p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#D96A24]">OPEN STARS ADMIN</p><h2 className="mt-1 text-2xl font-semibold">Новости и уведомления</h2><p className="mt-2 text-sm text-black/45">Публикация для всей школы, филиала или группы. Новость можно временно скрыть или удалить окончательно.</p></div><button onClick={()=>setOpen(false)} className="grid h-10 w-10 place-items-center rounded-full bg-white text-black/55"><X size={20}/></button></div>
+        <div className="flex items-start justify-between gap-4"><div><p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#D96A24]">OPEN STARS ADMIN</p><h2 className="mt-1 text-2xl font-semibold">Новости и уведомления</h2><p className="mt-2 text-sm text-black/45">Публикация для всей школы, филиала или группы. Новость можно временно скрыть или удалить окончательно.</p></div><button disabled={saving} onClick={()=>setOpen(false)} className="grid h-10 w-10 place-items-center rounded-full bg-white text-black/55"><X size={20}/></button></div>
 
         <div className="mt-6 grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
           <section className="rounded-[24px] border border-black/[0.06] bg-white p-5">
             <div className="flex items-center gap-2"><Send size={18} className="text-[#D96A24]"/><h3 className="font-semibold">Новая публикация</h3></div>
+            <fieldset disabled={saving}>
             <label className="mt-4 block text-xs font-semibold text-black/55">Заголовок<input className={inputClass} value={title} onChange={e=>setTitle(e.target.value)} placeholder="Например: Изменение расписания"/></label>
             <label className="mt-3 block text-xs font-semibold text-black/55">Текст<textarea className={`${inputClass} min-h-[130px] resize-y`} value={body} onChange={e=>setBody(e.target.value)} placeholder="Напишите сообщение родителям..."/></label>
+            <label className="mt-3 block text-xs font-semibold text-black/55">Фотографии проекта<input type="file" multiple accept="image/jpeg,image/png,image/webp" className={inputClass} onChange={e=>{const files=Array.from(e.target.files||[]);e.target.value="";if(photos.length+files.length>10){setError("В одну новость можно добавить до 10 фотографий.");return;}if(files.some(f=>!["image/jpeg","image/png","image/webp"].includes(f.type)||f.size>10*1024*1024)){setError("Выберите JPG, PNG или WebP, до 10 МБ каждое фото.");return;}setError("");setPhotos(v=>[...v,...files.map(file=>({id:crypto.randomUUID(),file}))]);}}/></label>
+            <p className="mt-2 text-xs text-black/40">До 10 фото · JPG, PNG, WebP · до 10 МБ каждое. Текст выше — общее описание проекта.</p>
+            <div className="mt-3 grid grid-cols-2 gap-2">{photos.map(photo=><div key={photo.id}><FilePreview file={photo.file}/><button type="button" className="mt-1 text-xs text-red-600" onClick={()=>{setPhotos(v=>v.filter(p=>p.id!==photo.id));if(photo.path)void removeNewsDraftPhotos([photo.path]).catch(()=>{});}}>Убрать фото</button></div>)}</div>
             <label className="mt-3 block text-xs font-semibold text-black/55">Категория<input className={inputClass} value={category} onChange={e=>setCategory(e.target.value)} /></label>
             <label className="mt-3 block text-xs font-semibold text-black/55">Кому<select className={inputClass} value={scope} onChange={e=>setScope(e.target.value as NewsScope)} disabled={isAdmin}><option value="all_school">Вся школа</option><option value="branch">Филиал</option><option value="group">Группа</option></select></label>
             {scope!=="all_school" && <label className="mt-3 block text-xs font-semibold text-black/55">Филиал<select className={inputClass} value={branch} onChange={e=>setBranch(e.target.value)} disabled={isAdmin}>{branches.map(v=><option key={v}>{v}</option>)}</select></label>}
             {scope==="group" && <label className="mt-3 block text-xs font-semibold text-black/55">Группа<select className={inputClass} value={groupName} onChange={e=>setGroupName(e.target.value)}>{groups.map(v=><option key={v}>{v}</option>)}</select></label>}
             {isAdmin && <p className="mt-2 text-[11px] leading-5 text-black/35">Администратор публикует только для своего филиала или его группы: {staffBranch}.</p>}
+            </fieldset>
+            {progress&&<p role="status" className="mt-3 text-sm text-black/50">{progress}</p>}
             <button type="button" onClick={send} disabled={saving} className="mt-5 flex w-full items-center justify-center gap-2 rounded-[14px] bg-[#D96A24] px-5 py-3.5 text-sm font-semibold text-white disabled:opacity-50">{saving?<LoaderCircle className="animate-spin" size={17}/>:<Bell size={17}/>} Опубликовать и уведомить</button>
           </section>
 
           <section className="rounded-[24px] border border-black/[0.06] bg-white p-5">
             <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-black/35">Опубликовано</p><h3 className="mt-1 text-lg font-semibold">Последние новости</h3>
-            {loading?<div className="grid min-h-[180px] place-items-center"><LoaderCircle className="animate-spin text-black/25"/></div>:items.length===0?<div className="mt-4 rounded-[18px] bg-[#FAF9F5] px-5 py-9 text-center text-sm text-black/40">Новостей пока нет.</div>:<div className="mt-4 space-y-3">{items.slice(0,30).map(item=><div key={item.id} className={`rounded-[17px] border p-4 ${item.active?"border-black/[0.06]":"border-black/[0.04] bg-black/[0.025] opacity-65"}`}><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="font-semibold">{item.title}</p><p className="mt-1 text-[11px] text-black/35">{audience(item)} · {fmt(item.publishedAt||item.createdAt)}</p>{!item.active && <span className="mt-2 inline-flex rounded-full bg-black/[0.05] px-2.5 py-1 text-[10px] font-bold text-black/40">Скрыта у родителей</span>}</div><div className="flex shrink-0 flex-wrap justify-end gap-2"><button onClick={()=>toggle(item)} disabled={saving} className="rounded-[10px] bg-[#FAF9F5] px-2.5 py-2 text-[11px] font-semibold text-black/50 disabled:opacity-40">{item.active?"Скрыть":"Вернуть"}</button><button onClick={()=>remove(item)} disabled={saving} className="grid h-9 w-9 place-items-center rounded-[10px] bg-red-50 text-red-600 disabled:opacity-40" aria-label={`Удалить новость ${item.title}`} title="Удалить окончательно"><Trash2 size={15}/></button></div></div>{item.body&&<p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-black/55">{item.body}</p>}</div>)}</div>}
+            {loading?<div className="grid min-h-[180px] place-items-center"><LoaderCircle className="animate-spin text-black/25"/></div>:items.length===0?<div className="mt-4 rounded-[18px] bg-[#FAF9F5] px-5 py-9 text-center text-sm text-black/40">Новостей пока нет.</div>:<div className="mt-4 space-y-3">{items.slice(0,30).map(item=><div key={item.id} className={`rounded-[17px] border p-4 ${item.active?"border-black/[0.06]":"border-black/[0.04] bg-black/[0.025] opacity-65"}`}><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="font-semibold">{item.title}</p><p className="mt-1 text-[11px] text-black/35">{audience(item)} · {fmt(item.publishedAt||item.createdAt)}</p>{!item.active && <span className="mt-2 inline-flex rounded-full bg-black/[0.05] px-2.5 py-1 text-[10px] font-bold text-black/40">Скрыта у родителей</span>}</div><div className="flex shrink-0 flex-wrap justify-end gap-2"><button onClick={()=>toggle(item)} disabled={saving} className="rounded-[10px] bg-[#FAF9F5] px-2.5 py-2 text-[11px] font-semibold text-black/50 disabled:opacity-40">{item.active?"Скрыть":"Вернуть"}</button><button onClick={()=>remove(item)} disabled={saving} className="grid h-9 w-9 place-items-center rounded-[10px] bg-red-50 text-red-600 disabled:opacity-40" aria-label={`Удалить новость ${item.title}`} title="Удалить окончательно"><Trash2 size={15}/></button></div></div>{item.body&&<p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-black/55">{item.body}</p>}<NewsPhotoGallery paths={item.photoPaths} staff title={item.title}/></div>)}</div>}
           </section>
         </div>
         {error&&<div className="mt-5 rounded-[15px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
