@@ -45,6 +45,7 @@ const items: Array<{
   { section: "child-photo", label: "Фото ребёнка", icon: ImagePlus, accent: "olive", roles: ["owner", "project_director", "admin", "manager"] },
   { section: "schedule", label: "Расписание", icon: CalendarDays, accent: "neutral", roles: ["owner", "project_director", "admin", "manager", "teacher"], teacherVisible: true },
   { section: "study", label: "Учебная часть", icon: BookOpenCheck, accent: "orange", roles: ["owner", "project_director", "admin", "manager", "teacher"], teacherVisible: true },
+  { section: "attendance-overview", label: "Посещаемость по округам", icon: CalendarDays, accent: "olive", roles: ["owner", "project_director", "admin", "manager"] },
   { section: "reports", label: "Excel-отчёты", icon: FileSpreadsheet, accent: "olive", roles: ["owner", "project_director", "admin", "manager", "teacher"], teacherVisible: true },
   { section: "coins", label: "Star Coin", icon: Coins, accent: "olive", roles: ["owner", "project_director", "admin", "manager"] },
   { section: "news", label: "Новости", icon: Newspaper, accent: "neutral", roles: ["owner", "project_director", "admin", "manager"] },
