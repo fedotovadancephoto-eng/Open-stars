@@ -402,7 +402,7 @@ export default function AdminApp() {
   const role = identity.role;
   const teacherView = role === "teacher" || staffMode === "teacher";
   const staffName = identity.profile.staff_display_name?.trim() || (role === "owner" ? "Директор" : identity.profile.full_name?.trim() || roleLabels[role]);
-  const roleChildren = teacherView ? children.filter((child) => assignmentAllowsChild(child, assignments)) : children;
+  const roleChildren = children.filter((child) => !child.archivedAt && (!teacherView || assignmentAllowsChild(child, assignments)));
   const needsAttention = roleChildren.filter((child) => missingFields(child).length > 0);
   const missingBirth = roleChildren.filter((child) => !child.birthDate);
   const missingPhoto = roleChildren.filter((child) => !child.photoUrl);
