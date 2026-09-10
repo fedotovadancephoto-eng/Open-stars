@@ -27,6 +27,7 @@ type HeaderPanel = "menu" | "notifications" | "profile" | null;
 interface HeaderProps {
   onNavigate?: (tab: string) => void;
   onLogout?: () => void;
+  onCoinNotification?: (childId: string) => void;
 }
 
 const menuItems = [
@@ -50,7 +51,7 @@ function formatNotificationDate(value: string) {
   return new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(date).replace(".", "");
 }
 
-export function Header({ onNavigate, onLogout }: HeaderProps) {
+export function Header({ onNavigate, onLogout, onCoinNotification }: HeaderProps) {
   const [panel, setPanel] = useState<HeaderPanel>(null);
   const [notifications, setNotifications] = useState<ParentNotification[]>([]);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
@@ -68,7 +69,18 @@ export function Header({ onNavigate, onLogout }: HeaderProps) {
     finally { setNotificationsLoading(false); }
   }
 
-  useEffect(() => { refreshNotifications(); }, []);
+  useEffect(() => {
+    void refreshNotifications();
+    const refreshVisible = () => { if (document.visibilityState === "visible") void refreshNotifications(); };
+    const timer = window.setInterval(refreshVisible, 30000);
+    window.addEventListener("focus", refreshVisible);
+    document.addEventListener("visibilitychange", refreshVisible);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refreshVisible);
+      document.removeEventListener("visibilitychange", refreshVisible);
+    };
+  }, []);
 
   const navigate = (tab: string) => {
     setPanel(null);
@@ -96,6 +108,7 @@ export function Header({ onNavigate, onLogout }: HeaderProps) {
         // Переход остаётся доступным, даже если отметку о прочтении временно не удалось сохранить.
       }
     }
+    if (item.target === "coins") { onCoinNotification?.(item.targetId); navigate("coins"); }
     if (item.target === "news") navigate("news");
     if (item.target === "photos") navigate("photos");
   }
