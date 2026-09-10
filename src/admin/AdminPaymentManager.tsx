@@ -1,3 +1,4 @@
+import { FinanceRegister } from "@/admin/FinanceRegister";
 import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
@@ -435,6 +436,7 @@ export function AdminPaymentManager() {
               <button type="button" onClick={() => setOpen(false)} className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white"><X size={20} /></button>
             </div>
 
+            <FinanceRegister kind="payments" lockedBranch={role === "admin" ? displayBranch : ""} />
             <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <label className="text-xs font-semibold text-black/55">Месяц
                 <input type="month" className={`${inputClass} sm:w-[210px]`} value={month} onChange={(event) => void changeMonth(event.target.value)} />

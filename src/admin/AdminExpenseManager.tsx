@@ -1,3 +1,4 @@
+import { FinanceRegister } from "@/admin/FinanceRegister";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   BarChart3,
@@ -347,6 +348,7 @@ export function AdminExpenseManager() {
 
         {loading && !context ? <div className="grid min-h-[420px] place-items-center"><LoaderCircle className="animate-spin text-black/25" size={30}/></div> : (
           <>
+            {isOwner && <FinanceRegister kind="expenses" />}
             {isOwner && summary && (
               <section className="mt-6">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -405,11 +407,12 @@ export function AdminExpenseManager() {
                       setCategoryId(value);
                     }}>
                       <option value="">Выберите категорию</option>
-                      {isOwner ? context?.categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>) : (
+                      {isOwner && <option value="__payroll__">Зарплата педагогам · выбрать педагога</option>}
+                      {isOwner ? context?.categories.map((category) => <option key={category.id} value={category.id}>{category.code === "payroll" ? "Зарплата сотрудников · общий расход" : category.name}</option>) : (
                         <>
-                          {visibleCategories.filter((category) => category.code !== "client_change").map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+                          {visibleCategories.filter((category) => category.code !== "client_change").map((category) => <option key={category.id} value={category.id}>{category.code === "payroll" ? "Зарплата сотрудников · общий расход" : category.name}</option>)}
                           <option value="__payroll__">Зарплата педагогам</option>
-                          {visibleCategories.filter((category) => category.code === "client_change").map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+                          {visibleCategories.filter((category) => category.code === "client_change").map((category) => <option key={category.id} value={category.id}>{category.code === "payroll" ? "Зарплата сотрудников · общий расход" : category.name}</option>)}
                         </>
                       )}
                     </select>

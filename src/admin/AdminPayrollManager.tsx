@@ -183,7 +183,7 @@ export function AdminPayrollManager() {
             <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#D96A24]">{context?.role === "owner" ? "OPEN STARS · OWNER" : "OPEN STARS ADMIN"}</p>
             <h2 className="mt-1 text-2xl font-semibold tracking-[-0.02em] text-[#171717]">Зарплата педагогам</h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-black/45">
-              {context?.role === "owner"
+              {context && context.role !== "admin"
                 ? "Еженедельные выплаты педагогам по всем филиалам. Каждая выплата сразу учитывается в расходах и едином ДДС."
                 : `Вы фиксируете фактически выданную зарплату педагогам филиала ${context?.staffBranch || ""}. Общий ДДС и финансы владельца здесь не показываются.`}
             </p>
@@ -197,7 +197,7 @@ export function AdminPayrollManager() {
         {error && <div className="mt-4 rounded-[16px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
         {success && <div className="mt-4 rounded-[16px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{success}</div>}
 
-        {context?.role === "owner" && (
+        {context && context.role !== "admin" && (
           <div className="mt-5 grid gap-3 sm:grid-cols-4">
             <div className="rounded-[20px] bg-[#171717] p-4 text-white"><p className="text-xs text-white/55">Выплачено за период</p><p className="mt-2 text-2xl font-semibold">{money(context.totalAmount)}</p></div>
             {context.branches.map((item) => <div key={item.branchId} className="rounded-[20px] border border-black/[0.06] bg-white p-4"><p className="text-xs text-black/45">{item.branch}</p><p className="mt-2 text-xl font-semibold text-[#171717]">{money(item.amount)}</p></div>)}
@@ -213,7 +213,7 @@ export function AdminPayrollManager() {
 
             <label className="mt-4 block text-xs font-semibold text-black/55">Педагог
               <select value={teacherProfileId} disabled={Boolean(editing)} onChange={(event) => setTeacherProfileId(event.target.value)} className={inputClass}>
-                {context?.teachers.map((item) => <option key={item.profileId} value={item.profileId}>{item.name}{context.role === "owner" ? ` · ${item.branch}` : ""}</option>)}
+                {context?.teachers.map((item) => <option key={item.profileId} value={item.profileId}>{item.name}{context.role !== "admin" ? ` · ${item.branch}` : ""}</option>)}
               </select>
             </label>
 
