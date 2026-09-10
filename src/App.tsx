@@ -298,7 +298,7 @@ function App() {
   return (
     <div className="flex min-h-screen bg-[#faf9f5]">
       <div className="min-w-0 flex-1">
-        <Header onNavigate={handleTabSelect} onLogout={handleLogout} />
+        <Header onNavigate={handleTabSelect} onLogout={handleLogout} onCoinNotification={(childId) => { if (childId !== child.id) handleChildSelect(childId); else setReloadKey((value) => value + 1); }} />
         <main className="mx-auto w-full max-w-7xl px-5 py-7 sm:px-6 lg:px-8">
           <section className="mb-6">
             <div className="inline-flex items-center rounded-full bg-gradient-to-r from-[#D96A24] to-[#E98A34] px-5 py-2.5 text-sm font-medium text-white shadow-sm">{ROLE_PORTAL_LABELS[DEMO_USER_ROLE]}</div>
