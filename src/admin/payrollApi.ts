@@ -3,7 +3,7 @@ import { getValidStaffSession } from "@/admin/adminApi";
 const SUPABASE_URL = "https://yiwiykbuaggyslfyhlfo.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_1MORh5rY7uMDVYLYVX5VAA_cyoph4-7";
 
-export type PayrollRole = "owner" | "admin";
+export type PayrollRole = "owner" | "manager" | "admin";
 export type PayrollPaymentMethod = "cash" | "bank" | "card" | "other";
 
 export type PayrollTeacher = {
@@ -84,7 +84,7 @@ async function rpc<T>(name: string, body: Record<string, unknown>) {
 
 function normalizeContext(data: any, from: string, to: string): PayrollContext {
   return {
-    role: data.role === "owner" ? "owner" : "admin",
+    role: data.role === "owner" ? "owner" : data.role === "manager" ? "manager" : "admin",
     staffBranch: data.staffBranch || "",
     from: data.from || from,
     to: data.to || to,
