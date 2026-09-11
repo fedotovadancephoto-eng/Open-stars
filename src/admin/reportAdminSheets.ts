@@ -1,5 +1,6 @@
+import { buildPaymentSheets } from "@/admin/reportPaymentSheets";
 import type { XlsxSheet } from "@/admin/xlsxExport";
-import { ReportContext, ReportFilters, activationLabel, childName, filterChildren, inPeriod, paymentLabel, reportRestSelect } from "@/admin/reportExportShared";
+import { ReportContext, ReportFilters, activationLabel, childName, filterChildren, inPeriod, reportRestSelect } from "@/admin/reportExportShared";
 
 function feedbackStatus(value: string) {
   return value === "new" ? "Новое" : value === "read" ? "В работе" : value === "closed" ? "Обработано" : value === "archived" ? "Архив" : value || "";
@@ -14,12 +15,14 @@ export async function buildAdminSheets(filters: ReportFilters, context: ReportCo
   const effectiveBranch = filters.branch || selectedChild?.branch || "";
   const effectiveGroup = filters.groupName || selectedChild?.groupName || "";
 
-  const [coins, payments, feedback, news, photos] = await Promise.all([
+  const [coins, payments, feedback, news, photos, receipts, charges] = await Promise.all([
     reportRestSelect("coin_transactions", "child_id,amount,transaction_type,reason,source,created_at", "created_at.asc"),
-    reportRestSelect("payments", "child_id,month,due_date,status,amount,created_at", "month.asc"),
+    reportRestSelect("payments", "id,child_id,month,due_date,status,amount,created_at", "month.asc"),
     reportRestSelect("parent_feedback", "child_id,category,message,status,branch_snapshot,child_name_snapshot,parent_name_snapshot,created_at", "created_at.asc"),
     reportRestSelect("school_news", "title,body,category,audience_scope,branch,group_name,active,published_at,created_at", "created_at.asc"),
     reportRestSelect("photo_sessions", "title,description,gallery_url,is_published,published_at,branch,group_name,lesson_day,lesson_time,created_at", "created_at.asc"),
+    reportRestSelect("payment_receipts", "id,payment_id,child_id,amount,payment_method,received_at,note,voided_at,refunded_at,refund_reason,branches(name)", "received_at.asc,id.asc"),
+    reportRestSelect("monthly_payment_charges", "child_id,month,expected_amount,due_date", "month.asc,id.asc"),
   ]);
 
   const sheets: XlsxSheet[] = [
@@ -33,11 +36,7 @@ export async function buildAdminSheets(filters: ReportFilters, context: ReportCo
       columns: [{ key: "date", label: "Дата", width: 20 }, { key: "child", label: "Ученик", width: 28 }, { key: "amount", label: "Изменение", width: 12 }, { key: "type", label: "Тип", width: 14 }, { key: "reason", label: "Причина", width: 48 }, { key: "source", label: "Источник", width: 18 }],
       rows: coins.filter((row) => ids.has(row.child_id) && inPeriod(row.created_at, filters)).map((row) => ({ date: row.created_at, child: childName(childMap, row.child_id), amount: Number(row.amount || 0), type: row.transaction_type, reason: row.reason || "", source: row.source || "" })),
     },
-    {
-      name: "Оплата",
-      columns: [{ key: "month", label: "Месяц", width: 14 }, { key: "child", label: "Ученик", width: 28 }, { key: "status", label: "Статус", width: 20 }, { key: "dueDate", label: "Срок", width: 14 }, { key: "amount", label: "Сумма", width: 14 }],
-      rows: payments.filter((row) => ids.has(row.child_id) && inPeriod(row.month || row.created_at, filters)).map((row) => ({ month: row.month, child: childName(childMap, row.child_id), status: paymentLabel(row.status), dueDate: row.due_date, amount: Number(row.amount || 0) })),
-    },
+    ...buildPaymentSheets(children, payments, receipts, charges, filters),
     {
       name: "Обратная связь",
       columns: [{ key: "date", label: "Дата", width: 20 }, { key: "branch", label: "Филиал", width: 18 }, { key: "child", label: "Ученик", width: 28 }, { key: "parent", label: "Родитель", width: 28 }, { key: "category", label: "Категория", width: 18 }, { key: "status", label: "Статус", width: 18 }, { key: "message", label: "Сообщение", width: 65 }],
