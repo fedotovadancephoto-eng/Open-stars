@@ -192,6 +192,7 @@ function App() {
   const tabContentRef = useRef<HTMLElement | null>(null);
   const openedNotification = useRef("");
   const [pushNavigationError, setPushNavigationError] = useState("");
+  const [pushSettingsOpen, setPushSettingsOpen] = useState(false);
 
   const openNotification = useCallback(async (id: string) => {
     const destination = await notificationDestination(id);
@@ -306,6 +307,7 @@ function App() {
   const handleLogout = async () => {
     try { await disconnectParentPush(); } catch { /* Local logout remains available offline. */ }
     logoutParent();
+    setPushSettingsOpen(false);
     setActiveTab("coins");
     setDataStatus("idle");
     setDataError("");
@@ -339,7 +341,7 @@ function App() {
   return (
     <div className="flex min-h-screen bg-[#faf9f5]">
       <div className="min-w-0 flex-1">
-        <Header onNavigate={handleTabSelect} onLogout={handleLogout} onNotification={openNotification} />
+        <Header onNavigate={handleTabSelect} onLogout={handleLogout} onNotification={openNotification} onOpenPushSettings={() => setPushSettingsOpen(true)} />
         <main className="mx-auto w-full max-w-7xl px-5 py-7 sm:px-6 lg:px-8">
           <section className="mb-6">
             <div className="inline-flex items-center rounded-full bg-gradient-to-r from-[#D96A24] to-[#E98A34] px-5 py-2.5 text-sm font-medium text-white shadow-sm">{ROLE_PORTAL_LABELS[DEMO_USER_ROLE]}</div>
@@ -348,7 +350,7 @@ function App() {
           </section>
 
           <ChildSwitcher children={familyChildren as ParentFamilyChild[]} activeId={child.id} switching={switchingChild} onSelect={handleChildSelect} />
-          <ParentPushSettings />
+          <ParentPushSettings settingsOpen={pushSettingsOpen} onCloseSettings={() => setPushSettingsOpen(false)} />
           {pushNavigationError && <p role="alert" className="mb-4 text-sm text-red-700">{pushNavigationError}</p>}
 
           {birthdayReward && <BirthdayBanner firstName={childFirstName || "звезда"} amount={birthdayReward.amount || 10} />}
