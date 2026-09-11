@@ -1,3 +1,6 @@
+import { buildAcademicSheets } from "@/admin/reportAcademicSheets";
+import { buildAdminSheets } from "@/admin/reportAdminSheets";
+import { createXlsxBlob } from "@/admin/xlsxExport";
 import { useEffect, useMemo, useState } from "react";
 import { Download, FileSpreadsheet, LoaderCircle, ShieldCheck, X } from "lucide-react";
 
@@ -32,6 +35,8 @@ export function AdminReportExport() {
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [prepared, setPrepared] = useState<{url:string;filename:string}|null>(null);
+  useEffect(() => () => { if (prepared) URL.revokeObjectURL(prepared.url); }, [prepared]);
 
   async function load() {
     setLoading(true);
@@ -49,6 +54,7 @@ export function AdminReportExport() {
 
   useEffect(() => onAdminSection("reports", () => {
     setOpen(true);
+    setPrepared(null);
     setSuccess("");
     void load();
   }), []);
@@ -59,6 +65,7 @@ export function AdminReportExport() {
   }, [context, filters.branch, filters.groupName]);
 
   function patch(patchValue: Partial<ReportFilters>) {
+    setPrepared(null);
     setFilters((current) => ({ ...current, ...patchValue }));
     setSuccess("");
   }
@@ -70,26 +77,30 @@ export function AdminReportExport() {
 
   async function exportReport() {
     if (!context) return;
+    setPrepared(null);
     setExporting(true);
     setError("");
     setSuccess("");
     try {
-      const [academicModule, adminModule, xlsxModule] = await Promise.all([
-        import("@/admin/reportAcademicSheets"),
-        import("@/admin/reportAdminSheets"),
-        import("@/admin/xlsxExport"),
-      ]);
       const [academic, admin] = await Promise.all([
-        academicModule.buildAcademicSheets(filters, context),
-        adminModule.buildAdminSheets(filters, context),
+        buildAcademicSheets(filters, context),
+        buildAdminSheets(filters, context),
       ]);
       const sheets = [...academic, ...admin];
       const selected = context.children.find((child) => child.id === filters.childId);
       const scopeParts: Array<string | undefined> = [filters.branch || undefined, filters.groupName || undefined, selected?.fullName];
       const scope = scopeParts.filter(isText).map(filePart).join("_") || "all";
-      xlsxModule.downloadXlsx(sheets, `OPEN_STARS_${scope}_${localDate()}.xlsx`);
+      const filename = `OPEN_STARS_${scope}_${localDate()}.xlsx`;
+      const url = URL.createObjectURL(createXlsxBlob(sheets));
+      setPrepared({url,filename});
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = filename;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
       const rows = sheets.reduce((sum, sheet) => sum + sheet.rows.length, 0);
-      setSuccess(`Готово: ${sheets.length} лист(ов), ${rows} строк данных. Файл .xlsx сохранён на устройство.`);
+      setSuccess(`Готово: ${sheets.length} лист(ов), ${rows} строк данных. Файл готов. Если скачивание не началось, нажмите ссылку ниже.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Не удалось сформировать Excel-файл.");
     } finally {
@@ -130,6 +141,7 @@ export function AdminReportExport() {
         {success && <div className="mt-4 rounded-[15px] border border-[#5F6338]/15 bg-[#5F6338]/[0.07] px-4 py-3 text-sm font-medium text-[#4D512E]">{success}</div>}
 
         <button type="button" onClick={exportReport} disabled={!context || loading || exporting} className="mt-5 flex w-full items-center justify-center gap-2 rounded-[15px] bg-[#171717] px-5 py-4 text-sm font-semibold text-white disabled:opacity-40">{exporting ? <LoaderCircle className="animate-spin" size={18}/> : <Download size={18}/>} {exporting ? "Формируем Excel..." : "Скачать полный Excel-отчёт"}</button>
+        {prepared && <div className="mt-4 rounded-[18px] bg-white p-4"><a href={prepared.url} download={prepared.filename} className="block rounded-[14px] bg-[#5F6338] px-4 py-4 text-center font-semibold text-white">Скачать подготовленный файл</a><p className="mt-2 text-xs text-black/50">На iPhone: если открылся просмотр файла, нажмите «Поделиться» → «Сохранить в Файлы».</p></div>}
         <div className="mt-3 flex items-center justify-center gap-2 text-[11px] text-black/35"><FileSpreadsheet size={14}/> Microsoft Excel · формат .xlsx</div>
       </div>
     </div>
