@@ -30,6 +30,9 @@ begin
   assert not has_function_privilege('authenticated','public.parent_push_worker(text,text,jsonb)','execute');
   assert not has_table_privilege('authenticated','parent_push.subscriptions','select');
 
+  insert into public.grades(child_id,subject,grade,lesson_date) values(a.child_id,'Push regression empty',null,current_date) returning id into t;
+  assert not exists(select 1 from public.notifications where target_id=t), 'An empty grade is not an assessment';
+
   insert into public.grades(child_id,subject,grade,lesson_date) values(a.child_id,'Push regression',4,current_date) returning id into g;
   select id into nid from public.notifications where target_id=g and recipient_user_id=a.uid;
   assert nid is not null, 'Grade creates family notification';
