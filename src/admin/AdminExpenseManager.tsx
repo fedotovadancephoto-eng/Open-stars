@@ -1,4 +1,4 @@
-import { FinanceRegister } from "@/admin/FinanceRegister";
+import { FinanceRegister, FinanceRow, ExpenseDrilldown } from "@/admin/FinanceRegister";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   BarChart3,
@@ -15,7 +15,7 @@ import {
   X,
 } from "lucide-react";
 
-import { onAdminSection, openAdminSection } from "@/admin/adminNavigation";
+import { onAdminSection, openAdminSection, notifyAdminDataUpdated } from "@/admin/adminNavigation";
 import {
   BusinessExpenseContext,
   ExpenseRequest,
@@ -26,6 +26,9 @@ import {
 } from "@/admin/businessApi";
 import {
   createOwnerDirectExpense,
+  fetchExpenseEditDetail,
+  correctOwnerExpense,
+  ExpenseEditDetail,
   ExpenseAllocationInput,
   ExpenseAllocationType,
   ExpensePaymentMethod,
@@ -100,6 +103,29 @@ export function AdminExpenseManager() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [editing, setEditing] = useState<ExpenseEditDetail|null>(null);
+  const [correctionReason, setCorrectionReason] = useState("");
+  const [drilldown, setDrilldown] = useState<ExpenseDrilldown|null>(null);
+  const editForm = useRef<HTMLElement|null>(null);
+
+  async function startExpenseEdit(row:FinanceRow) {
+    if (saving) return;
+    setSaving(true);setError("");setSuccess("");
+    try {
+      const detail=await fetchExpenseEditDetail(row.id);
+      setEditing(detail);setCorrectionReason("");setAmount(String(detail.amount));setExpenseDate(detail.expenseDate);
+      setDescription(detail.description||"");setCategoryId(detail.categoryId);setAccountId(detail.accountId||"");
+      setBranchId(detail.branchId||"");setAllocationType(detail.allocationType);setPaymentMethod(detail.paymentMethod||"other");
+      setDistributionMode("amount");setDistribution(Object.fromEntries((detail.allocations||[]).map(a=>[a.branchId,String(a.amount)])));
+      setReceipt(null);if(fileRef.current)fileRef.current.value="";
+      window.setTimeout(()=>editForm.current?.scrollIntoView({behavior:"smooth",block:"start"}),0);
+    }catch(reason){setError(reason instanceof Error?reason.message:"Не удалось открыть расход.");}finally{setSaving(false);}
+  }
+
+  function openPayrollFromExpense(row:FinanceRow) {
+    setOpen(false);
+    openAdminSection("payroll",{payoutId:row.sourceId,from:row.date,to:row.date});
+  }
 
   const [branchId, setBranchId] = useState("");
   const [categoryId, setCategoryId] = useState("");
@@ -144,6 +170,8 @@ export function AdminExpenseManager() {
 
   useEffect(() => onAdminSection("expenses", () => {
     setOpen(true);
+    resetForm();
+    setDrilldown(null);
     setError("");
     setSuccess("");
     setLoading(true);
@@ -162,6 +190,7 @@ export function AdminExpenseManager() {
   const ownerCashflow = useMemo(() => (context?.cashflow || []).filter((item) => item.direction === "expense").slice(0, 30), [context]);
 
   function resetForm() {
+    setEditing(null);setCorrectionReason("");
     setAmount("");
     setDescription("");
     setReceipt(null);
@@ -248,6 +277,7 @@ export function AdminExpenseManager() {
 
   async function createOwnerExpense() {
     const numericAmount = parseMoney(amount);
+    if (editing && !correctionReason.trim()) return setError("Укажите причину исправления.");
     if (!categoryId) return setError("Выберите категорию.");
     if (!Number.isFinite(numericAmount) || numericAmount <= 0) return setError("Введите сумму больше нуля.");
     if (allocationType === "branch" && !branchId) return setError("Выберите филиал.");
@@ -263,7 +293,7 @@ export function AdminExpenseManager() {
     setError("");
     setSuccess("");
     try {
-      const result = await createOwnerDirectExpense({
+      const values = {
         allocationType,
         branchId,
         allocations,
@@ -273,7 +303,8 @@ export function AdminExpenseManager() {
         expenseDate,
         paymentMethod,
         description,
-      });
+      };
+      const result = editing ? await correctOwnerExpense(editing, values, correctionReason) : await createOwnerDirectExpense(values);
       let receiptWarning = "";
       if (receipt) {
         const branchCode = allocationType === "branch"
@@ -287,7 +318,8 @@ export function AdminExpenseManager() {
       }
       await refresh();
       resetForm();
-      setSuccess(`Расход ${money(numericAmount)} сразу добавлен в единый ДДС.${receiptWarning}`);
+      notifyAdminDataUpdated({source:"expense-saved"});
+      setSuccess(editing ? `Исправление сохранено. ДДС и категории обновлены.${receiptWarning}` : `Расход ${money(numericAmount)} сразу добавлен в единый ДДС.${receiptWarning}`);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Не удалось провести расход.");
     } finally {
@@ -348,7 +380,7 @@ export function AdminExpenseManager() {
 
         {loading && !context ? <div className="grid min-h-[420px] place-items-center"><LoaderCircle className="animate-spin text-black/25" size={30}/></div> : (
           <>
-            {isOwner && <FinanceRegister kind="expenses" />}
+            {isOwner && <FinanceRegister kind="expenses" onEditExpense={row=>void startExpenseEdit(row)} onPayroll={openPayrollFromExpense} drilldown={drilldown} />}
             {isOwner && summary && (
               <section className="mt-6">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -371,7 +403,7 @@ export function AdminExpenseManager() {
                   </div>
                   <div className="rounded-[20px] border border-black/[0.05] bg-white p-4">
                     <div className="flex items-center gap-2"><BarChart3 size={16} className="text-[#D96A24]"/><h4 className="text-sm font-semibold">По категориям</h4></div>
-                    {summary.categories.length === 0 ? <p className="mt-4 text-sm text-black/35">За период расходов нет.</p> : <div className="mt-3 divide-y divide-black/[0.06]">{summary.categories.slice(0, 8).map((item) => <div key={item.categoryId} className="flex items-center justify-between gap-3 py-2.5 text-sm"><span className="min-w-0 truncate text-black/55">{item.category}</span><strong className="shrink-0">{money(item.amount)}</strong></div>)}</div>}
+                    {summary.categories.length === 0 ? <p className="mt-4 text-sm text-black/35">За период расходов нет.</p> : <div className="mt-3 divide-y divide-black/[0.06]">{summary.categories.map((item) => <button type="button" key={item.categoryId} onClick={()=>setDrilldown({categoryId:item.categoryId,from:periodFrom,to:periodTo,revision:Date.now()})} className="flex w-full items-center justify-between gap-3 py-2.5 text-left text-sm"><span className="min-w-0 truncate text-black/55">{item.category}</span><strong className="shrink-0">{money(item.amount)} →</strong></button>)}</div>}
                   </div>
                 </div>
                 {summary.pendingCount > 0 && <div className="mt-3 rounded-[16px] bg-amber-50 px-4 py-3 text-sm text-amber-800">Ждут вашего подтверждения: <strong>{summary.pendingCount}</strong> · {money(summary.pendingAmount)}. Подтвердить их можно в разделе «Бизнес».</div>}
@@ -379,25 +411,25 @@ export function AdminExpenseManager() {
             )}
 
             <div className="mt-6 grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
-              <section className="rounded-[26px] border border-black/[0.06] bg-white p-5 sm:p-6">
-                <div className="flex items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-[15px] bg-[#D96A24]/10 text-[#C95320]"><Plus size={20}/></span><div><h3 className="font-semibold">{isOwner ? "Внести расход" : "Добавить расход"}</h3><p className="mt-0.5 text-xs text-black/40">{isOwner ? "Без самоутверждения" : "Обычно меньше минуты"}</p></div></div>
+              <section ref={editForm} className="rounded-[26px] border border-black/[0.06] bg-white p-5 sm:p-6">
+                <div className="flex items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-[15px] bg-[#D96A24]/10 text-[#C95320]"><Plus size={20}/></span><div><h3 className="font-semibold">{editing ? "Исправить расход" : isOwner ? "Внести расход" : "Добавить расход"}</h3><p className="mt-0.5 text-xs text-black/40">{editing ? "Изменится существующая операция" : isOwner ? "Без самоутверждения" : "Обычно меньше минуты"}</p></div></div>
 
                 {isOwner && (
                   <div className="mt-5 grid grid-cols-3 gap-2">
-                    {([['branch','Филиал'],['common','Общий'],['distributed','Распределить']] as Array<[ExpenseAllocationType,string]>).map(([value,label]) => <button key={value} type="button" onClick={() => { setAllocationType(value); setDistribution({}); }} className={`rounded-[13px] px-2 py-3 text-xs font-semibold ${allocationType === value ? "bg-[#171717] text-white" : "bg-[#FAF9F5] text-black/50"}`}>{label}</button>)}
+                    {([['branch','Филиал'],['common','Общий'],['distributed','Распределить']] as Array<[ExpenseAllocationType,string]>).map(([value,label]) => <button key={value} type="button" disabled={editing?.campaignLinked} onClick={() => { setAllocationType(value); setDistribution({}); }} className={`rounded-[13px] px-2 py-3 text-xs font-semibold ${allocationType === value ? "bg-[#171717] text-white" : "bg-[#FAF9F5] text-black/50"}`}>{label}</button>)}
                   </div>
                 )}
 
                 <div className="mt-5 space-y-4">
                   {(!isOwner || allocationType === "branch") && <label className="block text-xs font-semibold text-black/55">Филиал
-                    <select className={inputClass} value={branchId} disabled={myBranchLocked} onChange={(event) => setBranchId(event.target.value)}>
+                    <select className={inputClass} value={branchId} disabled={myBranchLocked || editing?.campaignLinked} onChange={(event) => setBranchId(event.target.value)}>
                       <option value="">Выберите филиал</option>
                       {context?.branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
                     </select>
                   </label>}
 
                   <label className="block text-xs font-semibold text-black/55">Категория
-                    <select className={inputClass} value={categoryId} onChange={(event) => {
+                    <select disabled={editing?.campaignLinked} className={inputClass} value={categoryId} onChange={(event) => {
                       const value = event.target.value;
                       if (value === "__payroll__") {
                         setOpen(false);
@@ -407,7 +439,7 @@ export function AdminExpenseManager() {
                       setCategoryId(value);
                     }}>
                       <option value="">Выберите категорию</option>
-                      {isOwner && <option value="__payroll__">Зарплата педагогам · выбрать педагога</option>}
+                      {isOwner && !editing && <option value="__payroll__">Зарплата педагогам · выбрать педагога</option>}
                       {isOwner ? context?.categories.map((category) => <option key={category.id} value={category.id}>{category.code === "payroll" ? "Зарплата сотрудников · общий расход" : category.name}</option>) : (
                         <>
                           {visibleCategories.filter((category) => category.code !== "client_change").map((category) => <option key={category.id} value={category.id}>{category.code === "payroll" ? "Зарплата сотрудников · общий расход" : category.name}</option>)}
@@ -450,7 +482,9 @@ export function AdminExpenseManager() {
                     <span className="mt-2 block text-[11px] text-black/35">JPG, PNG, WEBP или PDF · до 10 МБ</span>
                   </label>
 
-                  <button type="button" disabled={saving} onClick={() => void (isOwner ? createOwnerExpense() : createStaffExpense())} className="flex w-full items-center justify-center gap-2 rounded-[15px] bg-[#171717] px-5 py-4 text-sm font-semibold text-white shadow-sm disabled:opacity-50">{saving ? <LoaderCircle className="animate-spin" size={18}/> : <ReceiptText size={18}/>} {isOwner ? "Провести в ДДС" : "Отправить владельцу"}</button>
+                  {editing && <div className="space-y-3">{error && <p role="alert" className="text-sm text-red-700">{error}</p>}<label className="block text-xs font-semibold text-black/55">Причина исправления *<textarea className={inputClass} value={correctionReason} onChange={event=>setCorrectionReason(event.target.value)} placeholder="Например: ошиблись в сумме" /></label><button type="button" disabled={saving} onClick={resetForm} className="rounded-xl border border-black/10 px-4 py-2 text-sm">Отменить редактирование</button>
+                  {editing.history.length>0 && <details className="rounded-xl bg-[#FAF9F5] p-3"><summary className="cursor-pointer text-sm font-semibold">История исправлений</summary>{editing.history.map((h,index)=><p key={index} className="mt-2 text-xs text-black/60">{shortDate(h.at)} · {h.by} · {money(h.oldAmount)} → {money(h.newAmount)} · {h.reason}</p>)}</details>}</div>}
+                  <button type="button" disabled={saving} onClick={() => void (isOwner ? createOwnerExpense() : createStaffExpense())} className="flex w-full items-center justify-center gap-2 rounded-[15px] bg-[#171717] px-5 py-4 text-sm font-semibold text-white shadow-sm disabled:opacity-50">{saving ? <LoaderCircle className="animate-spin" size={18}/> : <ReceiptText size={18}/>} {editing ? "Сохранить исправление" : isOwner ? "Провести в ДДС" : "Отправить владельцу"}</button>
                 </div>
               </section>
 
