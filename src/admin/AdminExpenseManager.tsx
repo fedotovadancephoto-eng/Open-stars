@@ -28,6 +28,7 @@ import {
   createOwnerDirectExpense,
   fetchExpenseEditDetail,
   correctOwnerExpense,
+  cancelOwnerExpense,
   ExpenseEditDetail,
   ExpenseAllocationInput,
   ExpenseAllocationType,
@@ -107,6 +108,39 @@ export function AdminExpenseManager() {
   const [correctionReason, setCorrectionReason] = useState("");
   const [drilldown, setDrilldown] = useState<ExpenseDrilldown|null>(null);
   const editForm = useRef<HTMLElement|null>(null);
+  const feedback = useRef<HTMLDivElement|null>(null);
+  const cancellationInProgress = useRef(false);
+
+  async function cancelExpense(row: FinanceRow) {
+    if (saving || cancellationInProgress.current) return;
+    cancellationInProgress.current = true;
+    setSaving(true); setError(""); setSuccess("");
+    try {
+      const detail = await fetchExpenseEditDetail(row.id);
+      const category = context?.categories.find(item => item.id === detail.categoryId)?.name || row.title;
+      const branch = context?.branches.find(item => item.id === detail.branchId)?.name || "Общий / распределённый";
+      const reason = window.prompt([
+        "Отменить расход: " + category + " · " + money(detail.amount),
+        branch + " · " + shortDate(detail.expenseDate),
+        detail.description || "",
+        "Запись будет исключена из расходов и ДДС. Укажите причину отмены:",
+      ].filter(Boolean).join("\n"));
+      if (reason === null) return;
+      if (!reason.trim()) throw new Error("Для отмены расхода нужно указать причину.");
+      await cancelOwnerExpense(detail, reason);
+      if (editing?.transactionId === detail.transactionId) resetForm();
+      setSuccess("Расход отменён и исключён из итогов расходов и ДДС. Причина отмены сохранена.");
+      notifyAdminDataUpdated({source:"expense-cancelled"});
+      try { await refresh(); }
+      catch { setError("Отмена сохранена. Нажмите «Обновить», чтобы загрузить свежий свод расходов."); }
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Не удалось отменить расход.");
+    } finally {
+      cancellationInProgress.current = false;
+      setSaving(false);
+      window.setTimeout(() => feedback.current?.scrollIntoView({behavior:"smooth",block:"start"}), 0);
+    }
+  }
 
   async function startExpenseEdit(row:FinanceRow) {
     if (saving) return;
@@ -374,13 +408,18 @@ export function AdminExpenseManager() {
           </div>
           <div className="flex gap-2">
             <button type="button" disabled={loading || saving} onClick={() => { setLoading(true); void refresh().catch((reason) => setError(reason instanceof Error ? reason.message : "Не удалось обновить расходы.")).finally(() => setLoading(false)); }} className="grid h-10 w-10 place-items-center rounded-full bg-white shadow-sm disabled:opacity-50"><RefreshCw size={18} className={loading ? "animate-spin" : ""}/></button>
-            <button type="button" onClick={() => setOpen(false)} className="grid h-10 w-10 place-items-center rounded-full bg-white shadow-sm"><X size={20}/></button>
+            <button type="button" disabled={saving} onClick={() => setOpen(false)} className="grid h-10 w-10 place-items-center rounded-full bg-white shadow-sm disabled:opacity-50"><X size={20}/></button>
           </div>
+        </div>
+
+        <div ref={feedback}>
+          {error && <div role="alert" className="mt-5 rounded-[16px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
+          {success && <div role="status" className="mt-5 flex gap-2 rounded-[16px] bg-[#5F6338]/[0.08] px-4 py-3 text-sm text-[#4D512E]"><CheckCircle2 className="mt-0.5 shrink-0" size={17}/>{success}</div>}
         </div>
 
         {loading && !context ? <div className="grid min-h-[420px] place-items-center"><LoaderCircle className="animate-spin text-black/25" size={30}/></div> : (
           <>
-            {isOwner && <FinanceRegister kind="expenses" onEditExpense={row=>void startExpenseEdit(row)} onPayroll={openPayrollFromExpense} drilldown={drilldown} />}
+            {isOwner && <FinanceRegister kind="expenses" onEditExpense={row=>void startExpenseEdit(row)} onCancelExpense={row=>void cancelExpense(row)} onPayroll={openPayrollFromExpense} drilldown={drilldown} busy={saving} />}
             {isOwner && summary && (
               <section className="mt-6">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -505,8 +544,6 @@ export function AdminExpenseManager() {
           </>
         )}
 
-        {error && <div className="mt-5 rounded-[16px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
-        {success && <div className="mt-5 flex gap-2 rounded-[16px] bg-[#5F6338]/[0.08] px-4 py-3 text-sm text-[#4D512E]"><CheckCircle2 className="mt-0.5 shrink-0" size={17}/>{success}</div>}
         {isOwner && <div className="mt-5 flex items-start gap-2 rounded-[15px] bg-white px-4 py-3 text-xs leading-5 text-black/40"><WalletCards className="mt-0.5 shrink-0" size={15}/><span>Филиальный расход учитывается целиком в выбранном филиале. «Общий» остаётся отдельным расходом OPEN STARS. «Распределить» создаёт одну реальную операцию ДДС и аналитически делит её между филиалами.</span></div>}
       </div>
     </div>
