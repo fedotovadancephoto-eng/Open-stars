@@ -57,9 +57,10 @@ async function rpc<T>(name: string, body: Record<string, unknown>) {
     if (message.includes("invalid allocations")) message = "Распределение по филиалам должно точно совпадать с общей суммой.";
     if (message.includes("invalid period")) message = "Проверьте период отчёта.";
     if (message.includes("correction reason required")) message = "Укажите причину исправления.";
-    if (message.includes("expense changed")) message = "Расход уже изменён. Откройте его заново перед исправлением.";
+    if (message.includes("cancellation reason required")) message = "Укажите причину отмены.";
+    if (message.includes("expense changed")) message = "Расход уже изменён. Откройте его заново перед исправлением или отменой.";
     if (message.includes("expense not found")) message = "Расход не найден или уже отменён.";
-    if (message.includes("use source workflow")) message = "Эта операция исправляется в разделе, где её внесли.";
+    if (message.includes("use source workflow")) message = "Для исправления или отмены откройте раздел, где внесли эту операцию.";
     if (message.includes("campaign scope locked")) message = "У рекламного расхода нужно сохранить категорию и округ кампании.";
     throw new Error(message);
   }
@@ -157,5 +158,13 @@ export function fetchExpenseEditDetail(transactionId:string) {
 export function correctOwnerExpense(detail:ExpenseEditDetail, values:ExpenseEditValues, reason:string) {
   return rpc<{expenseId:string;cashflowTransactionId:string;amount:number}>("owner_correct_expense", {
     p_transaction_id:detail.transactionId,p_version:detail.version,p_values:values,p_reason:reason.trim(),
+  });
+}
+
+export function cancelOwnerExpense(detail: ExpenseEditDetail, reason: string) {
+  return rpc<{expenseId:string;cancelled:boolean;alreadyCancelled:boolean}>("owner_cancel_expense", {
+    p_transaction_id: detail.transactionId,
+    p_version: detail.version,
+    p_reason: reason.trim(),
   });
 }
