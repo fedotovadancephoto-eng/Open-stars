@@ -183,10 +183,14 @@ function workbookFiles(sheets: XlsxSheet[]) {
   return files;
 }
 
-export function downloadXlsx(sheets: XlsxSheet[], filename: string) {
+export function createXlsxBlob(sheets: XlsxSheet[]) {
   if (!sheets.length) throw new Error("Нет данных для выгрузки.");
   const bytes = zipStore(workbookFiles(sheets));
-  const blob = new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  return new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+}
+
+export function downloadXlsx(sheets: XlsxSheet[], filename: string) {
+  const blob = createXlsxBlob(sheets);
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
@@ -194,5 +198,5 @@ export function downloadXlsx(sheets: XlsxSheet[], filename: string) {
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  window.setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
