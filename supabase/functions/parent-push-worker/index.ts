@@ -39,6 +39,16 @@ Deno.serve(async (req: Request) => {
       await rpc("init", generated);
       keys = await rpc("keys"); // concurrent initializers all use the one persisted key pair
     }
+    const request = await req.json().catch(() => ({}));
+    if (request.diagnostic === "encryption") {
+      // Authenticated operational check. Synthetic receiver; no notifications are sent.
+      const receiver = webpush.generateVAPIDKeys();
+      const auth = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(16)))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+      const details = webpush.generateRequestDetails({ endpoint: "https://fcm.googleapis.com/push/diagnostic", keys: { p256dh: receiver.publicKey, auth } }, "OPEN STARS", {
+        vapidDetails: { subject: "https://open-stars-cabinet.vercel.app", ...keys }, TTL: 60,
+      });
+      return Response.json({ ready: true, encryptionReady: Boolean(details.body?.length && details.headers.Authorization) });
+    }
     let delivered = 0;
     let failed = 0;
     for (let batch = 0; batch < 3; batch++) {
@@ -49,7 +59,7 @@ Deno.serve(async (req: Request) => {
           let status = 400;
           if (allowedEndpoint(job.endpoint)) {
             try {
-              const result = await webpush.sendNotification({
+              const details = webpush.generateRequestDetails({
                 endpoint: job.endpoint, keys: { p256dh: job.p256dh, auth: job.auth },
               }, JSON.stringify({
                 title: job.title,
@@ -58,10 +68,12 @@ Deno.serve(async (req: Request) => {
               }), {
                 vapidDetails: { subject: "https://open-stars-cabinet.vercel.app", ...keys },
                 TTL: job.target === "payments" ? 300 : 3600,
-                urgency: "normal", timeout: 8000,
-                // Push providers receive encrypted payloads. No redirect following is enabled.
+                urgency: "normal",
               });
-              status = result.statusCode;
+              const result = await fetch(details.endpoint, { method: "POST", headers: details.headers,
+                body: details.body, signal: AbortSignal.timeout(8000), redirect: "manual" });
+              status = result.status;
+              await result.body?.cancel();
             } catch (error) {
               status = typeof (error as { statusCode?: number }).statusCode === "number"
                 ? (error as { statusCode: number }).statusCode : 503;
