@@ -1,5 +1,5 @@
 import { groupLabel } from "@/groupLabels";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   Award,
@@ -18,6 +18,8 @@ import { claimBirthdayReward, BirthdayReward } from "@/birthdayApi";
 import { BirthdayBanner } from "@/components/BirthdayBanner";
 import { FeedbackCard } from "@/components/FeedbackCard";
 import { Header } from "@/components/Header";
+import { ParentPushSettings } from "@/components/ParentPushSettings";
+import { disconnectParentPush, notificationDestination } from "@/parentPushApi";
 import { OverviewCards } from "@/components/OverviewCards";
 import { ParentAuth } from "@/components/ParentAuth";
 import { ProfileCard } from "@/components/ProfileCard";
@@ -188,6 +190,44 @@ function App() {
   const [hasDashboard, setHasDashboard] = useState(false);
   const [switchingChild, setSwitchingChild] = useState(false);
   const tabContentRef = useRef<HTMLElement | null>(null);
+  const openedNotification = useRef("");
+  const [pushNavigationError, setPushNavigationError] = useState("");
+
+  const openNotification = useCallback(async (id: string) => {
+    const destination = await notificationDestination(id);
+    if (!destination) throw new Error("Уведомление больше недоступно.");
+    const allowedTabs = ["coins", "progress", "homework", "comments", "news", "photos", "payments"];
+    if (!allowedTabs.includes(destination.tab)) return;
+    if (destination.childId && destination.childId !== child.id) {
+      selectParentChild(destination.childId);
+      setSwitchingChild(true);
+    }
+    setActiveTab(destination.tab as TabId);
+    setReloadKey(v => v + 1);
+    setPushNavigationError("");
+    window.setTimeout(() => tabContentRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 200);
+  }, []);
+
+  useEffect(() => {
+    if (authStatus !== "authenticated" || dataStatus !== "ready") return;
+    const id = new URLSearchParams(window.location.search).get("notification");
+    if (!id || !/^[0-9a-f-]{36}$/i.test(id) || openedNotification.current === id) return;
+    openedNotification.current = id;
+    void openNotification(id).then(() => {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("notification");
+      window.history.replaceState(null, "", url);
+    }).catch(() => setPushNavigationError("Не удалось открыть уведомление. Оно доступно в колокольчике вверху кабинета."));
+  }, [authStatus, dataStatus, openNotification]);
+
+  useEffect(() => {
+    if (authStatus !== "authenticated" || !("serviceWorker" in navigator)) return;
+    const receive = (event: MessageEvent) => {
+      if (event.data?.type === "OPEN_STARS_PUSH_RECEIVED") setReloadKey(v => v + 1);
+    };
+    navigator.serviceWorker.addEventListener("message", receive);
+    return () => navigator.serviceWorker.removeEventListener("message", receive);
+  }, [authStatus]);
 
   useEffect(() => {
     let mounted = true;
@@ -263,7 +303,8 @@ function App() {
     setReloadKey((value) => value + 1);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try { await disconnectParentPush(); } catch { /* Local logout remains available offline. */ }
     logoutParent();
     setActiveTab("coins");
     setDataStatus("idle");
@@ -298,7 +339,7 @@ function App() {
   return (
     <div className="flex min-h-screen bg-[#faf9f5]">
       <div className="min-w-0 flex-1">
-        <Header onNavigate={handleTabSelect} onLogout={handleLogout} onCoinNotification={(childId) => { if (childId !== child.id) handleChildSelect(childId); else setReloadKey((value) => value + 1); }} />
+        <Header onNavigate={handleTabSelect} onLogout={handleLogout} onNotification={openNotification} />
         <main className="mx-auto w-full max-w-7xl px-5 py-7 sm:px-6 lg:px-8">
           <section className="mb-6">
             <div className="inline-flex items-center rounded-full bg-gradient-to-r from-[#D96A24] to-[#E98A34] px-5 py-2.5 text-sm font-medium text-white shadow-sm">{ROLE_PORTAL_LABELS[DEMO_USER_ROLE]}</div>
@@ -307,6 +348,8 @@ function App() {
           </section>
 
           <ChildSwitcher children={familyChildren as ParentFamilyChild[]} activeId={child.id} switching={switchingChild} onSelect={handleChildSelect} />
+          <ParentPushSettings />
+          {pushNavigationError && <p role="alert" className="mb-4 text-sm text-red-700">{pushNavigationError}</p>}
 
           {birthdayReward && <BirthdayBanner firstName={childFirstName || "звезда"} amount={birthdayReward.amount || 10} />}
 

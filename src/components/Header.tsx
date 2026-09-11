@@ -27,7 +27,7 @@ type HeaderPanel = "menu" | "notifications" | "profile" | null;
 interface HeaderProps {
   onNavigate?: (tab: string) => void;
   onLogout?: () => void;
-  onCoinNotification?: (childId: string) => void;
+  onNotification?: (notificationId: string) => Promise<void>;
 }
 
 const menuItems = [
@@ -51,10 +51,11 @@ function formatNotificationDate(value: string) {
   return new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(date).replace(".", "");
 }
 
-export function Header({ onNavigate, onLogout, onCoinNotification }: HeaderProps) {
+export function Header({ onNavigate, onLogout, onNotification }: HeaderProps) {
   const [panel, setPanel] = useState<HeaderPanel>(null);
   const [notifications, setNotifications] = useState<ParentNotification[]>([]);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
+  const [notificationError, setNotificationError] = useState("");
 
   const initials = [child.firstName, child.lastName]
     .filter(Boolean)
@@ -75,10 +76,13 @@ export function Header({ onNavigate, onLogout, onCoinNotification }: HeaderProps
     const timer = window.setInterval(refreshVisible, 30000);
     window.addEventListener("focus", refreshVisible);
     document.addEventListener("visibilitychange", refreshVisible);
+    const onPush = (event: MessageEvent) => { if (event.data?.type === "OPEN_STARS_PUSH_RECEIVED") refreshVisible(); };
+    navigator.serviceWorker?.addEventListener("message", onPush);
     return () => {
       window.clearInterval(timer);
       window.removeEventListener("focus", refreshVisible);
       document.removeEventListener("visibilitychange", refreshVisible);
+      navigator.serviceWorker?.removeEventListener("message", onPush);
     };
   }, []);
 
@@ -100,6 +104,14 @@ export function Header({ onNavigate, onLogout, onCoinNotification }: HeaderProps
   };
 
   async function openNotification(item: ParentNotification) {
+    setNotificationError("");
+    try {
+      await onNotification?.(item.id);
+      setPanel(null);
+    } catch {
+      setNotificationError("Не удалось открыть уведомление. Попробуйте ещё раз.");
+      return;
+    }
     if (!item.isRead) {
       try {
         await markParentNotificationRead(item.id);
@@ -108,9 +120,6 @@ export function Header({ onNavigate, onLogout, onCoinNotification }: HeaderProps
         // Переход остаётся доступным, даже если отметку о прочтении временно не удалось сохранить.
       }
     }
-    if (item.target === "coins") { onCoinNotification?.(item.targetId); navigate("coins"); }
-    if (item.target === "news") navigate("news");
-    if (item.target === "photos") navigate("photos");
   }
 
   const unreadCount = notifications.filter((item) => !item.isRead).length;
@@ -149,6 +158,8 @@ export function Header({ onNavigate, onLogout, onCoinNotification }: HeaderProps
 
       {panel === "notifications" && (
         <div className="absolute right-4 top-[calc(100%+8px)] max-h-[70vh] w-[min(380px,calc(100vw-32px))] overflow-y-auto rounded-[24px] border border-black/[0.06] bg-white p-5 shadow-[0_18px_50px_rgba(0,0,0,0.14)] sm:right-6">
+          <button type="button" onClick={() => { setPanel(null); document.getElementById("phone-notifications")?.scrollIntoView({ behavior: "smooth", block: "center" }); }} className="mb-3 text-sm font-semibold text-[#D96A24]">Уведомления на телефоне</button>
+          {notificationError && <p role="alert" className="mb-3 text-sm text-red-700">{notificationError}</p>}
           <div className="flex items-center gap-3"><div className="grid h-10 w-10 place-items-center rounded-full bg-[#D96A24]/10 text-[#C95320]"><Bell className="h-5 w-5" /></div><div><p className="font-semibold text-[#171717]">Уведомления</p><p className="text-xs text-black/40">{unreadCount ? `${unreadCount} непрочитанных` : "OPEN STARS"}</p></div></div>
           {notificationsLoading && notifications.length === 0 ? <div className="mt-4 rounded-[18px] bg-[#FAF9F5] px-4 py-5 text-center text-sm text-black/45">Загружаем...</div> : notifications.length === 0 ? <div className="mt-4 rounded-[18px] bg-[#FAF9F5] px-4 py-5 text-center text-sm text-black/45">Новых уведомлений пока нет.</div> : <div className="mt-4 space-y-2">{notifications.map((item) => <button key={item.id} type="button" onClick={() => openNotification(item)} className={`w-full rounded-[17px] border px-4 py-3 text-left transition ${item.isRead ? "border-black/[0.05] bg-white" : "border-[#D96A24]/20 bg-[#D96A24]/[0.055]"}`}><div className="flex items-start gap-2"><span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${item.isRead ? "bg-black/10" : "bg-[#D96A24]"}`} /><div className="min-w-0"><p className="text-sm font-semibold text-[#171717]">{item.title}</p>{item.body && <p className="mt-1 line-clamp-3 text-xs leading-5 text-black/45">{item.body}</p>}<p className="mt-1.5 text-[10px] text-black/30">{formatNotificationDate(item.createdAt)}</p></div></div></button>)}</div>}
         </div>
