@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { Bell } from "lucide-react";
+import { createPortal } from "react-dom";
+import { Bell, X } from "lucide-react";
 import { applicationKey, disconnectParentPush, parentPushAction, prepareParentPush, pushSupport, syncPushSubscription } from "@/parentPushApi";
 
-export function ParentPushSettings() {
+export function ParentPushSettings({ settingsOpen = false, onCloseSettings }: { settingsOpen?: boolean; onCloseSettings?: () => void }) {
   const [support] = useState(pushSupport);
   const [ready, setReady] = useState(false);
   const [connected, setConnected] = useState(false);
@@ -11,6 +12,13 @@ export function ParentPushSettings() {
   const [blocked, setBlocked] = useState(() => "Notification" in window && Notification.permission === "denied");
   const [retry, setRetry] = useState(0);
   const prepared = useRef<{ registration: ServiceWorkerRegistration; publicKey: string } | null>(null);
+  const dialogRef = useRef<HTMLDialogElement | null>(null);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (settingsOpen && dialog && !dialog.open) dialog.showModal();
+    return () => { if (dialog?.open) dialog.close(); };
+  }, [settingsOpen]);
 
   useEffect(() => {
     if (support !== "supported") return;
@@ -54,6 +62,7 @@ export function ParentPushSettings() {
       await syncPushSubscription(subscription);
       setConnected(true);
       setMessage("Уведомления включены на этом устройстве.");
+      onCloseSettings?.();
     } catch (error) { setMessage(error instanceof Error ? error.message : "Не удалось включить уведомления."); }
     finally { setBusy(false); }
   }
@@ -65,7 +74,11 @@ export function ParentPushSettings() {
     finally { setBusy(false); }
   }
 
-  return <section id="phone-notifications" aria-label="Уведомления на телефоне" className="mb-6 rounded-[22px] border border-[#D96A24]/15 bg-white p-4 sm:p-5">
+  // Read the actual device subscription before showing the invitation again on page load.
+  const checkingSubscription = support === "supported" && !ready && !message;
+  if (!settingsOpen && (connected || checkingSubscription)) return null;
+
+  const content = <section id="phone-notifications" aria-label="Уведомления на телефоне" className={`${settingsOpen ? "" : "mb-6 rounded-[22px] border border-[#D96A24]/15"} bg-white p-4 sm:p-5`}>
     <div className="flex items-center gap-3">
       <Bell className="h-5 w-5 shrink-0 text-[#D96A24]" />
       <div className="min-w-0 flex-1"><p className="text-sm font-semibold">Уведомления на телефоне</p><p className="mt-1 text-xs text-black/50">{connected ? "Подключены на этом устройстве" : "Новости, оценки, задания, комментарии, оплата и Star Coin"}</p></div>
@@ -80,4 +93,13 @@ export function ParentPushSettings() {
     </div>
     {message && <p role="status" className="mt-3 text-xs leading-5 text-[#5F6338]">{message}</p>}
   </section>;
+
+  if (!settingsOpen) return content;
+  return createPortal(<dialog ref={dialogRef} aria-labelledby="push-settings-title" onCancel={(event) => { event.preventDefault(); onCloseSettings?.(); }} className="m-auto w-[min(440px,calc(100vw-32px))] max-h-[85vh] overflow-y-auto rounded-[24px] border-0 bg-white p-0 text-[#171717] shadow-xl backdrop:bg-black/40">
+    <div className="flex items-center justify-between gap-3 border-b border-black/5 px-5 py-4">
+      <h2 id="push-settings-title" className="font-semibold">Настройки уведомлений</h2>
+      <button type="button" onClick={onCloseSettings} aria-label="Закрыть настройки уведомлений" className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#F4F2EC]"><X className="h-5 w-5" /></button>
+    </div>
+    {content}
+  </dialog>, document.body);
 }
