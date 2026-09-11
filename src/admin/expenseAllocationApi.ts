@@ -56,6 +56,11 @@ async function rpc<T>(name: string, body: Record<string, unknown>) {
     if (message.includes("invalid allocation type")) message = "Выберите способ распределения расхода.";
     if (message.includes("invalid allocations")) message = "Распределение по филиалам должно точно совпадать с общей суммой.";
     if (message.includes("invalid period")) message = "Проверьте период отчёта.";
+    if (message.includes("correction reason required")) message = "Укажите причину исправления.";
+    if (message.includes("expense changed")) message = "Расход уже изменён. Откройте его заново перед исправлением.";
+    if (message.includes("expense not found")) message = "Расход не найден или уже отменён.";
+    if (message.includes("use source workflow")) message = "Эта операция исправляется в разделе, где её внесли.";
+    if (message.includes("campaign scope locked")) message = "У рекламного расхода нужно сохранить категорию и округ кампании.";
     throw new Error(message);
   }
   return response.json() as Promise<T>;
@@ -134,4 +139,23 @@ export async function fetchOwnerExpenseSummary(from: string, to: string): Promis
       amount: Number(item.amount || 0),
     })),
   };
+}
+
+export type ExpenseEditValues = Parameters<typeof createOwnerDirectExpense>[0];
+export type ExpenseEditDetail = ExpenseEditValues & {
+  transactionId: string;
+  expenseId: string;
+  version: string;
+  campaignLinked: boolean;
+  history: Array<{at:string;reason:string;by:string;oldAmount:number;newAmount:number}>;
+};
+
+export function fetchExpenseEditDetail(transactionId:string) {
+  return rpc<ExpenseEditDetail>("owner_expense_detail", {p_transaction_id:transactionId});
+}
+
+export function correctOwnerExpense(detail:ExpenseEditDetail, values:ExpenseEditValues, reason:string) {
+  return rpc<{expenseId:string;cashflowTransactionId:string;amount:number}>("owner_correct_expense", {
+    p_transaction_id:detail.transactionId,p_version:detail.version,p_values:values,p_reason:reason.trim(),
+  });
 }

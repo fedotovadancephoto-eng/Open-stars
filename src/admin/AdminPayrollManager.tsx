@@ -80,12 +80,21 @@ export function AdminPayrollManager() {
     return next;
   }
 
-  useEffect(() => onAdminSection("payroll", () => {
+  useEffect(() => onAdminSection("payroll", (detail) => {
     setOpen(true);
     setError("");
     setSuccess("");
     setLoading(true);
-    void refresh().catch((reason) => setError(reason instanceof Error ? reason.message : "Не удалось открыть зарплаты.")).finally(() => setLoading(false));
+    resetForm();
+    const from=typeof detail.from==="string"?detail.from:monthStart();
+    const to=typeof detail.to==="string"?detail.to:today();
+    setPeriodFrom(from);setPeriodTo(to);
+    void refresh(from,to).then(next=>{
+      if(typeof detail.payoutId==="string"){
+        const payout=next.payouts.find(item=>item.id===detail.payoutId);
+        if(payout)startEdit(payout);else setError("Выплата не найдена или уже отменена.");
+      }
+    }).catch((reason) => setError(reason instanceof Error ? reason.message : "Не удалось открыть зарплаты.")).finally(() => setLoading(false));
   }), []);
 
   const selectedTeacher = useMemo(() => context?.teachers.find((item) => item.profileId === teacherProfileId) || null, [context, teacherProfileId]);
