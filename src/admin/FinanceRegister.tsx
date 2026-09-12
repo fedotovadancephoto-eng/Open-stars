@@ -19,6 +19,7 @@ type Props = {
   onCancelExpense?: (row: FinanceRow) => void;
   onPayroll?: (row: FinanceRow) => void;
   onPeriodChange?: (from: string, to: string) => void;
+  initialPeriod?: { from: string; to: string };
   busy?: boolean;
 };
 const control = "min-w-0 max-w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm";
@@ -29,15 +30,15 @@ function today() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-export function FinanceRegister({ kind, lockedBranch = "", onEditExpense, onCancelExpense, onPayroll, onPeriodChange, busy = false }: Props) {
+export function FinanceRegister({ kind, lockedBranch = "", onEditExpense, onCancelExpense, onPayroll, onPeriodChange, initialPeriod, busy = false }: Props) {
   const isExpense = kind === "expenses";
   const detailsId = useId();
   const detailsHeading = useRef<HTMLDivElement | null>(null);
   const lastTrigger = useRef<HTMLButtonElement | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [category, setCategory] = useState("");
-  const [from, setFrom] = useState(today().slice(0, 7) + "-01");
-  const [to, setTo] = useState(today());
+  const [from, setFrom] = useState(initialPeriod?.from ?? today().slice(0, 7) + "-01");
+  const [to, setTo] = useState(initialPeriod?.to ?? today());
   const [branch, setBranch] = useState("");
   const [method, setMethod] = useState("all");
   const [page, setPage] = useState(0);
