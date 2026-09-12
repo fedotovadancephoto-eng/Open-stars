@@ -1,7 +1,8 @@
-import { FinanceRegister, FinanceRow, ExpenseDrilldown } from "@/admin/FinanceRegister";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { FinanceRegister, FinanceRow } from "@/admin/FinanceRegister";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  BarChart3,
+  ChevronDown,
+  ChevronUp,
   CheckCircle2,
   FileText,
   Layers3,
@@ -38,7 +39,7 @@ import {
   submitExpenseV2,
 } from "@/admin/expenseAllocationApi";
 
-const inputClass = "mt-1.5 w-full rounded-[14px] border border-black/[0.08] bg-white px-3.5 py-3 text-sm text-[#171717] outline-none focus:border-[#D96A24]/45 focus:ring-4 focus:ring-[#D96A24]/[0.06]";
+const inputClass = "mt-1.5 w-full min-w-0 max-w-full rounded-[14px] border border-black/[0.08] bg-white px-3.5 py-3 text-sm text-[#171717] outline-none focus:border-[#D96A24]/45 focus:ring-4 focus:ring-[#D96A24]/[0.06]";
 const paymentLabels: Record<ExpensePaymentMethod, string> = {
   cash: "Наличные",
   bank: "Перевод / расчётный счёт",
@@ -106,7 +107,11 @@ export function AdminExpenseManager() {
   const [success, setSuccess] = useState("");
   const [editing, setEditing] = useState<ExpenseEditDetail|null>(null);
   const [correctionReason, setCorrectionReason] = useState("");
-  const [drilldown, setDrilldown] = useState<ExpenseDrilldown|null>(null);
+  const [formOpen, setFormOpen] = useState(false);
+  const [recentExpanded, setRecentExpanded] = useState(false);
+  const [allocationExpanded, setAllocationExpanded] = useState(false);
+  const [summaryRevision, setSummaryRevision] = useState(0);
+  const [summaryError, setSummaryError] = useState("");
   const editForm = useRef<HTMLElement|null>(null);
   const feedback = useRef<HTMLDivElement|null>(null);
   const cancellationInProgress = useRef(false);
@@ -147,6 +152,7 @@ export function AdminExpenseManager() {
     setSaving(true);setError("");setSuccess("");
     try {
       const detail=await fetchExpenseEditDetail(row.id);
+      setFormOpen(true);
       setEditing(detail);setCorrectionReason("");setAmount(String(detail.amount));setExpenseDate(detail.expenseDate);
       setDescription(detail.description||"");setCategoryId(detail.categoryId);setAccountId(detail.accountId||"");
       setBranchId(detail.branchId||"");setAllocationType(detail.allocationType);setPaymentMethod(detail.paymentMethod||"other");
@@ -177,7 +183,7 @@ export function AdminExpenseManager() {
   const [periodFrom, setPeriodFrom] = useState(monthStart());
   const [periodTo, setPeriodTo] = useState(today());
 
-  async function refresh(nextFrom = periodFrom, nextTo = periodTo) {
+  async function refresh() {
     const next = await fetchBusinessExpenseContext();
     setContext(next);
     if (next.role === "admin") {
@@ -193,8 +199,7 @@ export function AdminExpenseManager() {
       setCategoryId(nextCategories[0]?.id || "");
     }
     if (next.role === "owner") {
-      const nextSummary = await fetchOwnerExpenseSummary(nextFrom, nextTo);
-      setSummary(nextSummary);
+      setSummaryRevision(value => value + 1);
       if (!accountId && next.accounts.length) setAccountId(next.accounts[0].id);
     } else {
       setSummary(null);
@@ -205,7 +210,9 @@ export function AdminExpenseManager() {
   useEffect(() => onAdminSection("expenses", () => {
     setOpen(true);
     resetForm();
-    setDrilldown(null);
+    setFormOpen(false);
+    setRecentExpanded(false);
+    setAllocationExpanded(false);
     setError("");
     setSuccess("");
     setLoading(true);
@@ -221,7 +228,25 @@ export function AdminExpenseManager() {
     [context]
   );
   const recent = useMemo(() => context?.requests.slice(0, 40) || [], [context]);
-  const ownerCashflow = useMemo(() => (context?.cashflow || []).filter((item) => item.direction === "expense").slice(0, 30), [context]);
+  const changePeriod = useCallback((from: string, to: string) => {
+    setPeriodFrom(from);
+    setPeriodTo(to);
+  }, []);
+
+  useEffect(() => {
+    if (!open || !isOwner) return;
+    let active = true;
+    setSummary(null);
+    setSummaryError("");
+    if (!periodTo || (periodFrom && periodFrom > periodTo)) {
+      setSummaryError("Проверьте период в основной сводке.");
+      return;
+    }
+    void fetchOwnerExpenseSummary(periodFrom || "1900-01-01", periodTo)
+      .then(value => { if (active) setSummary(value); })
+      .catch(reason => { if (active) setSummaryError(reason instanceof Error ? reason.message : "Не удалось загрузить распределение расходов."); });
+    return () => { active = false; };
+  }, [open, isOwner, periodFrom, periodTo, summaryRevision]);
 
   function resetForm() {
     setEditing(null);setCorrectionReason("");
@@ -254,7 +279,9 @@ export function AdminExpenseManager() {
       }
       await refresh();
       resetForm();
+      setFormOpen(false);
       setSuccess(`Расход отправлен владельцу.${receiptWarning}`);
+      window.setTimeout(() => feedback.current?.scrollIntoView({behavior:"smooth",block:"start"}), 0);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Не удалось отправить расход.");
     } finally {
@@ -352,7 +379,9 @@ export function AdminExpenseManager() {
       }
       await refresh();
       resetForm();
+      setFormOpen(false);
       notifyAdminDataUpdated({source:"expense-saved"});
+      window.setTimeout(() => feedback.current?.scrollIntoView({behavior:"smooth",block:"start"}), 0);
       setSuccess(editing ? `Исправление сохранено. ДДС и категории обновлены.${receiptWarning}` : `Расход ${money(numericAmount)} сразу добавлен в единый ДДС.${receiptWarning}`);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Не удалось провести расход.");
@@ -376,39 +405,24 @@ export function AdminExpenseManager() {
     }
   }
 
-  async function changePeriod(from: string, to: string) {
-    setPeriodFrom(from);
-    setPeriodTo(to);
-    if (!isOwner) return;
-    setLoading(true);
-    setError("");
-    try {
-      await refresh(from, to);
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Не удалось обновить свод.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
   if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-[84] flex items-end justify-center bg-black/30 backdrop-blur-[2px] sm:items-center sm:p-5" onClick={() => !saving && setOpen(false)}>
-      <div className="max-h-[96vh] w-full max-w-7xl overflow-y-auto rounded-t-[30px] bg-[#FAF9F5] p-5 shadow-2xl sm:rounded-[30px] sm:p-7" onClick={(event) => event.stopPropagation()}>
-        <div className="flex items-start justify-between gap-4">
-          <div>
+      <div className="max-h-[96vh] w-full min-w-0 max-w-7xl overflow-x-hidden overflow-y-auto rounded-t-[30px] bg-[#FAF9F5] p-5 shadow-2xl sm:rounded-[30px] sm:p-7" onClick={(event) => event.stopPropagation()}>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
             <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#D96A24]">{isOwner ? "OPEN STARS · OWNER" : "OPEN STARS ADMIN"}</p>
             <h2 className="mt-1 text-2xl font-semibold tracking-[-0.02em]">{isOwner ? "Расходы" : "Расходы филиала"}</h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-black/45">
               {isOwner
-                ? "Ваш расход сразу попадает в единый ДДС. Можно отнести его к одному филиалу, оставить общим или распределить между филиалами."
+                ? "Итоги и категории — сразу. Для просмотра операций выберите нужную плашку."
                 : "Фиксируйте расходы своего филиала. После подтверждения владельцем они автоматически попадут в единый ДДС."}
             </p>
           </div>
-          <div className="flex gap-2">
-            <button type="button" disabled={loading || saving} onClick={() => { setLoading(true); void refresh().catch((reason) => setError(reason instanceof Error ? reason.message : "Не удалось обновить расходы.")).finally(() => setLoading(false)); }} className="grid h-10 w-10 place-items-center rounded-full bg-white shadow-sm disabled:opacity-50"><RefreshCw size={18} className={loading ? "animate-spin" : ""}/></button>
-            <button type="button" disabled={saving} onClick={() => setOpen(false)} className="grid h-10 w-10 place-items-center rounded-full bg-white shadow-sm disabled:opacity-50"><X size={20}/></button>
+          <div className="flex shrink-0 gap-2">
+            <button type="button" aria-label="Обновить расходы" disabled={loading || saving} onClick={() => { setLoading(true); void refresh().then(() => notifyAdminDataUpdated({source:"expenses-refreshed"})).catch((reason) => setError(reason instanceof Error ? reason.message : "Не удалось обновить расходы.")).finally(() => setLoading(false)); }} className="grid h-10 w-10 place-items-center rounded-full bg-white shadow-sm disabled:opacity-50"><RefreshCw size={18} className={loading ? "animate-spin" : ""}/></button>
+            <button type="button" aria-label="Закрыть расходы" disabled={saving} onClick={() => setOpen(false)} className="grid h-10 w-10 place-items-center rounded-full bg-white shadow-sm disabled:opacity-50"><X size={20}/></button>
           </div>
         </div>
 
@@ -419,39 +433,18 @@ export function AdminExpenseManager() {
 
         {loading && !context ? <div className="grid min-h-[420px] place-items-center"><LoaderCircle className="animate-spin text-black/25" size={30}/></div> : (
           <>
-            {isOwner && <FinanceRegister kind="expenses" onEditExpense={row=>void startExpenseEdit(row)} onCancelExpense={row=>void cancelExpense(row)} onPayroll={openPayrollFromExpense} drilldown={drilldown} busy={saving} />}
-            {isOwner && summary && (
-              <section className="mt-6">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                  <div><p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#5F6338]">Единый свод расходов</p><h3 className="mt-1 text-xl font-semibold">Куда уходят деньги</h3></div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <label className="text-[10px] font-semibold text-black/40">С<input type="date" className="mt-1 block rounded-[11px] border border-black/[0.07] bg-white px-2.5 py-2 text-xs" value={periodFrom} onChange={(event) => void changePeriod(event.target.value, periodTo)}/></label>
-                    <label className="text-[10px] font-semibold text-black/40">По<input type="date" className="mt-1 block rounded-[11px] border border-black/[0.07] bg-white px-2.5 py-2 text-xs" value={periodTo} onChange={(event) => void changePeriod(periodFrom, event.target.value)}/></label>
-                  </div>
-                </div>
-                <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-                  <div className="rounded-[20px] bg-[#171717] p-4 text-white"><p className="text-xs text-white/45">Всего подтверждено</p><p className="mt-2 text-2xl font-semibold">{money(summary.totalApproved)}</p></div>
-                  <div className="rounded-[20px] border border-black/[0.05] bg-white p-4"><p className="text-xs text-black/40">По филиалам</p><p className="mt-2 text-2xl font-semibold">{money(summary.branchDirectAmount)}</p></div>
-                  <div className="rounded-[20px] border border-[#5F6338]/15 bg-[#5F6338]/[0.06] p-4"><p className="text-xs text-[#4D512E]">Распределено</p><p className="mt-2 text-2xl font-semibold text-[#4D512E]">{money(summary.distributedAmount)}</p></div>
-                  <div className="rounded-[20px] border border-[#D96A24]/15 bg-[#D96A24]/[0.06] p-4"><p className="text-xs text-[#C95320]">Общие OPEN STARS</p><p className="mt-2 text-2xl font-semibold text-[#C95320]">{money(summary.commonAmount)}</p></div>
-                </div>
-                <div className="mt-3 grid gap-3 lg:grid-cols-[1fr_1fr]">
-                  <div className="rounded-[20px] border border-black/[0.05] bg-white p-4">
-                    <div className="flex items-center gap-2"><Layers3 size={16} className="text-[#5F6338]"/><h4 className="text-sm font-semibold">Нагрузка на филиалы</h4></div>
-                    <div className="mt-3 divide-y divide-black/[0.06]">{summary.branches.map((item) => <div key={item.branchId} className="flex items-center justify-between py-2.5 text-sm"><span className="text-black/55">{item.branch}</span><strong>{money(item.amount)}</strong></div>)}</div>
-                  </div>
-                  <div className="rounded-[20px] border border-black/[0.05] bg-white p-4">
-                    <div className="flex items-center gap-2"><BarChart3 size={16} className="text-[#D96A24]"/><h4 className="text-sm font-semibold">По категориям</h4></div>
-                    {summary.categories.length === 0 ? <p className="mt-4 text-sm text-black/35">За период расходов нет.</p> : <div className="mt-3 divide-y divide-black/[0.06]">{summary.categories.map((item) => <button type="button" key={item.categoryId} onClick={()=>setDrilldown({categoryId:item.categoryId,from:periodFrom,to:periodTo,revision:Date.now()})} className="flex w-full items-center justify-between gap-3 py-2.5 text-left text-sm"><span className="min-w-0 truncate text-black/55">{item.category}</span><strong className="shrink-0">{money(item.amount)} →</strong></button>)}</div>}
-                  </div>
-                </div>
-                {summary.pendingCount > 0 && <div className="mt-3 rounded-[16px] bg-amber-50 px-4 py-3 text-sm text-amber-800">Ждут вашего подтверждения: <strong>{summary.pendingCount}</strong> · {money(summary.pendingAmount)}. Подтвердить их можно в разделе «Бизнес».</div>}
-              </section>
-            )}
+            <button type="button" aria-expanded={formOpen} aria-controls="expense-entry-form" disabled={saving}
+              onClick={() => setFormOpen(value => !value)}
+              className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-[#D96A24] px-5 py-3.5 text-sm font-semibold text-white disabled:opacity-50 sm:w-auto">
+              {formOpen ? <ChevronUp size={19}/> : <Plus size={19}/>}
+              {formOpen ? "Свернуть форму" : editing ? "Продолжить исправление" : "Внести расход"}
+            </button>
 
-            <div className="mt-6 grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
-              <section ref={editForm} className="rounded-[26px] border border-black/[0.06] bg-white p-5 sm:p-6">
-                <div className="flex items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-[15px] bg-[#D96A24]/10 text-[#C95320]"><Plus size={20}/></span><div><h3 className="font-semibold">{editing ? "Исправить расход" : isOwner ? "Внести расход" : "Добавить расход"}</h3><p className="mt-0.5 text-xs text-black/40">{editing ? "Изменится существующая операция" : isOwner ? "Без самоутверждения" : "Обычно меньше минуты"}</p></div></div>
+            {formOpen && (
+              <section id="expense-entry-form" ref={editForm} className="mt-4 min-w-0 rounded-[26px] border border-black/[0.06] bg-white p-5 sm:p-6">
+                <div className="flex items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-[15px] bg-[#D96A24]/10 text-[#C95320]"><Plus size={20}/></span><div><h3 className="font-semibold">{editing ? "Исправить расход" : isOwner ? "Внести расход" : "Добавить расход"}</h3><p className="mt-0.5 text-xs text-black/40">{editing ? "Изменится существующая операция" : isOwner ? "Сразу в ДДС" : "Обычно меньше минуты"}</p></div></div>
+
+                <button type="button" disabled={saving} onClick={() => setFormOpen(false)} className="mt-3 inline-flex items-center gap-1 rounded-xl border border-black/10 px-3 py-2 text-sm"><ChevronUp size={16}/>Свернуть форму</button>
 
                 {isOwner && (
                   <div className="mt-5 grid grid-cols-3 gap-2">
@@ -490,7 +483,7 @@ export function AdminExpenseManager() {
                     {!isOwner && <span className="mt-1.5 block text-[11px] text-black/30">Зарплата педагогам оформляется отдельным блоком с педагогом и неделей.</span>}
                   </label>
 
-                  <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="grid min-w-0 gap-3 sm:grid-cols-2">
                     <label className="block text-xs font-semibold text-black/55">Сумма, ₽<input className={inputClass} inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="3500"/></label>
                     <label className="block text-xs font-semibold text-black/55">Дата расхода<input className={inputClass} type="date" value={expenseDate} onChange={(event) => setExpenseDate(event.target.value)}/></label>
                   </div>
@@ -521,30 +514,56 @@ export function AdminExpenseManager() {
                     <span className="mt-2 block text-[11px] text-black/35">JPG, PNG, WEBP или PDF · до 10 МБ</span>
                   </label>
 
-                  {editing && <div className="space-y-3">{error && <p role="alert" className="text-sm text-red-700">{error}</p>}<label className="block text-xs font-semibold text-black/55">Причина исправления *<textarea className={inputClass} value={correctionReason} onChange={event=>setCorrectionReason(event.target.value)} placeholder="Например: ошиблись в сумме" /></label><button type="button" disabled={saving} onClick={resetForm} className="rounded-xl border border-black/10 px-4 py-2 text-sm">Отменить редактирование</button>
+                  {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
+                  {editing && <div className="space-y-3"><label className="block text-xs font-semibold text-black/55">Причина исправления *<textarea className={inputClass} value={correctionReason} onChange={event=>setCorrectionReason(event.target.value)} placeholder="Например: ошиблись в сумме" /></label><button type="button" disabled={saving} onClick={() => { resetForm(); setFormOpen(false); }} className="rounded-xl border border-black/10 px-4 py-2 text-sm">Отменить редактирование</button>
                   {editing.history.length>0 && <details className="rounded-xl bg-[#FAF9F5] p-3"><summary className="cursor-pointer text-sm font-semibold">История исправлений</summary>{editing.history.map((h,index)=><p key={index} className="mt-2 text-xs text-black/60">{shortDate(h.at)} · {h.by} · {money(h.oldAmount)} → {money(h.newAmount)} · {h.reason}</p>)}</details>}</div>}
                   <button type="button" disabled={saving} onClick={() => void (isOwner ? createOwnerExpense() : createStaffExpense())} className="flex w-full items-center justify-center gap-2 rounded-[15px] bg-[#171717] px-5 py-4 text-sm font-semibold text-white shadow-sm disabled:opacity-50">{saving ? <LoaderCircle className="animate-spin" size={18}/> : <ReceiptText size={18}/>} {editing ? "Сохранить исправление" : isOwner ? "Провести в ДДС" : "Отправить владельцу"}</button>
                 </div>
+                {isOwner && <div className="mt-5 flex items-start gap-2 rounded-[15px] bg-white px-4 py-3 text-xs leading-5 text-black/40"><WalletCards className="mt-0.5 shrink-0" size={15}/><span>Филиальный расход учитывается целиком в выбранном филиале. «Общий» остаётся отдельным расходом OPEN STARS. «Распределить» создаёт одну реальную операцию ДДС и аналитически делит её между филиалами.</span></div>}
               </section>
+            )}
 
-              <section className="rounded-[26px] border border-black/[0.06] bg-white p-5 sm:p-6">
-                <div className="flex items-center justify-between gap-3"><div><h3 className="font-semibold">{isOwner ? "Последние расходы ДДС" : "Последние расходы"}</h3><p className="mt-1 text-xs text-black/40">{isOwner ? "Из всех источников" : "Только доступные вашей роли и филиалу"}</p></div><span className="rounded-full bg-black/[0.05] px-3 py-1.5 text-xs font-semibold text-black/50">{isOwner ? ownerCashflow.length : recent.length}</span></div>
+            {isOwner && <FinanceRegister kind="expenses" onEditExpense={row => void startExpenseEdit(row)} onCancelExpense={row => void cancelExpense(row)} onPayroll={openPayrollFromExpense} onPeriodChange={changePeriod} busy={saving} />}
 
-                {isOwner ? (
-                  ownerCashflow.length === 0 ? <div className="grid min-h-[260px] place-items-center text-center text-sm text-black/35">Расходов пока нет.</div> : <div className="mt-4 max-h-[640px] divide-y divide-black/[0.06] overflow-y-auto pr-1">{ownerCashflow.map((item) => <article key={item.id} className="py-3.5"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate text-sm font-semibold">{item.description || item.categoryName || "Расход"}</p><p className="mt-1 text-xs text-black/35">{item.branchName || "Общий / распределённый"} · {shortDate(item.transactionDate)} · {item.accountName || "счёт не указан"}</p></div><strong className="shrink-0 text-sm text-red-600">−{money(item.amount)}</strong></div></article>)}</div>
-                ) : recent.length === 0 ? (
+            {isOwner && <section className="mt-5 rounded-3xl border border-black/5 bg-white p-4 sm:p-5">
+              <button type="button" aria-expanded={allocationExpanded} aria-controls="expense-allocation-summary" onClick={() => setAllocationExpanded(value => !value)} className="flex w-full items-center justify-between gap-3 text-left text-sm font-semibold">
+                <span className="flex items-center gap-2"><Layers3 className="shrink-0 text-[#5F6338]" size={18}/>Распределение расходов по филиалам</span>
+                {allocationExpanded ? <ChevronUp className="shrink-0" size={18}/> : <ChevronDown className="shrink-0" size={18}/>}
+              </button>
+              {allocationExpanded && <div id="expense-allocation-summary" className="mt-4">
+                <p className="text-xs text-black/50">Все филиалы · {periodFrom ? shortDate(periodFrom) : "За всё время"} — {shortDate(periodTo)}. Возвраты родителям учтены в основной сводке ДДС.</p>
+                {summaryError ? <p role="alert" className="mt-3 text-sm text-red-700">{summaryError}</p> : !summary ? <p className="mt-3 text-sm text-black/45">Загружаем распределение…</p> : <>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                    <div className="rounded-2xl bg-[#FAF9F5] p-3"><p className="text-xs text-black/50">Прямые расходы филиалов</p><strong className="mt-1 block text-xl">{money(summary.branchDirectAmount)}</strong></div>
+                    <div className="rounded-2xl bg-[#5F6338]/[0.06] p-3"><p className="text-xs text-[#4D512E]">Распределено между филиалами</p><strong className="mt-1 block text-xl text-[#4D512E]">{money(summary.distributedAmount)}</strong></div>
+                    <div className="rounded-2xl bg-[#D96A24]/[0.06] p-3"><p className="text-xs text-[#C95320]">Общие OPEN STARS</p><strong className="mt-1 block text-xl text-[#C95320]">{money(summary.commonAmount)}</strong></div>
+                  </div>
+                  <h4 className="mt-4 text-sm font-semibold">Нагрузка на филиалы</h4>
+                  <div className="mt-2 divide-y divide-black/5">{summary.branches.map(item => <div key={item.branchId} className="flex items-center justify-between gap-3 py-2.5 text-sm"><span className="text-black/55">{item.branch}</span><strong className="shrink-0">{money(item.amount)}</strong></div>)}</div>
+                </>}
+                <button type="button" onClick={() => setAllocationExpanded(false)} className="mt-4 inline-flex items-center gap-1 rounded-xl border border-black/10 px-3 py-2 text-sm"><ChevronUp size={16}/>Свернуть</button>
+              </div>}
+            </section>}
+            {isOwner && summary && summary.pendingCount > 0 && <div className="mt-3 rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-800">Ждут вашего подтверждения: <strong>{summary.pendingCount}</strong> · {money(summary.pendingAmount)}. Подтвердить их можно в разделе «Бизнес».</div>}
+
+            {!isOwner && <section className="mt-5 rounded-3xl border border-black/5 bg-white p-5">
+              <button type="button" aria-expanded={recentExpanded} aria-controls="recent-expense-requests" onClick={() => setRecentExpanded(value => !value)} className="flex w-full items-center justify-between gap-3 text-left font-semibold">
+                <span>Последние расходы · {recent.length}</span>{recentExpanded ? <ChevronUp size={18}/> : <ChevronDown size={18}/>}
+              </button>
+              {recentExpanded && <div id="recent-expense-requests">
+                {recent.length === 0 ? (
                   <div className="grid min-h-[260px] place-items-center text-center text-sm text-black/35">Расходов пока нет.</div>
                 ) : (
                   <div className="mt-4 max-h-[640px] space-y-3 overflow-y-auto pr-1">
                     {recent.map((expense) => <article key={expense.id} className="rounded-[20px] border border-black/[0.06] bg-[#FAF9F5] p-4"><div className="flex items-start justify-between gap-3"><div><p className="font-semibold">{expense.categoryName}</p><p className="mt-1 text-xs text-black/40">{expense.branchName} · {shortDate(expense.expenseDate)} · {expense.requesterName}</p></div><p className="shrink-0 text-lg font-semibold">{money(expense.amount)}</p></div>{expense.description && <p className="mt-3 text-sm leading-5 text-black/60">{expense.description}</p>}<div className="mt-3 flex flex-wrap items-center gap-2"><span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${expense.status === "approved" ? "bg-[#5F6338]/10 text-[#4D512E]" : expense.status === "rejected" ? "bg-red-50 text-red-600" : expense.status === "submitted" ? "bg-[#D96A24]/10 text-[#C95320]" : "bg-black/[0.05] text-black/50"}`}>{statusLabel[expense.status] || expense.status}</span>{expense.attachments.map((attachment) => <button key={attachment.id} type="button" onClick={() => void openExpenseReceipt(attachment).catch((reason) => setError(reason instanceof Error ? reason.message : "Не удалось открыть чек."))} className="flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-black/60"><FileText size={13}/>Чек</button>)}{expense.status === "submitted" && expense.attachments.length === 0 && <label className="cursor-pointer rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-[#C95320]">+ Добавить чек<input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) void retryReceipt(expense, file); event.currentTarget.value = ""; }}/></label>}</div>{expense.status === "approved" && <div className="mt-3 flex items-center gap-2 text-xs font-medium text-[#4D512E]"><CheckCircle2 size={15}/>Операция уже попала в ДДС</div>}{expense.reviewComment && <p className="mt-3 rounded-[12px] bg-white px-3 py-2 text-xs text-black/50">Комментарий владельца: {expense.reviewComment}</p>}</article>)}
                   </div>
                 )}
-              </section>
-            </div>
+                <button type="button" onClick={() => setRecentExpanded(false)} className="mt-4 inline-flex items-center gap-1 rounded-xl border border-black/10 px-3 py-2 text-sm"><ChevronUp size={16}/>Свернуть</button>
+              </div>}
+            </section>}
           </>
         )}
 
-        {isOwner && <div className="mt-5 flex items-start gap-2 rounded-[15px] bg-white px-4 py-3 text-xs leading-5 text-black/40"><WalletCards className="mt-0.5 shrink-0" size={15}/><span>Филиальный расход учитывается целиком в выбранном филиале. «Общий» остаётся отдельным расходом OPEN STARS. «Распределить» создаёт одну реальную операцию ДДС и аналитически делит её между филиалами.</span></div>}
       </div>
     </div>
   );
