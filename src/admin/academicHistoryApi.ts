@@ -1,4 +1,5 @@
 import { getValidStaffSession } from "@/admin/adminApi";
+import { HomeworkMaterial, readHomeworkMaterials, validateHomeworkMaterials } from '@/homeworkMaterials';
 
 const SUPABASE_URL = "https://yiwiykbuaggyslfyhlfo.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_1MORh5rY7uMDVYLYVX5VAA_cyoph4-7";
@@ -32,6 +33,8 @@ export type AcademicHomeworkHistoryRecord = {
   teacherName: string;
   createdAt: string;
   createdBy: string;
+  publicationId: string;
+  materials: HomeworkMaterial[];
 };
 
 export type AcademicCommentHistoryRecord = {
@@ -110,6 +113,12 @@ function createdByFilter(createdBy: string) {
   return createdBy ? `eq.${createdBy}` : "is.null";
 }
 
+function homeworkPath(record: AcademicHomeworkHistoryRecord) {
+  return tablePath('homework', record.publicationId
+    ? { publication_id: `eq.${record.publicationId}` }
+    : { subject: `eq.${record.subject}`, created_at: `eq.${record.createdAt}`, created_by: createdByFilter(record.createdBy) });
+}
+
 function commentPath(record: AcademicCommentHistoryRecord) {
   return record.audienceScope === "group" && record.publicationId
     ? tablePath("teacher_comments", { publication_id: `eq.${record.publicationId}` })
@@ -155,7 +164,7 @@ export async function fetchAcademicFullHistory(childId: string): Promise<Academi
       limit: "250",
     })),
     tableRequest<any[]>(tablePath("homework", {
-      select: "id,subject,title,description,text_content,due_date,lesson_date,teacher_name,created_at,created_by",
+      select: "id,subject,title,description,text_content,due_date,lesson_date,teacher_name,created_at,created_by,publication_id,materials",
       ...childFilter,
       order: "lesson_date.desc,created_at.desc",
       limit: "250",
@@ -193,6 +202,8 @@ export async function fetchAcademicFullHistory(childId: string): Promise<Academi
       teacherName: row.teacher_name || "",
       createdAt: row.created_at || "",
       createdBy: row.created_by || "",
+      publicationId: row.publication_id || '',
+      materials: readHomeworkMaterials(row.materials),
     })),
     comments: (commentRows || []).map((row) => ({
       id: row.id,
@@ -239,13 +250,10 @@ export async function updateHistoryHomework(input: {
   title: string;
   description: string;
   dueDate: string;
+  materials: HomeworkMaterial[];
 }) {
   if (!input.title.trim()) throw new Error("Введите название домашнего задания.");
-  const rows = await tableRequest<any[]>(tablePath("homework", {
-    subject: `eq.${input.record.subject}`,
-    created_at: `eq.${input.record.createdAt}`,
-    created_by: createdByFilter(input.record.createdBy),
-  }), {
+  const rows = await tableRequest<any[]>(homeworkPath(input.record), {
     method: "PATCH",
     headers: { Prefer: "return=representation" },
     body: JSON.stringify({
@@ -253,6 +261,7 @@ export async function updateHistoryHomework(input: {
       description: input.description.trim() || null,
       text_content: input.description.trim() || null,
       due_date: input.dueDate || null,
+      materials: validateHomeworkMaterials(input.materials),
     }),
   });
   ensureChanged(rows, "Домашнее задание не найдено или у вас нет доступа к нему.");
@@ -260,11 +269,7 @@ export async function updateHistoryHomework(input: {
 }
 
 export async function deleteHistoryHomework(record: AcademicHomeworkHistoryRecord) {
-  const rows = await tableRequest<any[]>(tablePath("homework", {
-    subject: `eq.${record.subject}`,
-    created_at: `eq.${record.createdAt}`,
-    created_by: createdByFilter(record.createdBy),
-  }), {
+  const rows = await tableRequest<any[]>(homeworkPath(record), {
     method: "DELETE",
     headers: { Prefer: "return=representation" },
   });

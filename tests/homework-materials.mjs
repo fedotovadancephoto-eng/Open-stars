@@ -1,0 +1,32 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import ts from 'typescript';
+
+const source = readFileSync(new URL('../src/homeworkMaterials.ts', import.meta.url), 'utf8');
+const { outputText } = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ES2022 } });
+const { homeworkFileType, normalizeHomeworkUrl, validateHomeworkMaterials, readHomeworkMaterials } = await import(`data:text/javascript;base64,${Buffer.from(outputText).toString('base64')}`);
+const MiB = 1024 * 1024;
+const image = { kind: 'image', name: 'Exercise.jpg', mimeType: 'image/jpeg', size: MiB, path: '11111111-1111-4111-8111-111111111111/22222222-2222-4222-8222-222222222222.jpg' };
+
+assert.equal(normalizeHomeworkUrl(' example.org/exercise '), 'https://example.org/exercise');
+assert.equal(normalizeHomeworkUrl('https://example.org/a?x=1#part'), 'https://example.org/a?x=1#part');
+for (const url of ['', 'javascript:alert(1)', 'data:text/html,test', 'file:///tmp/a', 'https://user:pass@example.org', 'https://example.org/a b', 'https://example.org/\\evil', 'https://example.org/\u0001']) assert.throws(() => normalizeHomeworkUrl(url));
+assert.throws(() => normalizeHomeworkUrl(`https://example.org/${'a'.repeat(2048)}`));
+assert.equal(homeworkFileType({ name: 'Photo.JPEG', type: '', size: 1 }).mimeType, 'image/jpeg');
+assert.equal(homeworkFileType({ name: 'Video.MOV', type: '', size: 50 * MiB }).kind, 'video');
+assert.equal(homeworkFileType({ name: 'photo.jpg', type: 'image/jpeg', size: 10 * MiB }).kind, 'image');
+for (const size of [0, -1, NaN, Infinity, 0.5, 10 * MiB + 1]) assert.throws(() => homeworkFileType({ name: 'p.jpg', type: 'image/jpeg', size }));
+assert.throws(() => homeworkFileType({ name: 'movie.mp4', type: 'video/mp4', size: 50 * MiB + 1 }));
+for (const [name, type] of [['photo.heic', 'image/heic'], ['vector.svg', 'image/svg+xml'], ['program.mp4', 'application/octet-stream']]) assert.throws(() => homeworkFileType({ name, type, size: 100 }));
+assert.deepEqual(validateHomeworkMaterials([{ kind: 'link', name: ' ', url: 'example.org' }]), [{ kind: 'link', name: 'example.org', url: 'https://example.org/' }]);
+assert.deepEqual(validateHomeworkMaterials([image]), [image]);
+assert.throws(() => validateHomeworkMaterials([image, image]));
+assert.throws(() => validateHomeworkMaterials([{ kind: 'link', name: '', url: 'example.org' }, { kind: 'link', name: '', url: 'https://example.org/' }]));
+for (const patch of [{ kind: 'video' }, { path: '../photo.jpg' }, { name: '' }, { name: 'a'.repeat(181) }]) assert.throws(() => validateHomeworkMaterials([{ ...image, ...patch }]));
+const links = Array.from({ length: 10 }, (_, n) => ({ kind: 'link', name: `Link ${n}`, url: `https://example.org/${n}` }));
+assert.equal(validateHomeworkMaterials(links).length, 10);
+assert.throws(() => validateHomeworkMaterials([...links, { kind: 'link', name: 'Extra', url: 'https://example.org/extra' }]));
+assert.deepEqual(readHomeworkMaterials(undefined), []);
+assert.deepEqual(readHomeworkMaterials(null), []);
+assert.deepEqual(readHomeworkMaterials([null, {}, { kind: 'link', name: 'Unsafe', url: 'javascript:alert(1)' }, image]), [image]);
+console.log('Homework links, file types, size limits, duplicate checks and legacy reading: passed.');

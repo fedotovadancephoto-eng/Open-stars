@@ -1,4 +1,5 @@
 import { getValidStaffSession } from "@/admin/adminApi";
+import { HomeworkMaterial, validateHomeworkMaterials } from '@/homeworkMaterials';
 
 const SUPABASE_URL = "https://yiwiykbuaggyslfyhlfo.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_1MORh5rY7uMDVYLYVX5VAA_cyoph4-7";
@@ -209,8 +210,10 @@ export async function publishGroupHomework(input: {
   dueDate: string;
   lessonDate: string;
   teacherName: string;
+  materials: HomeworkMaterial[];
+  requestId: string;
 }) {
-  return rpc<number>("staff_publish_group_homework", {
+  return rpc<number>("staff_publish_group_homework_materials", {
     p_branch: input.branch,
     p_group_name: input.groupName,
     p_stream_start: input.stream,
@@ -220,6 +223,8 @@ export async function publishGroupHomework(input: {
     p_due_date: input.dueDate || null,
     p_lesson_date: input.lessonDate || null,
     p_teacher_name: input.teacherName.trim() || null,
+    p_materials: validateHomeworkMaterials(input.materials),
+    p_request: input.requestId,
   });
 }
 

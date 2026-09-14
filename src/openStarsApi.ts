@@ -1,3 +1,5 @@
+import { readHomeworkMaterials } from '@/homeworkMaterials';
+
 const SUPABASE_URL = "https://yiwiykbuaggyslfyhlfo.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_1MORh5rY7uMDVYLYVX5VAA_cyoph4-7";
 const SESSION_STORAGE_KEY = "openstars_parent_session";
@@ -447,6 +449,7 @@ export async function fetchParentDashboard() {
         subject: row.subject || "Занятие",
         title: row.title || "Домашнее задание",
         description: row.description || row.text_content || "",
+        materials: readHomeworkMaterials(row.materials),
         dueDate: formatDate(row.due_date),
         date: formatDate(row.lesson_date),
         status,
