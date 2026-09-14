@@ -2,6 +2,7 @@ import { BookOpen, CheckCircle2, Clock3 } from "lucide-react";
 
 import { Card } from "@/components/Card";
 import { homework } from "@/data/demoData";
+import { HomeworkMaterials } from '@/components/HomeworkMaterials';
 
 export function HomeworkTab() {
   return (
@@ -80,10 +81,11 @@ export function HomeworkTab() {
                       {item.title}
                     </h3>
                     {item.description && (
-                      <p className="mt-2 text-sm leading-7 text-black/55">
+                      <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-7 text-black/55">
                         {item.description}
                       </p>
                     )}
+                    <HomeworkMaterials materials={item.materials || []}/>
                     {item.dueDate && (
                       <p className="mt-3 text-xs font-medium text-black/40">
                         Выполнить до: {item.dueDate}

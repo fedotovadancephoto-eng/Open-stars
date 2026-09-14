@@ -16,6 +16,8 @@ import {
 } from "@/admin/academicApi";
 import { AcademicHistoryManager } from "@/admin/AcademicHistoryManager";
 import { publishGroupComment } from "@/admin/groupCommentApi";
+import { HomeworkMaterial, validateHomeworkMaterials } from '@/homeworkMaterials';
+import { HomeworkMaterialsEditor } from '@/admin/HomeworkMaterialsEditor';
 
 const branches: AcademicBranch[] = ["Свердловский", "НЛО", "Октябрьский"];
 const groups: AcademicGroup[] = ["Базовый", "Продвинутый", "PRO"];
@@ -57,6 +59,9 @@ export function AdminStudyManager() {
   const [homeworkTitle, setHomeworkTitle] = useState("");
   const [homeworkDescription, setHomeworkDescription] = useState("");
   const [homeworkDue, setHomeworkDue] = useState("");
+  const [homeworkMaterials, setHomeworkMaterials] = useState<HomeworkMaterial[]>([]);
+  const [homeworkUploading, setHomeworkUploading] = useState(false);
+  const homeworkRequest = useRef({ signature: '', id: '' });
   const [personalChild, setPersonalChild] = useState("");
   const [commentAudience, setCommentAudience] = useState<CommentAudience>("individual");
   const [commentTitle, setCommentTitle] = useState("");
@@ -177,17 +182,23 @@ export function AdminStudyManager() {
   }
 
   async function publishHomework() {
+    if (homeworkUploading || saving) return;
     if (!roster.length || loading) return setError("Сначала загрузите группу на выбранную дату.");
     if (!homeworkTitle.trim()) return setError("Введите название домашнего задания.");
     setSaving(true);
     setError("");
     setSuccess("");
     try {
-      const count = await publishGroupHomework({ branch, groupName, stream, subject, title: homeworkTitle, description: homeworkDescription, dueDate: homeworkDue, lessonDate, teacherName });
+      const payload = { branch, groupName, stream, subject, title: homeworkTitle, description: homeworkDescription, dueDate: homeworkDue, lessonDate, teacherName, materials: validateHomeworkMaterials(homeworkMaterials) };
+      const signature = JSON.stringify(payload);
+      if (homeworkRequest.current.signature !== signature) homeworkRequest.current = { signature, id: crypto.randomUUID() };
+      const count = await publishGroupHomework({ ...payload, requestId: homeworkRequest.current.id });
       setSuccess(`Домашнее задание опубликовано для ${count} ученик(ов).`);
       setHomeworkTitle("");
       setHomeworkDescription("");
       setHomeworkDue("");
+      setHomeworkMaterials([]);
+      homeworkRequest.current = { signature: '', id: '' };
       setHistoryVersion((value) => value + 1);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Не удалось опубликовать домашнее задание.");
@@ -261,7 +272,7 @@ export function AdminStudyManager() {
             </div>
 
             <div className="mt-6 rounded-[24px] border border-black/[0.06] bg-white p-5 sm:p-6">
-              <fieldset disabled={saving} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+              <fieldset disabled={saving || homeworkUploading} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
                 <label className="text-xs font-semibold text-black/55">Филиал<select className={inputClass} value={branch} disabled={branchLocked && Boolean(staffBranch)} onChange={(e) => { setBranch(e.target.value as AcademicBranch); clearLoadedRoster(); }}>{branches.map((v) => <option key={v}>{v}</option>)}</select></label>
                 <label className="text-xs font-semibold text-black/55">Группа<select className={inputClass} value={groupName} onChange={(e) => { setGroupName(e.target.value as AcademicGroup); clearLoadedRoster(); }}>{groups.map((v) => <option key={v} value={v}>{groupLabel(v, branch, lessonDate, stream)}</option>)}</select></label>
                 <label className="text-xs font-semibold text-black/55">Поток<select className={inputClass} value={stream} onChange={(e) => { setStream(e.target.value as AcademicStream); clearLoadedRoster(); }}>{streams.map((v) => <option key={v}>{v}</option>)}</select></label>
@@ -289,10 +300,11 @@ export function AdminStudyManager() {
               <div className="space-y-5">
                 <section className="rounded-[24px] border border-black/[0.06] bg-white p-5">
                   <div className="flex items-center gap-2"><ClipboardCheck className="text-[#D96A24]" size={19}/><h3 className="font-semibold">Домашнее задание группе</h3></div>
-                  <label className="mt-4 block text-xs font-semibold text-black/55">Название<input className={inputClass} value={homeworkTitle} onChange={(e)=>setHomeworkTitle(e.target.value)} placeholder="Например: Отработать проходку" /></label>
-                  <label className="mt-3 block text-xs font-semibold text-black/55">Описание<textarea className={`${inputClass} min-h-[90px] resize-y`} value={homeworkDescription} onChange={(e)=>setHomeworkDescription(e.target.value)} /></label>
-                  <label className="mt-3 block text-xs font-semibold text-black/55">Выполнить до<input type="date" className={inputClass} value={homeworkDue} onChange={(e)=>setHomeworkDue(e.target.value)} /></label>
-                  <button type="button" onClick={publishHomework} disabled={saving || !roster.length} className="mt-4 w-full rounded-[13px] bg-[#171717] px-4 py-3 text-sm font-semibold text-white disabled:opacity-40">Опубликовать группе</button>
+                  <label className="mt-4 block text-xs font-semibold text-black/55">Название<input className={inputClass} disabled={saving} value={homeworkTitle} onChange={(e)=>setHomeworkTitle(e.target.value)} placeholder="Например: Отработать проходку" /></label>
+                  <label className="mt-3 block text-xs font-semibold text-black/55">Описание<textarea className={`${inputClass} min-h-[90px] resize-y`} disabled={saving} value={homeworkDescription} onChange={(e)=>setHomeworkDescription(e.target.value)} /></label>
+                  <label className="mt-3 block text-xs font-semibold text-black/55">Выполнить до<input type="date" className={inputClass} disabled={saving} value={homeworkDue} onChange={(e)=>setHomeworkDue(e.target.value)} /></label>
+                  <HomeworkMaterialsEditor value={homeworkMaterials} onChange={setHomeworkMaterials} disabled={saving} onBusyChange={setHomeworkUploading}/>
+                  <button type="button" onClick={publishHomework} disabled={saving || homeworkUploading || loading || !roster.length} className="mt-4 w-full rounded-[13px] bg-[#171717] px-4 py-3 text-sm font-semibold text-white disabled:opacity-40">Опубликовать группе</button>
                 </section>
 
                 <section className="rounded-[24px] border border-black/[0.06] bg-white p-5">

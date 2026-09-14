@@ -19,6 +19,9 @@ import {
   updateHistoryGrade,
   updateHistoryHomework,
 } from "@/admin/academicHistoryApi";
+import { HomeworkMaterial } from '@/homeworkMaterials';
+import { HomeworkMaterials } from '@/components/HomeworkMaterials';
+import { HomeworkMaterialsEditor } from '@/admin/HomeworkMaterialsEditor';
 import { AttendanceHistorySection } from "@/admin/AttendanceHistorySection";
 
 const emptyHistory: AcademicFullHistory = { grades: [], homework: [], comments: [], achievements: [] };
@@ -26,7 +29,7 @@ const fieldClass = "w-full rounded-[11px] border border-black/[0.08] bg-white px
 
 type Props = { childId: string; childName: string; subject?: string; refreshKey: number };
 type GradeDraft = { record: AcademicGradeHistoryRecord; grade: number };
-type HomeworkDraft = { record: AcademicHomeworkHistoryRecord; title: string; description: string; dueDate: string };
+type HomeworkDraft = { record: AcademicHomeworkHistoryRecord; title: string; description: string; dueDate: string; materials: HomeworkMaterial[] };
 type CommentDraft = { record: AcademicCommentHistoryRecord; title: string; text: string; date: string };
 type AchievementDraft = { record: AcademicAchievementHistoryRecord; title: string; description: string; achievedAt: string };
 
@@ -48,6 +51,7 @@ export function AcademicHistoryManager({ childId, childName, refreshKey }: Props
   const [loading, setLoading] = useState(false);
   const [searching, setSearching] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [materialsUploading, setMaterialsUploading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [gradeDraft, setGradeDraft] = useState<GradeDraft | null>(null);
@@ -113,7 +117,7 @@ export function AcademicHistoryManager({ childId, childName, refreshKey }: Props
   }
 
   async function run(action: () => Promise<string>, fallback: string) {
-    if (!student) return;
+    if (!student || saving || materialsUploading) return;
     setSaving(true);
     setError("");
     setSuccess("");
@@ -176,9 +180,9 @@ export function AcademicHistoryManager({ childId, childName, refreshKey }: Props
                 {history.homework.length === 0 ? <p className="mt-2 text-sm text-black/35">Нет ДЗ.</p> : <div className="mt-2 space-y-2">{history.homework.map((record) => {
                   const draft = homeworkDraft?.record.id === record.id ? homeworkDraft : null;
                   return <div key={record.id} className="rounded-[13px] bg-[#FAF9F5] p-3">{draft ? (
-                    <div className="space-y-2"><input className={fieldClass} value={draft.title} onChange={(e) => setHomeworkDraft({ ...draft, title: e.target.value })}/><textarea className={`${fieldClass} min-h-[70px]`} value={draft.description} onChange={(e) => setHomeworkDraft({ ...draft, description: e.target.value })}/><input type="date" className={fieldClass} value={draft.dueDate} onChange={(e) => setHomeworkDraft({ ...draft, dueDate: e.target.value })}/><p className="text-[11px] text-black/35">Изменение применяется ко всей исходной групповой публикации.</p><div className="flex gap-2"><button type="button" onClick={() => void run(async () => { const count = await updateHistoryHomework({ record, title: draft.title, description: draft.description, dueDate: draft.dueDate }); setHomeworkDraft(null); return `ДЗ изменено в ${count} кабинет(ах).`; }, "Не удалось изменить ДЗ.")} className="flex items-center gap-1 rounded-[9px] bg-[#5F6338] px-3 py-2 text-xs font-semibold text-white"><Save size={14}/> Сохранить</button><button type="button" onClick={() => setHomeworkDraft(null)} className="rounded-[9px] bg-white px-3 py-2 text-xs">Отмена</button></div></div>
+                    <fieldset disabled={saving || materialsUploading} className="min-w-0 space-y-2"><input aria-label="Название домашнего задания" className={fieldClass} value={draft.title} onChange={(e) => setHomeworkDraft({ ...draft, title: e.target.value })}/><textarea className={`${fieldClass} min-h-[70px]`} value={draft.description} onChange={(e) => setHomeworkDraft({ ...draft, description: e.target.value })}/><input type="date" className={fieldClass} value={draft.dueDate} onChange={(e) => setHomeworkDraft({ ...draft, dueDate: e.target.value })}/><HomeworkMaterialsEditor key={record.id} value={draft.materials} onChange={materials => setHomeworkDraft(current => current?.record.id === record.id ? { ...current, materials } : current)} disabled={saving} onBusyChange={setMaterialsUploading}/><p className="text-[11px] text-black/35">Изменение применяется ко всей исходной групповой публикации.</p><div className="flex gap-2"><button type="button" onClick={() => void run(async () => { const count = await updateHistoryHomework({ record, title: draft.title, description: draft.description, dueDate: draft.dueDate, materials: draft.materials }); setHomeworkDraft(null); return `ДЗ изменено в ${count} кабинет(ах).`; }, "Не удалось изменить ДЗ.")} className="flex items-center gap-1 rounded-[9px] bg-[#5F6338] px-3 py-2 text-xs font-semibold text-white"><Save size={14}/> Сохранить</button><button type="button" onClick={() => setHomeworkDraft(null)} className="rounded-[9px] bg-white px-3 py-2 text-xs">Отмена</button></div></fieldset>
                   ) : (
-                    <div className="flex items-start gap-2"><div className="min-w-0 flex-1"><p className="text-sm font-semibold">{record.title}</p><p className="mt-1 text-[11px] text-black/40">{record.subject} · {formatDate(record.lessonDate)}{record.dueDate ? ` · до ${formatDate(record.dueDate)}` : ""}</p>{record.description && <p className="mt-2 text-xs leading-5 text-black/55">{record.description}</p>}</div><button type="button" onClick={() => setHomeworkDraft({ record, title: record.title, description: record.description, dueDate: record.dueDate })} className="grid h-8 w-8 shrink-0 place-items-center rounded-[9px] bg-white text-black/45"><Pencil size={14}/></button><button type="button" onClick={() => { if (window.confirm(`Удалить «${record.title}» у всей группы?`)) void run(async () => { const count = await deleteHistoryHomework(record); return `ДЗ удалено из ${count} кабинет(ов).`; }, "Не удалось удалить ДЗ."); }} className="grid h-8 w-8 shrink-0 place-items-center rounded-[9px] bg-red-50 text-red-600"><Trash2 size={14}/></button></div>
+                    <div className="flex items-start gap-2"><div className="min-w-0 flex-1"><p className="text-sm font-semibold">{record.title}</p><p className="mt-1 text-[11px] text-black/40">{record.subject} · {formatDate(record.lessonDate)}{record.dueDate ? ` · до ${formatDate(record.dueDate)}` : ""}</p>{record.description && <p className="mt-2 whitespace-pre-wrap break-words text-xs leading-5 text-black/55">{record.description}</p>}<HomeworkMaterials materials={record.materials} staff/></div><button type="button" disabled={saving || materialsUploading} aria-label="Изменить домашнее задание" onClick={() => setHomeworkDraft({ record, title: record.title, description: record.description, dueDate: record.dueDate, materials: record.materials })} className="grid h-8 w-8 shrink-0 place-items-center rounded-[9px] bg-white text-black/45"><Pencil size={14}/></button><button type="button" disabled={saving || materialsUploading} aria-label="Удалить домашнее задание" onClick={() => { if (window.confirm(`Удалить «${record.title}» у всей группы?`)) void run(async () => { const count = await deleteHistoryHomework(record); return `ДЗ удалено из ${count} кабинет(ов).`; }, "Не удалось удалить ДЗ."); }} className="grid h-8 w-8 shrink-0 place-items-center rounded-[9px] bg-red-50 text-red-600"><Trash2 size={14}/></button></div>
                   )}</div>;
                 })}</div>}
               </div>
