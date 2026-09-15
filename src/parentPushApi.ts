@@ -59,7 +59,7 @@ export async function disconnectParentPush() {
   }
 }
 
-export type NotificationDestination = { tab: string; childId: string | null } | null;
+export type NotificationDestination = { tab: string; childId: string | null; feedbackId?: string | null } | null;
 export function notificationDestination(id: string) {
   return parentPushAction<NotificationDestination>("destination", { id });
 }

@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { Archive, CheckCircle2, Inbox, LoaderCircle, MessageSquareHeart, Trash2, X } from "lucide-react";
 
+import { AdminFeedbackReplies } from "@/admin/AdminFeedbackReplies";
+import type { FeedbackReply } from "@/feedbackTypes";
+
 import { getValidStaffSession } from "@/admin/adminApi";
 
 const SUPABASE_URL = "https://yiwiykbuaggyslfyhlfo.supabase.co";
@@ -9,6 +12,7 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_1MORh5rY7uMDVYLYVX5VAA_cyoph4-7
 type FeedbackStatus = "new" | "read" | "closed" | "archived";
 
 type FeedbackRow = {
+  replies: FeedbackReply[];
   id: string;
   category: "app" | "education";
   message: string;
@@ -52,7 +56,7 @@ async function staffRequest(path: string, options?: RequestInit) {
 }
 
 async function loadFeedback(): Promise<FeedbackRow[]> {
-  const response = await staffRequest("parent_feedback?select=id,category,message,status,branch_snapshot,child_name_snapshot,parent_name_snapshot,created_at,read_at,closed_at,archived_at&order=created_at.desc");
+  const response = await staffRequest("parent_feedback?select=id,category,message,status,branch_snapshot,child_name_snapshot,parent_name_snapshot,created_at,read_at,closed_at,archived_at,replies:parent_feedback_replies(id,staff_name_snapshot,message,created_at)&order=created_at.desc");
   if (!response.ok) throw new Error("Не удалось загрузить обратную связь.");
   return response.json();
 }
@@ -83,7 +87,7 @@ export function AdminFeedbackManager() {
   const [enabled, setEnabled] = useState(false);
   const [open, setOpen] = useState(false);
   const [rows, setRows] = useState<FeedbackRow[]>([]);
-  const [filter, setFilter] = useState<"all" | FeedbackStatus>("all");
+  const [filter, setFilter] = useState<"all" | "unanswered" | FeedbackStatus>("all");
   const [loading, setLoading] = useState(false);
   const [busyId, setBusyId] = useState("");
   const [error, setError] = useState("");
@@ -114,7 +118,7 @@ export function AdminFeedbackManager() {
     return () => { cancelled = true; if (timer) window.clearTimeout(timer); window.clearInterval(polling); };
   }, [enabled]);
 
-  const visible = useMemo(() => filter === "all" ? rows : rows.filter((item) => item.status === filter), [filter, rows]);
+  const visible = useMemo(() => filter === "all" ? rows : rows.filter((item) => filter === "unanswered" ? item.status !== "archived" && item.replies.length === 0 : item.status === filter), [filter, rows]);
   const newCount = rows.filter((item) => item.status === "new").length;
 
   async function change(id: string, status: FeedbackStatus) {
@@ -143,12 +147,12 @@ export function AdminFeedbackManager() {
     {open && <div className="fixed inset-0 z-[86] flex items-end justify-center bg-black/30 backdrop-blur-[2px] sm:items-center sm:p-5" onClick={() => setOpen(false)}>
       <div className="max-h-[96vh] w-full max-w-5xl overflow-y-auto rounded-t-[28px] bg-[#FAF9F5] p-5 shadow-2xl sm:rounded-[28px] sm:p-7" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between gap-4">
-          <div><p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#D96A24]">OPEN STARS ADMIN</p><h2 className="mt-1 text-2xl font-semibold">Обратная связь родителей</h2><p className="mt-2 text-sm leading-6 text-black/45">Рабочие обращения храним в истории. Тестовые можно удалить навсегда.</p></div>
+          <div><p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#D96A24]">OPEN STARS ADMIN</p><h2 className="mt-1 text-2xl font-semibold">Обратная связь родителей</h2><p className="mt-2 text-sm leading-6 text-black/45">Ответьте под обращением — родитель увидит ответ в кабинете и получит уведомление.</p></div>
           <button type="button" onClick={() => setOpen(false)} className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white"><X size={20}/></button>
         </div>
 
         <div className="mt-5 flex flex-wrap gap-2">
-          {(["all","new","read","closed","archived"] as const).map((item) => <button key={item} type="button" onClick={() => setFilter(item)} className={`rounded-full px-3.5 py-2 text-xs font-semibold ${filter === item ? "bg-[#171717] text-white" : "bg-white text-black/50"}`}>{item === "all" ? `Все · ${rows.length}` : `${statusLabels[item]} · ${rows.filter((row) => row.status === item).length}`}</button>)}
+          {(["all","unanswered","new","read","closed","archived"] as const).map((item) => <button key={item} type="button" onClick={() => setFilter(item)} className={`rounded-full px-3.5 py-2 text-xs font-semibold ${filter === item ? "bg-[#171717] text-white" : "bg-white text-black/50"}`}>{item === "all" ? `Все · ${rows.length}` : item === "unanswered" ? "Без ответа" : `${statusLabels[item]} · ${rows.filter((row) => row.status === item).length}`}</button>)}
         </div>
 
         {error && <div className="mt-4 rounded-[15px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
@@ -157,6 +161,10 @@ export function AdminFeedbackManager() {
           {visible.map((item) => <article key={item.id} className={`rounded-[20px] border bg-white p-4 sm:p-5 ${item.status === "new" ? "border-[#D96A24]/30" : "border-black/[0.055]"}`}>
             <div className="flex flex-wrap items-start justify-between gap-3"><div><div className="flex flex-wrap gap-2"><span className="rounded-full bg-[#FAF9F5] px-2.5 py-1 text-[10px] font-bold uppercase text-black/45">{categoryLabels[item.category]}</span><span className="rounded-full bg-[#5F6338]/10 px-2.5 py-1 text-[10px] font-bold text-[#4D512E]">{statusLabels[item.status]}</span></div><p className="mt-3 font-semibold">{item.parent_name_snapshot || "Родитель"}</p><p className="mt-1 text-xs text-black/40">{[item.child_name_snapshot,item.branch_snapshot,formatDate(item.created_at)].filter(Boolean).join(" · ")}</p></div></div>
             <p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-black/65">{item.message}</p>
+            <AdminFeedbackReplies feedbackId={item.id} replies={item.replies} onSent={reply => setRows(current => current.map(row => row.id !== item.id ? row : {
+              ...row, status: row.status === "new" ? "read" : row.status,
+              replies: [...row.replies.filter(existing => existing.id !== reply.id), reply],
+            }))} />
             <div className="mt-4 flex flex-wrap gap-2">
               {item.status === "new" && <button type="button" disabled={busyId===item.id} onClick={() => change(item.id,"read")} className="rounded-[11px] border border-black/[0.07] px-3 py-2 text-xs font-semibold">В работу</button>}
               {(item.status === "new" || item.status === "read") && <button type="button" disabled={busyId===item.id} onClick={() => change(item.id,"closed")} className="flex items-center gap-1.5 rounded-[11px] bg-[#171717] px-3 py-2 text-xs font-semibold text-white"><CheckCircle2 size={14}/> Обработано</button>}

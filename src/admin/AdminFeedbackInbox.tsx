@@ -8,16 +8,20 @@ import {
   MessageSquareHeart,
 } from "lucide-react";
 
+import { AdminFeedbackReplies } from "@/admin/AdminFeedbackReplies";
+import type { FeedbackReply } from "@/feedbackTypes";
+
 import { getValidStaffSession } from "@/admin/adminApi";
 
 const SUPABASE_URL = "https://yiwiykbuaggyslfyhlfo.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_1MORh5rY7uMDVYLYVX5VAA_cyoph4-7";
 
-type FeedbackStatus = "new" | "read" | "closed";
+type FeedbackStatus = "new" | "read" | "closed" | "archived";
 type FeedbackCategory = "app" | "education";
 type NotificationState = NotificationPermission | "unsupported";
 
 type FeedbackRow = {
+  replies: FeedbackReply[];
   id: string;
   category: FeedbackCategory;
   message: string;
@@ -39,6 +43,7 @@ const statusLabels: Record<FeedbackStatus, string> = {
   new: "Новое",
   read: "Просмотрено",
   closed: "Закрыто",
+  archived: "Архив",
 };
 
 function formatDate(value: string) {
@@ -102,7 +107,7 @@ async function staffRequest(path: string, options?: RequestInit) {
 
 async function loadFeedback(): Promise<FeedbackRow[]> {
   const response = await staffRequest(
-    "parent_feedback?select=id,category,message,status,branch_snapshot,child_name_snapshot,parent_name_snapshot,created_at,read_at,closed_at&order=created_at.desc"
+    "parent_feedback?select=id,category,message,status,branch_snapshot,child_name_snapshot,parent_name_snapshot,created_at,read_at,closed_at,replies:parent_feedback_replies(id,staff_name_snapshot,message,created_at)&order=created_at.desc"
   );
   if (!response.ok) throw new Error("Не удалось загрузить обратную связь.");
   return response.json();
@@ -130,7 +135,7 @@ export function AdminFeedbackInbox() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [updatingId, setUpdatingId] = useState("");
-  const [filter, setFilter] = useState<"all" | FeedbackStatus>("all");
+  const [filter, setFilter] = useState<"all" | "unanswered" | FeedbackStatus>("all");
   const [toastCount, setToastCount] = useState(0);
   const [notificationState, setNotificationState] = useState<NotificationState>(() => currentNotificationState());
   const previousNewCount = useRef<number | null>(null);
@@ -147,6 +152,7 @@ export function AdminFeedbackInbox() {
       if (permission === "granted") {
         showSystemNotification(1, {
           id: "preview",
+          replies: [],
           category: "app",
           message: "",
           status: "new",
@@ -196,7 +202,7 @@ export function AdminFeedbackInbox() {
 
   const newCount = rows.filter((item) => item.status === "new").length;
   const visible = useMemo(
-    () => (filter === "all" ? rows : rows.filter((item) => item.status === filter)),
+    () => (filter === "all" ? rows : rows.filter((item) => filter === "unanswered" ? item.status !== "archived" && item.replies.length === 0 : item.status === filter)),
     [filter, rows]
   );
 
@@ -253,14 +259,14 @@ export function AdminFeedbackInbox() {
                 <BellOff size={14} /> Уведомления запрещены в браузере
               </span>
             )}
-            {(["all", "new", "read", "closed"] as const).map((item) => (
+            {(["all", "unanswered", "new", "read", "closed", "archived"] as const).map((item) => (
               <button
                 key={item}
                 type="button"
                 onClick={() => setFilter(item)}
                 className={`rounded-full px-3 py-2 text-xs font-semibold ${filter === item ? "bg-[#171717] text-white" : "bg-[#F2F0E8] text-black/50"}`}
               >
-                {item === "all" ? "Все" : statusLabels[item]}
+                {item === "all" ? "Все" : item === "unanswered" ? "Без ответа" : statusLabels[item]}
               </button>
             ))}
           </div>
@@ -294,12 +300,16 @@ export function AdminFeedbackInbox() {
                 </div>
 
                 <p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-black/65">{item.message}</p>
+            <AdminFeedbackReplies feedbackId={item.id} replies={item.replies} onSent={reply => setRows(current => current.map(row => row.id !== item.id ? row : {
+              ...row, status: row.status === "new" ? "read" : row.status,
+              replies: [...row.replies.filter(existing => existing.id !== reply.id), reply],
+            }))} />
 
                 <div className="mt-4 flex flex-wrap gap-2">
                   {item.status === "new" && (
                     <button type="button" disabled={updatingId === item.id} onClick={() => changeStatus(item.id, "read")} className="rounded-[12px] border border-black/[0.07] bg-white px-3.5 py-2 text-xs font-semibold text-black/55 disabled:opacity-50">Просмотрено</button>
                   )}
-                  {item.status !== "closed" && (
+                  {(item.status === "new" || item.status === "read") && (
                     <button type="button" disabled={updatingId === item.id} onClick={() => changeStatus(item.id, "closed")} className="flex items-center gap-1.5 rounded-[12px] bg-[#171717] px-3.5 py-2 text-xs font-semibold text-white disabled:opacity-50"><CheckCircle2 size={14} /> Закрыть</button>
                   )}
                 </div>
