@@ -1,3 +1,4 @@
+import { gradeAverage, groupJournalGrades, mapParentGrade, type DatabaseGrade } from "@/gradeJournal";
 import { readHomeworkMaterials } from '@/homeworkMaterials';
 
 const SUPABASE_URL = "https://yiwiykbuaggyslfyhlfo.supabase.co";
@@ -161,6 +162,17 @@ async function restSelect<T>(table: string, query: string, accessToken: string):
   return response.json();
 }
 
+async function fetchParentGradeRows(childId: string, accessToken: string) {
+  const rows: DatabaseGrade[] = [];
+  const pageSize = 500;
+  for (let offset = 0; ; offset += pageSize) {
+    const page = await restSelect<DatabaseGrade>("grades",
+      `select=id,subject,grade,lesson_date,created_at,teacher_name&child_id=eq.${childId}&order=lesson_date.desc,created_at.desc,id.desc&limit=${pageSize}&offset=${offset}`, accessToken);
+    rows.push(...page);
+    if (page.length < pageSize) return rows;
+  }
+}
+
 function jwtSubject(accessToken: string) {
   const part = accessToken.split(".")[1];
   if (!part) return "";
@@ -294,7 +306,7 @@ export async function fetchParentDashboard() {
   const today = dateInSchoolTimeZone();
 
   const [gradeRows, attendanceRows, homeworkRows, commentRows, achievementRows, scheduleRows, paymentRows, coinRows, newsRows, photoRows, ruleRows] = await Promise.all([
-    restSelect<any>("grades", `select=*&child_id=eq.${childId}&order=lesson_date.desc`, token),
+    fetchParentGradeRows(childId, token),
     restSelect<any>("attendance", `select=*&child_id=eq.${childId}&order=lesson_date.desc`, token),
     restSelect<any>("homework", `select=*&child_id=eq.${childId}&order=due_date.asc.nullslast,lesson_date.desc`, token),
     restSelect<any>("teacher_comments", `select=*&child_id=eq.${childId}&order=comment_date.desc`, token),
@@ -308,23 +320,15 @@ export async function fetchParentDashboard() {
   ]);
 
   const fullName = [dbChild.first_name, dbChild.last_name].filter(Boolean).join(" ");
-  const averageGrade = gradeRows.length
-    ? gradeRows.reduce((sum, row) => sum + Number(row.grade || 0), 0) / gradeRows.length
-    : 0;
+  const parentGrades = gradeRows.map(mapParentGrade);
+  const averageGrade = gradeAverage(parentGrades) ?? 0;
   const overall = averageGrade ? Math.round((averageGrade / 5) * 100) : 0;
   const attended = attendanceRows.filter((row) => row.present).length;
   const attendancePct = attendanceRows.length ? Math.round((attended / attendanceRows.length) * 100) : 0;
 
-  const subjects = new Map<string, number[]>();
-  gradeRows.forEach((row) => {
-    const key = row.subject || "Занятия";
-    const list = subjects.get(key) || [];
-    list.push(Number(row.grade || 0));
-    subjects.set(key, list);
-  });
-  const skills = Array.from(subjects.entries()).map(([name, values]) => ({
-    name,
-    mastery: Math.round((values.reduce((sum, value) => sum + value, 0) / Math.max(values.length, 1) / 5) * 100),
+  const skills = groupJournalGrades(parentGrades).filter(row => row.average !== null).map(row => ({
+    name: row.label,
+    mastery: Math.round((row.average! / 5) * 100),
   }));
 
   const monthlyAttendance = new Map<string, { total: number; present: number }>();
@@ -405,15 +409,7 @@ export async function fetchParentDashboard() {
       source: row.source || "OPEN STARS",
       type: row.source === "manual" ? "manual" : "auto",
     })),
-    grades: gradeRows.map((row) => ({
-      id: row.id,
-      subject: row.subject || "Занятие",
-      grade: Number(row.grade),
-      value: Number(row.grade),
-      date: formatDate(row.lesson_date),
-      teacher: row.teacher_name || "Преподаватель OPEN STARS",
-      comment: "",
-    })),
+    grades: parentGrades,
     progress: {
       overall,
       month: overall,

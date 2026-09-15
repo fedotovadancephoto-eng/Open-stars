@@ -376,7 +376,7 @@ function App() {
 
           <section ref={tabContentRef} className="mt-6 scroll-mt-24 pb-8">
             {activeTab === "coins" && <CoinsTab />}
-            {activeTab === "progress" && <ProgressTab />}
+            {activeTab === "progress" && <ProgressTab key={child.id} />}
             {activeTab === "homework" && <HomeworkTab />}
             {activeTab === "comments" && <CommentsTab />}
             {activeTab === "achievements" && <AchievementsTab />}

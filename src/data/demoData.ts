@@ -1,3 +1,5 @@
+import type { ParentGrade } from "@/gradeJournal";
+
 export const parent = {
   firstName: "Родитель",
   name: "Родитель",
@@ -49,7 +51,7 @@ export const starCoinRules: Array<{
 }> = [];
 
 export const coinHistory: any[] = [];
-export const grades: any[] = [];
+export const grades: ParentGrade[] = [];
 
 export const progress = {
   overall: 0,
