@@ -12,6 +12,7 @@ import {
   LogOut,
   Menu,
   MessageCircle,
+  MessageSquareHeart,
   Newspaper,
   PartyPopper,
   TrendingUp,
@@ -32,6 +33,7 @@ interface HeaderProps {
 }
 
 const menuItems = [
+  { id: "feedback", label: "Обратная связь", icon: MessageSquareHeart },
   { id: "coins", label: "Star Coin", icon: Coins },
   { id: "progress", label: "Успеваемость", icon: TrendingUp },
   { id: "homework", label: "Домашние задания", icon: BookOpen },

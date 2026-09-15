@@ -9,6 +9,7 @@ import {
   Coins,
   CreditCard,
   MessageCircle,
+  MessageSquareHeart,
   Newspaper,
   PartyPopper,
   TrendingUp,
@@ -47,7 +48,8 @@ type TabId =
   | "schedule"
   | "payments"
   | "events"
-  | "photos";
+  | "photos"
+  | "feedback";
 
 type AuthStatus = "checking" | "guest" | "authenticated";
 type DataStatus = "idle" | "loading" | "ready" | "error";
@@ -70,6 +72,7 @@ const developmentTabs: TabConfig[] = [
 ];
 
 const parentTabs: TabConfig[] = [
+  { id: "feedback", label: "Обратная связь", icon: MessageSquareHeart, iconBox: "bg-[#5F6338]/12", iconColor: "text-[#4D512E]", hoverBg: "hover:bg-[#5F6338]/[0.055]" },
   { id: "schedule", label: "Расписание", icon: CalendarDays, iconBox: "bg-[#5F6338]/12", iconColor: "text-[#4D512E]", hoverBg: "hover:bg-[#5F6338]/[0.055]" },
   { id: "news", label: "Новости", icon: Newspaper, iconBox: "bg-[#D96A24]/12", iconColor: "text-[#C95320]", hoverBg: "hover:bg-[#D96A24]/[0.055]" },
   { id: "payments", label: "Оплата", icon: CreditCard, iconBox: "bg-[#5F6338]/12", iconColor: "text-[#4D512E]", hoverBg: "hover:bg-[#5F6338]/[0.055]" },
@@ -191,22 +194,24 @@ function App() {
   const [switchingChild, setSwitchingChild] = useState(false);
   const tabContentRef = useRef<HTMLElement | null>(null);
   const openedNotification = useRef("");
+  const [feedbackFocus, setFeedbackFocus] = useState({ id: "", notificationId: "" });
   const [pushNavigationError, setPushNavigationError] = useState("");
   const [pushSettingsOpen, setPushSettingsOpen] = useState(false);
 
   const openNotification = useCallback(async (id: string) => {
     const destination = await notificationDestination(id);
     if (!destination) throw new Error("Уведомление больше недоступно.");
-    const allowedTabs = ["coins", "progress", "homework", "comments", "news", "photos", "payments"];
+    const allowedTabs = ["coins", "progress", "homework", "comments", "news", "photos", "payments", "feedback"];
     if (!allowedTabs.includes(destination.tab)) return;
     if (destination.childId && destination.childId !== child.id) {
       selectParentChild(destination.childId);
       setSwitchingChild(true);
     }
+    setFeedbackFocus({ id: destination.tab === "feedback" ? destination.feedbackId || "" : "", notificationId: id });
     setActiveTab(destination.tab as TabId);
     setReloadKey(v => v + 1);
     setPushNavigationError("");
-    window.setTimeout(() => tabContentRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 200);
+    if (destination.tab !== "feedback") window.setTimeout(() => tabContentRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 200);
   }, []);
 
   useEffect(() => {
@@ -292,6 +297,7 @@ function App() {
   }, [authStatus, reloadKey]);
 
   const handleTabSelect = (tab: string) => {
+    setFeedbackFocus({ id: "", notificationId: "" });
     setActiveTab(tab as TabId);
     window.setTimeout(() => tabContentRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 40);
   };
@@ -379,9 +385,10 @@ function App() {
             {activeTab === "payments" && <PaymentsTab />}
             {activeTab === "events" && <EventsTab childId={child.id} childName={childFirstName} />}
             {activeTab === "photos" && <PhotosTab />}
+            {activeTab === "feedback" && <FeedbackCard key={child.id} childId={child.id} refreshKey={reloadKey} focusId={feedbackFocus.id} focusKey={feedbackFocus.notificationId} />}
           </section>
 
-          <FeedbackCard />
+          {activeTab !== "feedback" && <button type="button" onClick={() => handleTabSelect("feedback")} className="mb-8 flex w-full items-center justify-center gap-2 rounded-2xl bg-white p-5 text-sm font-semibold text-[#4D512E] shadow-sm"><MessageSquareHeart size={20} />Написать школе / посмотреть ответы</button>}
         </main>
       </div>
     </div>
