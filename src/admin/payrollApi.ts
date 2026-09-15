@@ -14,6 +14,9 @@ export type PayrollTeacher = {
 
 export type PayrollPayout = {
   id: string;
+  kind: 'weekly' | 'masterclass';
+  classTitle: string;
+  classDate: string;
   teacherProfileId: string;
   teacherName: string;
   branchId: string;
@@ -40,6 +43,7 @@ export type PayrollContext = {
   to: string;
   totalAmount: number;
   teachers: PayrollTeacher[];
+  availableBranches: string[];
   payouts: PayrollPayout[];
   branches: PayrollBranchSummary[];
 };
@@ -68,7 +72,12 @@ async function rpc<T>(name: string, body: Record<string, unknown>) {
     }
     if (message.includes("not authorized")) message = "Недостаточно прав для этой операции.";
     if (message.includes("invalid period")) message = "Проверьте период.";
-    if (message.includes("teacher required") || message.includes("invalid teacher")) message = "Выберите педагога.";
+    if (message.includes("masterclass teacher required")) message = "Введите ФИО педагога мастер-класса.";
+    if (message.includes("masterclass title required")) message = "Введите название мастер-класса.";
+    if (message.includes("masterclass date required")) message = "Укажите дату мастер-класса.";
+    if (message.includes("request conflict")) message = "Эта выплата уже отправлена с другими данными. Обновите историю.";
+    if (message.includes("invalid branch")) message = "Выберите округ выплаты.";
+    if (message.includes("teacher required") || message.includes("invalid teacher")) message = "Выберите действующего педагога этого округа.";
     if (message.includes("week required")) message = "Укажите неделю выплаты.";
     if (message.includes("invalid amount")) message = "Введите корректную сумму зарплаты.";
     if (message.includes("payout date required")) message = "Укажите дату выплаты.";
@@ -89,6 +98,7 @@ function normalizeContext(data: any, from: string, to: string): PayrollContext {
     from: data.from || from,
     to: data.to || to,
     totalAmount: Number(data.totalAmount || 0),
+    availableBranches: Array.isArray(data.availableBranches) ? data.availableBranches : [],
     teachers: (Array.isArray(data.teachers) ? data.teachers : []).map((item: any) => ({
       profileId: item.profileId || "",
       name: item.name || "Педагог",
@@ -96,6 +106,9 @@ function normalizeContext(data: any, from: string, to: string): PayrollContext {
     })),
     payouts: (Array.isArray(data.payouts) ? data.payouts : []).map((item: any) => ({
       id: item.id || "",
+      kind: item.kind === 'masterclass' ? 'masterclass' : 'weekly',
+      classTitle: item.classTitle || '',
+      classDate: item.classDate || '',
       teacherProfileId: item.teacherProfileId || "",
       teacherName: item.teacherName || "Педагог",
       branchId: item.branchId || "",
@@ -162,4 +175,37 @@ export async function voidTeacherPayroll(payoutId: string, reason: string) {
     p_payout_id: payoutId,
     p_reason: reason.trim(),
   });
+}
+
+type MasterclassPayrollInput = {
+  teacherName: string;
+  classTitle: string;
+  classDate: string;
+  amount: number;
+  payoutDate: string;
+  paymentMethod: PayrollPaymentMethod;
+  comment: string;
+};
+
+function masterclassBody(input: MasterclassPayrollInput) {
+  return {
+    p_teacher_name: input.teacherName.trim(),
+    p_class_title: input.classTitle.trim(),
+    p_class_date: input.classDate,
+    p_amount: input.amount,
+    p_payout_date: input.payoutDate,
+    p_payment_method: input.paymentMethod,
+    p_comment: input.comment.trim() || null,
+  };
+}
+
+export async function recordMasterclassPayroll(input: MasterclassPayrollInput & { branch: string; teacherProfileId: string; requestId: string }) {
+  return rpc('staff_record_masterclass_payroll', {
+    ...masterclassBody(input), p_branch: input.branch,
+    p_teacher_profile_id: input.teacherProfileId || null, p_request: input.requestId,
+  });
+}
+
+export async function correctMasterclassPayroll(input: MasterclassPayrollInput & { payoutId: string }) {
+  return rpc('staff_correct_masterclass_payroll', { ...masterclassBody(input), p_payout_id: input.payoutId });
 }
