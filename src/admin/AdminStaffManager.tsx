@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { CheckCircle2, Copy, Download, KeyRound, LoaderCircle, RefreshCw, Trash2, UserPlus, X } from "lucide-react";
 
 import { fetchStaffIdentity } from "@/admin/adminApi";
-import { onAdminSection } from "@/admin/adminNavigation";
+import { onAdminSection, notifyAdminDataUpdated } from "@/admin/adminNavigation";
 import {
   CreatedStaffInvite,
   StaffDirectoryRow,
@@ -12,6 +12,9 @@ import {
   fetchStaffInvites,
   reissueStaffInvite,
   revokeStaffInvite,
+  dismissStaff,
+  fetchDismissedStaff,
+  DismissedStaffRow,
 } from "@/admin/staffManagementApi";
 
 const branches = ["Свердловский", "НЛО", "Октябрьский"];
@@ -36,8 +39,8 @@ function fmt(value: string) {
 }
 
 function inviteStatus(item: StaffInviteRow) {
-  if (item.claimedAt) return { label: "Активирован", className: "bg-[#5F6338]/10 text-[#4D512E]" };
   if (item.revokedAt) return { label: "Отозван", className: "bg-black/[0.05] text-black/40" };
+  if (item.claimedAt) return { label: "Активирован", className: "bg-[#5F6338]/10 text-[#4D512E]" };
   if (item.expiresAt && new Date(item.expiresAt).getTime() < Date.now()) return { label: "Истёк", className: "bg-red-50 text-red-600" };
   return { label: "Ожидает активации", className: "bg-[#D96A24]/10 text-[#C95320]" };
 }
@@ -51,6 +54,7 @@ export function AdminStaffManager() {
   const [open, setOpen] = useState(false);
   const [actorRole, setActorRole] = useState("");
   const [directory, setDirectory] = useState<StaffDirectoryRow[]>([]);
+  const [dismissed, setDismissed] = useState<DismissedStaffRow[]>([]);
   const [invites, setInvites] = useState<StaffInviteRow[]>([]);
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
@@ -67,11 +71,14 @@ export function AdminStaffManager() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  async function refresh() {
-    const [people, inviteRows] = await Promise.all([fetchStaffDirectory(), fetchStaffInvites()]);
+  const refresh = useCallback(async (role: string) => {
+    const [people, inviteRows, dismissedRows] = await Promise.all([
+      fetchStaffDirectory(), fetchStaffInvites(), role === "owner" ? fetchDismissedStaff() : Promise.resolve([]),
+    ]);
     setDirectory(people);
     setInvites(inviteRows);
-  }
+    setDismissed(dismissedRows);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -83,21 +90,38 @@ export function AdminStaffManager() {
         const canManage = identity.role === "owner" || identity.role === "project_director";
         setActorRole(identity.role);
         setEnabled(canManage);
-        if (canManage) await refresh();
+        if (canManage) await refresh(identity.role);
       } catch {
         if (!cancelled) timer = window.setTimeout(detect, 1400);
       }
     }
     void detect();
     return () => { cancelled = true; if (timer) window.clearTimeout(timer); };
-  }, []);
+  }, [refresh]);
 
   useEffect(() => onAdminSection("team", () => {
     setOpen(true);
     setLoading(true);
     setError("");
-    void refresh().catch((e) => setError(e instanceof Error ? e.message : "Не удалось загрузить сотрудников.")).finally(() => setLoading(false));
-  }), []);
+    void refresh(actorRole).catch((e) => setError(e instanceof Error ? e.message : "Не удалось загрузить сотрудников.")).finally(() => setLoading(false));
+  }), [actorRole, refresh]);
+
+  async function dismiss(person: StaffDirectoryRow) {
+    if (busyId || saving || bulkBusy) return;
+    const reason = window.prompt(`Уволить ${person.fullName}? Рабочий доступ будет отключён. История выплат и операций сохранится. Укажите причину:`, "Прекращение работы");
+    if (!reason?.trim()) return;
+    setBusyId(person.profileId);
+    setError("");
+    setSuccess("");
+    try {
+      await dismissStaff(person.profileId, reason);
+      await refresh(actorRole);
+      notifyAdminDataUpdated({ source: "staff" });
+      setSuccess(`${person.fullName}: рабочий доступ отключён, сотрудник перенесён в уволенные.`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Не удалось уволить сотрудника.");
+    } finally { setBusyId(""); }
+  }
 
   useEffect(() => {
     if (roleName === "teacher") {
@@ -140,7 +164,7 @@ export function AdminStaffManager() {
       setSuccess(`Код создан. Передайте сотруднику телефон, код и ссылку ${isCrmRole ? "/admin/crm" : "/admin"}. Код показывается только сейчас.`);
       setFullName("");
       setPhone("");
-      await refresh();
+      await refresh(actorRole);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Не удалось создать приглашение.");
     } finally {
@@ -155,7 +179,7 @@ export function AdminStaffManager() {
     try {
       await revokeStaffInvite(item.inviteId);
       setReissuedCodes((current) => current.filter((code) => code.inviteId !== item.inviteId));
-      await refresh();
+      await refresh(actorRole);
       setSuccess("Приглашение отозвано.");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Не удалось отозвать приглашение.");
@@ -172,7 +196,7 @@ export function AdminStaffManager() {
     try {
       const next = await reissueStaffInvite(item);
       setReissuedCodes((current) => [...current.filter((code) => code.inviteId !== next.inviteId), next]);
-      await refresh();
+      await refresh(actorRole);
       setSuccess(`Новый код для ${item.fullName} создан. Сохраните его сейчас.`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Не удалось создать новый код.");
@@ -198,7 +222,7 @@ export function AdminStaffManager() {
         }
       }
       setReissuedCodes(generated);
-      await refresh();
+      await refresh(actorRole);
       if (generated.length > 0) setSuccess(`Создано новых кодов: ${generated.length}. Скопируйте или скачайте список сейчас.`);
       if (failed.length > 0) setError(`Не удалось перевыпустить: ${failed.join(", ")}. Остальные новые коды уже показаны ниже.`);
     } finally {
@@ -280,6 +304,9 @@ export function AdminStaffManager() {
             <button type="button" onClick={closeManager} disabled={saving || bulkBusy || Boolean(busyId)} className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white text-black/55 shadow-sm disabled:opacity-40"><X size={20} /></button>
           </div>
 
+              {error && <div className="mt-4 rounded-[15px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
+              {success && <div className="mt-4 flex gap-2 rounded-[15px] border border-[#5F6338]/15 bg-[#5F6338]/[0.07] px-4 py-3 text-sm text-[#4D512E]"><CheckCircle2 size={17} className="shrink-0" />{success}</div>}
+
           <div className="mt-6 grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
             <section className="rounded-[24px] border border-black/[0.06] bg-white p-5 sm:p-6">
               <div className="flex items-center gap-2"><UserPlus size={19} className="text-[#D96A24]" /><h3 className="font-semibold">Новый доступ</h3></div>
@@ -301,14 +328,20 @@ export function AdminStaffManager() {
               <button type="button" onClick={() => void create()} disabled={saving || bulkBusy} className="mt-5 flex w-full items-center justify-center gap-2 rounded-[14px] bg-[#171717] px-5 py-3.5 text-sm font-semibold text-white disabled:opacity-50">{saving ? <LoaderCircle className="animate-spin" size={17} /> : <KeyRound size={17} />} Создать код на 7 дней</button>
 
               {created && <div className="mt-5 rounded-[20px] border border-[#D96A24]/20 bg-[#FFF8F1] p-4"><p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#C95320]">Код активации</p><div className="mt-2 flex items-center gap-3"><span className="font-mono text-3xl font-bold tracking-[0.18em] text-[#171717]">{created.activationCode}</span><button type="button" onClick={() => void copyCode()} className="grid h-10 w-10 place-items-center rounded-xl bg-white text-black/50 shadow-sm" aria-label="Скопировать код"><Copy size={17} /></button></div><p className="mt-2 text-xs leading-5 text-black/45">{created.fullName} · {created.phone}<br />Действует до {fmt(created.expiresAt)}.</p></div>}
-              {error && <div className="mt-4 rounded-[15px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
-              {success && <div className="mt-4 flex gap-2 rounded-[15px] border border-[#5F6338]/15 bg-[#5F6338]/[0.07] px-4 py-3 text-sm text-[#4D512E]"><CheckCircle2 size={17} className="shrink-0" />{success}</div>}
             </section>
 
             <div className="space-y-5">
               <section className="rounded-[24px] border border-black/[0.06] bg-white p-5">
-                <div className="flex items-center justify-between gap-3"><div><p className="text-[11px] font-bold uppercase tracking-[0.18em] text-black/35">Команда</p><h3 className="mt-1 text-lg font-semibold">Активные сотрудники · {directory.length}</h3></div><button type="button" onClick={() => { setLoading(true); void refresh().finally(() => setLoading(false)); }} className="grid h-9 w-9 place-items-center rounded-full bg-[#FAF9F5] text-black/45"><RefreshCw size={16} className={loading ? "animate-spin" : ""} /></button></div>
-                {loading ? <div className="grid min-h-[140px] place-items-center"><LoaderCircle className="animate-spin text-black/25" /></div> : directory.length === 0 ? <p className="mt-4 text-sm text-black/40">Активных сотрудников пока нет.</p> : <div className="mt-4 max-h-[360px] space-y-2 overflow-y-auto">{directory.map((person) => <div key={person.profileId} className="rounded-[16px] border border-black/[0.055] p-3"><div className="flex flex-wrap items-start justify-between gap-2"><div><p className="text-sm font-semibold">{person.fullName}</p><p className="mt-1 text-xs text-black/40">{roleLabels[person.roleName] || person.roleName}{person.branch ? ` · ${person.branch}` : ""}</p></div><span className="rounded-full bg-[#5F6338]/10 px-2.5 py-1 text-[10px] font-bold text-[#4D512E]">Активен</span></div>{person.teachingSubjects.length > 0 && <p className="mt-2 text-xs text-[#C95320]">Педагог: {person.teachingSubjects.join(", ")}</p>}</div>)}</div>}
+                <div className="flex items-center justify-between gap-3"><div><p className="text-[11px] font-bold uppercase tracking-[0.18em] text-black/35">Команда</p><h3 className="mt-1 text-lg font-semibold">Активные сотрудники · {directory.length}</h3></div><button type="button" onClick={() => { setLoading(true); void refresh(actorRole).catch(e => setError(e instanceof Error ? e.message : "Не удалось обновить сотрудников.")).finally(() => setLoading(false)); }} className="grid h-9 w-9 place-items-center rounded-full bg-[#FAF9F5] text-black/45"><RefreshCw size={16} className={loading ? "animate-spin" : ""} /></button></div>
+                {loading ? <div className="grid min-h-[140px] place-items-center"><LoaderCircle className="animate-spin text-black/25" /></div> : directory.length === 0 ? <p className="mt-4 text-sm text-black/40">Активных сотрудников пока нет.</p> : <div className="mt-4 max-h-[420px] space-y-2 overflow-y-auto">{directory.map(person => (
+                  <div key={person.profileId} className="rounded-[16px] border border-black/[0.055] p-3">
+                    <div className="flex flex-wrap items-start justify-between gap-2"><div><p className="text-sm font-semibold">{person.fullName}</p><p className="mt-1 text-xs text-black/40">{roleLabels[person.roleName] || person.roleName}{person.branch ? ` · ${person.branch}` : ''}</p></div><span className="rounded-full bg-[#5F6338]/10 px-2.5 py-1 text-[10px] font-bold text-[#4D512E]">Активен</span></div>
+                    {person.teachingSubjects.length > 0 && <p className="mt-2 text-xs text-[#C95320]">Педагог: {person.teachingSubjects.join(', ')}</p>}
+                    {actorRole === 'owner' && person.roleName !== 'owner' && <button type="button" disabled={saving || bulkBusy || Boolean(busyId)} onClick={() => void dismiss(person)} className="mt-3 rounded-[10px] bg-red-50 px-3 py-2 text-xs font-semibold text-red-600 disabled:opacity-45">{busyId === person.profileId ? 'Отключаем доступ…' : 'Уволить'}</button>}
+                  </div>
+                ))}</div>}
+                {actorRole === 'owner' && dismissed.length > 0 && <details className="mt-4 rounded-[16px] border border-black/[0.06] p-3"><summary className="cursor-pointer text-sm font-semibold">Уволенные · {dismissed.length}</summary><div className="mt-3 max-h-[360px] space-y-3 overflow-y-auto">{dismissed.map(person => <div key={person.profileId} className="border-t border-black/[0.05] pt-3"><p className="text-sm font-semibold">{person.fullName}</p><p className="mt-1 text-xs text-black/45">{roleLabels[person.roleName] || person.roleName}{person.branch ? ` · ${person.branch}` : ''}</p><p className="mt-1 text-xs text-black/40">Доступ отключён {fmt(person.dismissedAt)}</p><p className="mt-1 break-words text-xs text-black/45">{person.reason}</p></div>)}</div></details>}
+
               </section>
 
               <section className="rounded-[24px] border border-black/[0.06] bg-white p-5">

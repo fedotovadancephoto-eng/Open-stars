@@ -28,6 +28,15 @@ export type StaffInviteRow = {
 
 export type CreatedStaffInvite = StaffInviteRow & { activationCode: string };
 
+export type DismissedStaffRow = {
+  profileId: string;
+  fullName: string;
+  roleName: string;
+  branch: string;
+  dismissedAt: string;
+  reason: string;
+};
+
 type ApiError = { message?: string; details?: string };
 
 function friendly(message: string) {
@@ -40,6 +49,10 @@ function friendly(message: string) {
   if (message.includes("invite revoked")) return "Это приглашение уже отозвано.";
   if (message.includes("invite not found")) return "Приглашение не найдено. Обновите список сотрудников.";
   if (message.includes("not authorized")) return "У вас нет доступа к управлению сотрудниками.";
+  if (message.includes("cannot dismiss yourself")) return "Нельзя уволить собственный аккаунт.";
+  if (message.includes("dismiss reason required")) return "Укажите причину прекращения работы.";
+  if (message.includes("staff not found")) return "Сотрудник не найден. Обновите список.";
+  if (message.includes("invalid staff role")) return "Этот аккаунт нельзя уволить через список сотрудников.";
   return message;
 }
 
@@ -147,4 +160,12 @@ export async function reissueStaffInvite(invite: StaffInviteRow) {
 
 export async function revokeStaffInvite(inviteId: string) {
   return rpc<boolean>("staff_revoke_staff_invite", { p_invite_id: inviteId });
+}
+
+export async function fetchDismissedStaff() {
+  return rpc<DismissedStaffRow[]>("staff_list_dismissed_staff");
+}
+
+export async function dismissStaff(profileId: string, reason: string) {
+  return rpc("staff_dismiss_staff", { p_profile_id: profileId, p_reason: reason.trim() });
 }
