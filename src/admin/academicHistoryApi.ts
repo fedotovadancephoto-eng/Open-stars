@@ -23,6 +23,13 @@ export type AcademicGradeHistoryRecord = {
   createdAt: string;
 };
 
+export type AcademicAttendanceHistoryRecord = {
+  id: string;
+  subject: string;
+  lessonDate: string;
+  present: boolean;
+};
+
 export type AcademicHomeworkHistoryRecord = {
   id: string;
   subject: string;
@@ -59,6 +66,7 @@ export type AcademicAchievementHistoryRecord = {
 };
 
 export type AcademicFullHistory = {
+  attendance: AcademicAttendanceHistoryRecord[];
   grades: AcademicGradeHistoryRecord[];
   homework: AcademicHomeworkHistoryRecord[];
   comments: AcademicCommentHistoryRecord[];
@@ -74,6 +82,8 @@ async function getSession() {
 function friendlyMessage(message: string) {
   if (message.toLowerCase().includes("row-level security")) return "У вас нет доступа к этой записи.";
   if (message.includes("not authorized")) return "У вас нет доступа к этому ученику или предмету.";
+  if (message.includes("attendance required")) return "Сначала отметьте присутствие ученика на этом занятии.";
+  if (message.includes("invalid grade")) return "Оценка должна быть от 1 до 5.";
   return message;
 }
 
@@ -99,6 +109,31 @@ async function tableRequest<T>(path: string, init: RequestInit = {}): Promise<T>
   if (response.status === 204) return undefined as T;
   const text = await response.text();
   return (text ? JSON.parse(text) : undefined) as T;
+}
+
+async function rpc<T>(name: string, body: Record<string, unknown>): Promise<T> {
+  const session = await getSession();
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${name}`, {
+    method: "POST",
+    headers: {
+      apikey: SUPABASE_PUBLISHABLE_KEY,
+      Authorization: `Bearer ${session.access_token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    let message = "Не удалось выполнить действие.";
+    try {
+      const payload = (await response.json()) as ApiError;
+      message = payload.message || payload.details || message;
+    } catch {
+      // ignore invalid JSON error bodies
+    }
+    throw new Error(friendlyMessage(message));
+  }
+  if (response.status === 204) return undefined as T;
+  return response.json() as Promise<T>;
 }
 
 function tablePath(table: string, params: Record<string, string>) {
@@ -153,10 +188,17 @@ export async function searchAcademicStudents(query: string): Promise<AcademicStu
 }
 
 export async function fetchAcademicFullHistory(childId: string): Promise<AcademicFullHistory> {
-  if (!childId) return { grades: [], homework: [], comments: [], achievements: [] };
+  if (!childId) return { attendance: [], grades: [], homework: [], comments: [], achievements: [] };
   const childFilter = { child_id: `eq.${childId}` };
 
-  const [gradeRows, homeworkRows, commentRows, achievementRows] = await Promise.all([
+  const [attendanceRows, gradeRows, homeworkRows, commentRows, achievementRows] = await Promise.all([
+    tableRequest<any[]>(tablePath("attendance", {
+      select: "id,subject,lesson_date,present",
+      ...childFilter,
+      present: "eq.true",
+      order: "lesson_date.desc,created_at.desc",
+      limit: "250",
+    })),
     tableRequest<any[]>(tablePath("grades", {
       select: "id,subject,grade,lesson_date,teacher_name,created_at",
       ...childFilter,
@@ -184,6 +226,12 @@ export async function fetchAcademicFullHistory(childId: string): Promise<Academi
   ]);
 
   return {
+    attendance: (attendanceRows || []).map((row) => ({
+      id: row.id,
+      subject: row.subject || "Без предмета",
+      lessonDate: row.lesson_date || "",
+      present: Boolean(row.present),
+    })),
     grades: (gradeRows || []).map((row) => ({
       id: row.id,
       subject: row.subject || "Без предмета",
@@ -225,6 +273,22 @@ export async function fetchAcademicFullHistory(childId: string): Promise<Academi
       createdAt: row.created_at || "",
     })),
   };
+}
+
+export async function addHistoryGrade(input: {
+  childId: string;
+  subject: string;
+  grade: number;
+  lessonDate: string;
+}) {
+  if (!input.childId || !input.subject.trim() || !input.lessonDate) throw new Error("Выберите прошедшее занятие.");
+  if (!Number.isInteger(input.grade) || input.grade < 1 || input.grade > 5) throw new Error("Оценка должна быть от 1 до 5.");
+  return rpc<string>("staff_add_history_grade", {
+    p_child_id: input.childId,
+    p_subject: input.subject.trim(),
+    p_grade: input.grade,
+    p_lesson_date: input.lessonDate,
+  });
 }
 
 export async function updateHistoryGrade(id: string, grade: number) {

@@ -52,6 +52,10 @@ function friendly(message: string) {
   if (message.includes("cannot dismiss yourself")) return "Нельзя уволить собственный аккаунт.";
   if (message.includes("dismiss reason required")) return "Укажите причину прекращения работы.";
   if (message.includes("staff not found")) return "Сотрудник не найден. Обновите список.";
+  if (message.includes("staff is not dismissed")) return "Этот сотрудник уже восстановлен или не находится в списке уволенных.";
+  if (message.includes("dismissal history not found")) return "Не найдена история прежней роли сотрудника. Обратитесь к директору.";
+  if (message.includes("staff account is not activated")) return "У сотрудника нет активированного аккаунта — создайте новый доступ.";
+  if (message.includes("teacher assignments missing")) return "В истории не найдены прежние предметы педагога.";
   if (message.includes("invalid staff role")) return "Этот аккаунт нельзя уволить через список сотрудников.";
   return message;
 }
@@ -168,4 +172,12 @@ export async function fetchDismissedStaff() {
 
 export async function dismissStaff(profileId: string, reason: string) {
   return rpc("staff_dismiss_staff", { p_profile_id: profileId, p_reason: reason.trim() });
+}
+
+export async function restoreStaff(profileId: string, fullName: string) {
+  return rpc("staff_restore_staff", {
+    p_profile_id: profileId,
+    p_full_name: fullName.trim(),
+    p_reason: "Восстановление существующего аккаунта",
+  });
 }
