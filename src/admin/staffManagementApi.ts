@@ -57,6 +57,8 @@ function friendly(message: string) {
   if (message.includes("staff account is not activated")) return "У сотрудника нет активированного аккаунта — создайте новый доступ.";
   if (message.includes("teacher assignments missing")) return "В истории не найдены прежние предметы педагога.";
   if (message.includes("invalid staff role")) return "Этот аккаунт нельзя уволить через список сотрудников.";
+  if (message.includes("staff account is not active")) return "У сотрудника нет активного аккаунта для повторной активации.";
+  if (message.includes("cannot reactivate owner")) return "Доступ директора нельзя перевыпустить из списка сотрудников.";
   return message;
 }
 
@@ -158,6 +160,26 @@ export async function reissueStaffInvite(invite: StaffInviteRow) {
   if (!row?.activation_code) throw new Error("Не удалось выпустить новый код.");
   return {
     ...mapInvite(row, invite),
+    activationCode: row.activation_code,
+  } as CreatedStaffInvite;
+}
+
+export async function createStaffReactivationInvite(person: StaffDirectoryRow) {
+  const rows: any[] = await rpc("staff_create_staff_reactivation_invite", {
+    p_profile_id: person.profileId,
+    p_valid_hours: 168,
+  });
+  const row = rows?.[0];
+  if (!row?.activation_code) throw new Error("Не удалось выпустить код повторной активации.");
+  return {
+    ...mapInvite(row, {
+      fullName: person.fullName,
+      phone: person.phone,
+      roleName: person.roleName,
+      branch: person.branch,
+      teachingSubject: person.teachingSubjects[0] || "",
+      createdAt: new Date().toISOString(),
+    }),
     activationCode: row.activation_code,
   } as CreatedStaffInvite;
 }
