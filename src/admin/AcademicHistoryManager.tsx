@@ -1,5 +1,5 @@
-import { FormEvent, useCallback, useEffect, useState } from "react";
-import { Award, History, LoaderCircle, Pencil, RefreshCw, Save, Search, Trash2, UsersRound, X } from "lucide-react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { Award, History, LoaderCircle, Pencil, Plus, RefreshCw, Save, Search, Trash2, UsersRound, X } from "lucide-react";
 
 import {
   AcademicAchievementHistoryRecord,
@@ -18,17 +18,19 @@ import {
   updateHistoryComment,
   updateHistoryGrade,
   updateHistoryHomework,
+  addHistoryGrade,
 } from "@/admin/academicHistoryApi";
 import { HomeworkMaterial } from '@/homeworkMaterials';
 import { HomeworkMaterials } from '@/components/HomeworkMaterials';
 import { HomeworkMaterialsEditor } from '@/admin/HomeworkMaterialsEditor';
 import { AttendanceHistorySection } from "@/admin/AttendanceHistorySection";
 
-const emptyHistory: AcademicFullHistory = { grades: [], homework: [], comments: [], achievements: [] };
+const emptyHistory: AcademicFullHistory = { attendance: [], grades: [], homework: [], comments: [], achievements: [] };
 const fieldClass = "w-full rounded-[11px] border border-black/[0.08] bg-white px-3 py-2.5 text-sm outline-none focus:border-[#D96A24]/45 focus:ring-4 focus:ring-[#D96A24]/[0.06]";
 
 type Props = { childId: string; childName: string; subject?: string; refreshKey: number };
 type GradeDraft = { record: AcademicGradeHistoryRecord; grade: number };
+type NewGradeDraft = { attendanceId: string; grade: number };
 type HomeworkDraft = { record: AcademicHomeworkHistoryRecord; title: string; description: string; dueDate: string; materials: HomeworkMaterial[] };
 type CommentDraft = { record: AcademicCommentHistoryRecord; title: string; text: string; date: string };
 type AchievementDraft = { record: AcademicAchievementHistoryRecord; title: string; description: string; achievedAt: string };
@@ -55,6 +57,7 @@ export function AcademicHistoryManager({ childId, childName, refreshKey }: Props
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [gradeDraft, setGradeDraft] = useState<GradeDraft | null>(null);
+  const [newGrade, setNewGrade] = useState<NewGradeDraft | null>(null);
   const [homeworkDraft, setHomeworkDraft] = useState<HomeworkDraft | null>(null);
   const [commentDraft, setCommentDraft] = useState<CommentDraft | null>(null);
   const [achievementDraft, setAchievementDraft] = useState<AchievementDraft | null>(null);
@@ -84,12 +87,18 @@ export function AcademicHistoryManager({ childId, childName, refreshKey }: Props
 
   useEffect(() => {
     setGradeDraft(null);
+    setNewGrade(null);
     setHomeworkDraft(null);
     setCommentDraft(null);
     setAchievementDraft(null);
     setSuccess("");
     void load(student?.id || "");
   }, [student?.id, refreshKey, load]);
+
+  const missingGradeLessons = useMemo(() => {
+    const graded = new Set(history.grades.map((record) => `${record.lessonDate}\u0000${record.subject}`));
+    return history.attendance.filter((record) => record.present && !graded.has(`${record.lessonDate}\u0000${record.subject}`));
+  }, [history.attendance, history.grades]);
 
   async function search(event: FormEvent) {
     event.preventDefault();
@@ -164,7 +173,8 @@ export function AcademicHistoryManager({ childId, childName, refreshKey }: Props
               <AttendanceHistorySection childId={student.id} refreshKey={refreshKey} />
 
               <div className="border-t border-black/[0.06] pt-5">
-                <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-black/35">Оценки · {history.grades.length}</p>
+                <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-[11px] font-bold uppercase tracking-[0.16em] text-black/35">Оценки · {history.grades.length}</p>{missingGradeLessons.length > 0 && <button type="button" onClick={() => setNewGrade({ attendanceId: missingGradeLessons[0].id, grade: 5 })} className="flex items-center gap-1.5 rounded-[10px] bg-[#D96A24]/10 px-3 py-2 text-xs font-semibold text-[#C95320]"><Plus size={14}/> Добавить за прошлое занятие</button>}</div>
+                {newGrade && <div className="mt-3 rounded-[14px] border border-[#D96A24]/15 bg-[#FFF8F1] p-3"><p className="text-xs font-semibold text-[#C95320]">Оценка за занятие, где присутствие уже отмечено</p><div className="mt-2 grid gap-2 sm:grid-cols-[1fr_110px_auto]"><label className="text-xs font-semibold text-black/50">Занятие<select className={`${fieldClass} mt-1`} value={newGrade.attendanceId} onChange={(e) => setNewGrade({ ...newGrade, attendanceId: e.target.value })}>{missingGradeLessons.map((record) => <option key={record.id} value={record.id}>{formatDate(record.lessonDate)} · {record.subject}</option>)}</select></label><label className="text-xs font-semibold text-black/50">Оценка<select className={`${fieldClass} mt-1`} value={newGrade.grade} onChange={(e) => setNewGrade({ ...newGrade, grade: Number(e.target.value) })}>{[5,4,3,2,1].map((value) => <option key={value}>{value}</option>)}</select></label><div className="flex items-end gap-2"><button type="button" disabled={saving} onClick={() => { const lesson = missingGradeLessons.find((record) => record.id === newGrade.attendanceId); if (!lesson || !student) return; void run(async () => { await addHistoryGrade({ childId: student.id, subject: lesson.subject, lessonDate: lesson.lessonDate, grade: newGrade.grade }); setNewGrade(null); return "Оценка добавлена. Star Coin начислены автоматически."; }, "Не удалось добавить оценку."); }} className="grid h-10 w-10 place-items-center rounded-[10px] bg-[#5F6338] text-white disabled:opacity-50"><Save size={15}/></button><button type="button" onClick={() => setNewGrade(null)} className="grid h-10 w-10 place-items-center rounded-[10px] bg-white text-black/45"><X size={15}/></button></div></div></div>}
                 {history.grades.length === 0 ? <p className="mt-2 text-sm text-black/35">Нет оценок.</p> : <div className="mt-2 space-y-2">{history.grades.map((record) => {
                   const draft = gradeDraft?.record.id === record.id ? gradeDraft : null;
                   return <div key={record.id} className="rounded-[13px] bg-[#FAF9F5] p-3">{draft ? (

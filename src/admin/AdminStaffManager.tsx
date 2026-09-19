@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CheckCircle2, Copy, Download, KeyRound, LoaderCircle, RefreshCw, Trash2, UserPlus, X } from "lucide-react";
+import { CheckCircle2, Copy, Download, KeyRound, LoaderCircle, RefreshCw, RotateCcw, Trash2, UserPlus, X } from "lucide-react";
 
 import { fetchStaffIdentity } from "@/admin/adminApi";
 import { onAdminSection, notifyAdminDataUpdated } from "@/admin/adminNavigation";
@@ -15,6 +15,7 @@ import {
   dismissStaff,
   fetchDismissedStaff,
   DismissedStaffRow,
+  restoreStaff,
 } from "@/admin/staffManagementApi";
 
 const branches = ["Свердловский", "НЛО", "Октябрьский"];
@@ -120,6 +121,27 @@ export function AdminStaffManager() {
       setSuccess(`${person.fullName}: рабочий доступ отключён, сотрудник перенесён в уволенные.`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Не удалось уволить сотрудника.");
+    } finally { setBusyId(""); }
+  }
+
+  async function restore(person: DismissedStaffRow) {
+    if (busyId || saving || bulkBusy) return;
+    const fullName = window.prompt(
+      `Восстановить существующий аккаунт ${person.fullName}? Укажите актуальные имя и фамилию:`,
+      person.fullName,
+    );
+    if (!fullName?.trim()) return;
+    if (!window.confirm(`Вернуть доступ для «${fullName.trim()}» с прежней ролью и назначениями?`)) return;
+    setBusyId(person.profileId);
+    setError("");
+    setSuccess("");
+    try {
+      await restoreStaff(person.profileId, fullName);
+      await refresh(actorRole);
+      notifyAdminDataUpdated({ source: "staff" });
+      setSuccess(`${fullName.trim()}: прежний аккаунт восстановлен. Повторная активация и новый код не нужны — сотрудник входит по телефону и своему паролю.`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Не удалось восстановить сотрудника.");
     } finally { setBusyId(""); }
   }
 
@@ -340,7 +362,7 @@ export function AdminStaffManager() {
                     {actorRole === 'owner' && person.roleName !== 'owner' && <button type="button" disabled={saving || bulkBusy || Boolean(busyId)} onClick={() => void dismiss(person)} className="mt-3 rounded-[10px] bg-red-50 px-3 py-2 text-xs font-semibold text-red-600 disabled:opacity-45">{busyId === person.profileId ? 'Отключаем доступ…' : 'Уволить'}</button>}
                   </div>
                 ))}</div>}
-                {actorRole === 'owner' && dismissed.length > 0 && <details className="mt-4 rounded-[16px] border border-black/[0.06] p-3"><summary className="cursor-pointer text-sm font-semibold">Уволенные · {dismissed.length}</summary><div className="mt-3 max-h-[360px] space-y-3 overflow-y-auto">{dismissed.map(person => <div key={person.profileId} className="border-t border-black/[0.05] pt-3"><p className="text-sm font-semibold">{person.fullName}</p><p className="mt-1 text-xs text-black/45">{roleLabels[person.roleName] || person.roleName}{person.branch ? ` · ${person.branch}` : ''}</p><p className="mt-1 text-xs text-black/40">Доступ отключён {fmt(person.dismissedAt)}</p><p className="mt-1 break-words text-xs text-black/45">{person.reason}</p></div>)}</div></details>}
+                {actorRole === 'owner' && dismissed.length > 0 && <details className="mt-4 rounded-[16px] border border-black/[0.06] p-3"><summary className="cursor-pointer text-sm font-semibold">Уволенные · {dismissed.length}</summary><div className="mt-3 max-h-[360px] space-y-3 overflow-y-auto">{dismissed.map(person => <div key={person.profileId} className="border-t border-black/[0.05] pt-3"><p className="text-sm font-semibold">{person.fullName}</p><p className="mt-1 text-xs text-black/45">{roleLabels[person.roleName] || person.roleName}{person.branch ? ` · ${person.branch}` : ''}</p><p className="mt-1 text-xs text-black/40">Доступ отключён {fmt(person.dismissedAt)}</p><p className="mt-1 break-words text-xs text-black/45">{person.reason}</p><button type="button" disabled={saving || bulkBusy || Boolean(busyId)} onClick={() => void restore(person)} className="mt-2 flex items-center gap-1.5 rounded-[10px] bg-[#5F6338]/10 px-3 py-2 text-xs font-semibold text-[#4D512E] disabled:opacity-45">{busyId === person.profileId ? <LoaderCircle size={14} className="animate-spin" /> : <RotateCcw size={14} />} Восстановить</button></div>)}</div></details>}
 
               </section>
 
