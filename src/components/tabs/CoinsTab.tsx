@@ -22,11 +22,11 @@ const ruleIcons = {
 } as const;
 
 const extraActivities = [
-  { id: "show", title: "Участие в показах", icon: Trophy },
-  { id: "shoot", title: "Рекламные и творческие съёмки", icon: Camera },
-  { id: "event", title: "Выездные мероприятия", icon: Car },
-  { id: "friend", title: "Приведи друга", icon: UserPlus },
-  { id: "school-life", title: "Активность в жизни школы", icon: Sparkles },
+  { id: "show", title: "Участие в показах", amount: 100, icon: Trophy },
+  { id: "shoot", title: "Рекламные и творческие съёмки", amount: 30, icon: Camera },
+  { id: "event", title: "Выездные мероприятия на показ в другие города", amount: 200, icon: Car },
+  { id: "friend", title: "Приведи друга", amount: 50, icon: UserPlus },
+  { id: "school-life", title: "Активность в жизни школы / волонтёрство", amount: 30, icon: Sparkles },
 ];
 
 function sourceLabel(source: string) {
@@ -128,12 +128,12 @@ export function CoinsTab() {
 
         <div className="mt-7">
           <div className="flex items-center gap-3"><span className="h-px w-7 bg-[#5F6338]" /><p className="text-[11px] font-bold uppercase tracking-[0.18em] text-black/45">Дополнительные активности</p></div>
-          <p className="mt-3 text-xs leading-5 text-black/40">За эти активности команда OPEN STARS может начислить дополнительный бонус. Размер зависит от конкретного события и всегда виден в истории операций.</p>
+          <p className="mt-3 text-xs leading-5 text-black/40">За эти активности команда OPEN STARS начисляет Star Coin вручную. Начисление всегда видно в истории операций.</p>
           <div className="mt-4 grid gap-3 md:grid-cols-2">
             {extraActivities.map((item, index) => {
               const Icon = item.icon;
               const orange = index % 2 === 0;
-              return <div key={item.id} className="flex min-h-[70px] items-center gap-3 rounded-[18px] border border-black/[0.06] bg-white px-4 py-3"><div className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${orange ? "bg-[#D96A24]/10 text-[#C95320]" : "bg-[#5F6338]/10 text-[#4D512E]"}`}><Icon className="h-5 w-5" strokeWidth={2.1} /></div><p className="text-sm font-semibold leading-snug text-[#171717]">{item.title}</p></div>;
+              return <div key={item.id} className="flex min-h-[70px] items-center gap-3 rounded-[18px] border border-black/[0.06] bg-white px-4 py-3"><div className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${orange ? "bg-[#D96A24]/10 text-[#C95320]" : "bg-[#5F6338]/10 text-[#4D512E]"}`}><Icon className="h-5 w-5" strokeWidth={2.1} /></div><p className="min-w-0 flex-1 text-sm font-semibold leading-snug text-[#171717]">{item.title}</p><span className={`shrink-0 text-base font-bold ${orange ? "text-[#C95320]" : "text-[#4D512E]"}`}>+{item.amount}</span></div>;
             })}
           </div>
         </div>
