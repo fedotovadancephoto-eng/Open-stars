@@ -1,6 +1,9 @@
+import { fetchWithTimeout } from "@/apiRequest";
+
 const SUPABASE_URL = "https://yiwiykbuaggyslfyhlfo.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_1MORh5rY7uMDVYLYVX5VAA_cyoph4-7";
 const STAFF_SESSION_KEY = "openstars_staff_session";
+export const STAFF_SESSION_CHANGED_EVENT = "openstars:staff-session-changed";
 
 export type StaffRole = "owner" | "project_director" | "admin" | "manager" | "teacher";
 export type BranchName = "Свердловский" | "НЛО" | "Октябрьский";
@@ -83,10 +86,12 @@ type ApiError = { message?: string; error?: string; details?: string };
 
 function saveStaffSession(session: StaffSession) {
   localStorage.setItem(STAFF_SESSION_KEY, JSON.stringify(session));
+  window.dispatchEvent(new Event(STAFF_SESSION_CHANGED_EVENT));
 }
 
 export function clearStaffSession() {
   localStorage.removeItem(STAFF_SESSION_KEY);
+  window.dispatchEvent(new Event(STAFF_SESSION_CHANGED_EVENT));
 }
 
 export function getStaffSession(): StaffSession | null {
@@ -105,7 +110,7 @@ function isExpired(session: StaffSession) {
 }
 
 export async function loginStaff(phone: string, password: string) {
-  const response = await fetch(`${SUPABASE_URL}/functions/v1/login-staff`, {
+  const response = await fetchWithTimeout(`${SUPABASE_URL}/functions/v1/login-staff`, {
     method: "POST",
     headers: { "Content-Type": "application/json", apikey: SUPABASE_PUBLISHABLE_KEY },
     body: JSON.stringify({ phone, password }),
@@ -131,7 +136,7 @@ export async function refreshStaffSession() {
   const session = getStaffSession();
   if (!session) return null;
 
-  const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+  const response = await fetchWithTimeout(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
     method: "POST",
     headers: { "Content-Type": "application/json", apikey: SUPABASE_PUBLISHABLE_KEY },
     body: JSON.stringify({ refresh_token: session.refresh_token }),
@@ -175,7 +180,7 @@ function authUserIdFromAccessToken(token: string) {
 }
 
 async function restSelect<T>(table: string, query: string, token: string): Promise<T[]> {
-  const response = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${query}`, {
+  const response = await fetchWithTimeout(`${SUPABASE_URL}/rest/v1/${table}?${query}`, {
     headers: { apikey: SUPABASE_PUBLISHABLE_KEY, Authorization: `Bearer ${token}` },
   });
 
@@ -191,7 +196,7 @@ async function restSelect<T>(table: string, query: string, token: string): Promi
 }
 
 async function restPatch<T>(table: string, query: string, body: unknown, token: string): Promise<T[]> {
-  const response = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${query}`, {
+  const response = await fetchWithTimeout(`${SUPABASE_URL}/rest/v1/${table}?${query}`, {
     method: "PATCH",
     headers: {
       apikey: SUPABASE_PUBLISHABLE_KEY,
@@ -234,7 +239,7 @@ async function rpc<T>(functionName: string, body: Record<string, unknown>): Prom
   const session = await getValidStaffSession();
   if (!session) throw new Error("Сессия сотрудника не найдена.");
 
-  const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${functionName}`, {
+  const response = await fetchWithTimeout(`${SUPABASE_URL}/rest/v1/rpc/${functionName}`, {
     method: "POST",
     headers: {
       apikey: SUPABASE_PUBLISHABLE_KEY,

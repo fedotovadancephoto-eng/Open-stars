@@ -1,5 +1,6 @@
 import { getValidStaffSession } from "@/admin/adminApi";
 import { HomeworkMaterial, validateHomeworkMaterials } from '@/homeworkMaterials';
+import { fetchWithTimeout } from "@/apiRequest";
 
 const SUPABASE_URL = "https://yiwiykbuaggyslfyhlfo.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_1MORh5rY7uMDVYLYVX5VAA_cyoph4-7";
@@ -84,7 +85,7 @@ function friendlyApiMessage(message: string) {
 async function rpc<T>(name: string, body: Record<string, unknown> = {}): Promise<T> {
   const session = await getSession();
 
-  const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${name}`, {
+  const response = await fetchWithTimeout(`${SUPABASE_URL}/rest/v1/rpc/${name}`, {
     method: "POST",
     headers: {
       apikey: SUPABASE_PUBLISHABLE_KEY,
@@ -116,7 +117,7 @@ async function tableRequest<T>(path: string, init: RequestInit = {}): Promise<T>
   headers.set("Authorization", `Bearer ${session.access_token}`);
   if (init.body) headers.set("Content-Type", "application/json");
 
-  const response = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+  const response = await fetchWithTimeout(`${SUPABASE_URL}/rest/v1/${path}`, {
     ...init,
     headers,
   });

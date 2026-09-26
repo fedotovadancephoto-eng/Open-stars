@@ -1,5 +1,6 @@
 import { gradeAverage, groupJournalGrades, mapParentGrade, type DatabaseGrade } from "@/gradeJournal";
 import { readHomeworkMaterials } from '@/homeworkMaterials';
+import { fetchWithTimeout } from "@/apiRequest";
 
 const SUPABASE_URL = "https://yiwiykbuaggyslfyhlfo.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_1MORh5rY7uMDVYLYVX5VAA_cyoph4-7";
@@ -45,7 +46,7 @@ export type ParentFamilyChild = {
 type ApiErrorResponse = { error?: string; message?: string };
 
 async function callEdgeFunction<T>(functionName: string, body: Record<string, unknown>): Promise<T> {
-  const response = await fetch(`${SUPABASE_URL}/functions/v1/${functionName}`, {
+  const response = await fetchWithTimeout(`${SUPABASE_URL}/functions/v1/${functionName}`, {
     method: "POST",
     headers: { "Content-Type": "application/json", apikey: SUPABASE_PUBLISHABLE_KEY },
     body: JSON.stringify(body),
@@ -116,7 +117,7 @@ export async function refreshParentSession() {
   const currentSession = getParentSession();
   if (!currentSession) return null;
 
-  const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+  const response = await fetchWithTimeout(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
     method: "POST",
     headers: { "Content-Type": "application/json", apikey: SUPABASE_PUBLISHABLE_KEY },
     body: JSON.stringify({ refresh_token: currentSession.refresh_token }),
@@ -152,7 +153,7 @@ export function logoutParent() {
 }
 
 async function restSelect<T>(table: string, query: string, accessToken: string): Promise<T[]> {
-  const response = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${query}`, {
+  const response = await fetchWithTimeout(`${SUPABASE_URL}/rest/v1/${table}?${query}`, {
     headers: { apikey: SUPABASE_PUBLISHABLE_KEY, Authorization: `Bearer ${accessToken}` },
   });
   if (!response.ok) {

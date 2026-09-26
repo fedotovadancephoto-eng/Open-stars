@@ -1,5 +1,5 @@
 import { groupLabel } from "@/groupLabels";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   AlertCircle,
   Award,
@@ -49,6 +49,7 @@ import {
 } from "@/admin/childInternalProfileApi";
 import { STAFF_VIEW_MODE_EVENT, STAFF_VIEW_MODE_KEY } from "@/admin/StaffModeSwitch";
 import { StaffAuth } from "@/admin/StaffAuth";
+import { canAccessAdminSection } from "@/admin/staffPermissions";
 import { Logo } from "@/components/Logo";
 
 type AdminState = "checking" | "guest" | "loading" | "ready" | "error";
@@ -81,14 +82,14 @@ const branchOptions = ["Свердловский", "НЛО", "Октябрьск
 const groupOptions = ["Базовый", "Продвинутый", "PRO"] as const;
 
 const navItems = [
-  { id: "students" as SectionId, label: "Ученики", icon: UsersRound, roles: ["owner", "project_director", "admin", "manager", "teacher"] },
-  { id: "schedule" as SectionId, label: "Расписание", icon: CalendarDays, roles: ["owner", "project_director", "admin", "manager", "teacher"] },
-  { id: "study" as SectionId, label: "Учебная часть", icon: BookOpenCheck, roles: ["owner", "project_director", "admin", "manager", "teacher"] },
-  { id: "coins" as SectionId, label: "Star Coin", icon: Coins, roles: ["owner", "project_director", "admin", "manager"] },
-  { id: "news" as SectionId, label: "Новости", icon: Newspaper, roles: ["owner", "project_director", "admin", "manager"] },
-  { id: "payments" as SectionId, label: "Оплата", icon: CreditCard, roles: ["owner", "project_director", "admin", "manager"] },
-  { id: "photos" as SectionId, label: "Фотосессии", icon: Camera, roles: ["owner", "project_director", "admin", "manager"] },
-  { id: "team" as SectionId, label: "Сотрудники", icon: ShieldCheck, roles: ["owner", "project_director"] },
+  { id: "students" as SectionId, label: "Ученики", icon: UsersRound },
+  { id: "schedule" as SectionId, label: "Расписание", icon: CalendarDays },
+  { id: "study" as SectionId, label: "Учебная часть", icon: BookOpenCheck },
+  { id: "coins" as SectionId, label: "Star Coin", icon: Coins },
+  { id: "news" as SectionId, label: "Новости", icon: Newspaper },
+  { id: "payments" as SectionId, label: "Оплата", icon: CreditCard },
+  { id: "photos" as SectionId, label: "Фотосессии", icon: Camera },
+  { id: "team" as SectionId, label: "Сотрудники", icon: ShieldCheck },
 ];
 
 const inputClass = "mt-1.5 w-full rounded-[13px] border border-black/[0.08] bg-[#FAF9F5] px-3.5 py-3 text-sm text-[#171717] outline-none placeholder:text-black/25 focus:border-[#D96A24]/45 focus:ring-4 focus:ring-[#D96A24]/[0.06]";
@@ -343,10 +344,10 @@ export default function AdminApp() {
 
   async function load(silent = false) {
     setError("");
-    const session = await getValidStaffSession();
-    if (!session) { setState("guest"); return; }
     if (!silent) setState("loading");
     try {
+      const session = await getValidStaffSession();
+      if (!session) { setState("guest"); return; }
       const [staff, academic] = await Promise.all([fetchStaffIdentity(), fetchAcademicContext()]);
       const childRows = await fetchAdminChildren(staff.role);
       setIdentity(staff);
@@ -396,7 +397,7 @@ export default function AdminApp() {
   if (state === "checking" || state === "loading") return <LoadingScreen />;
   if (state === "guest") return <StaffAuth onSuccess={() => void load()} />;
   if (state === "error" || !identity) {
-    return <div className="grid min-h-screen place-items-center bg-[#FAF9F5] px-5"><div className="w-full max-w-md rounded-[26px] bg-white p-6 text-center shadow-sm"><h2 className="text-xl font-semibold text-[#171717]">Не удалось открыть кабинет</h2><p className="mt-3 text-sm leading-6 text-black/45">{error}</p><button type="button" onClick={() => { clearStaffSession(); setState("guest"); }} className="mt-5 rounded-[14px] bg-[#171717] px-5 py-3 text-sm font-semibold text-white">Войти снова</button></div></div>;
+    return <div className="grid min-h-screen place-items-center bg-[#FAF9F5] px-5"><div className="w-full max-w-md rounded-[26px] bg-white p-6 text-center shadow-sm"><h2 className="text-xl font-semibold text-[#171717]">Не удалось открыть кабинет</h2><p className="mt-3 text-sm leading-6 text-black/45">{error}</p><div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-center"><button type="button" onClick={() => void load()} className="rounded-[14px] bg-[#171717] px-5 py-3 text-sm font-semibold text-white">Повторить</button><button type="button" onClick={() => { clearStaffSession(); setState("guest"); }} className="rounded-[14px] bg-black/[0.06] px-5 py-3 text-sm font-semibold text-[#171717]">Войти снова</button></div></div></div>;
   }
 
   const role = identity.role;
@@ -412,7 +413,7 @@ export default function AdminApp() {
   const activeParents = roleChildren.filter((child) => child.activationStatus === "active").length;
 
   const visibleNav = navItems.filter((item) => {
-    if (!item.roles.includes(role)) return false;
+    if (!canAccessAdminSection(role, item.id)) return false;
     if (teacherView) return item.id === "students" || item.id === "schedule" || item.id === "study";
     return true;
   });

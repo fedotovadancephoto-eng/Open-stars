@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { GraduationCap, ShieldCheck } from "lucide-react";
 
-import { fetchStaffIdentity, StaffRole } from "@/admin/adminApi";
+import { StaffRole } from "@/admin/adminApi";
 import { fetchAcademicContext } from "@/admin/academicApi";
+import { useStaffAccess } from "@/admin/StaffAccessContext";
 
 export const STAFF_VIEW_MODE_KEY = "openstars_staff_view_mode";
 export const STAFF_VIEW_MODE_EVENT = "openstars:staff-view-mode";
@@ -22,38 +23,34 @@ function storedMode(): StaffViewMode {
 
 export function StaffModeSwitch() {
   const [enabled, setEnabled] = useState(false);
-  const [role, setRole] = useState<StaffRole | null>(null);
+  const { role } = useStaffAccess();
   const [mode, setMode] = useState<StaffViewMode>(storedMode);
   const [subjects, setSubjects] = useState<string[]>([]);
 
   useEffect(() => {
     let cancelled = false;
-    let timer = 0;
-
     async function detect() {
       try {
-        const [identity, academic] = await Promise.all([fetchStaffIdentity(), fetchAcademicContext()]);
+        const academic = await fetchAcademicContext();
         if (cancelled) return;
         const uniqueSubjects = Array.from(new Set((academic.assignments || []).map((item) => item.subject).filter(Boolean)));
-        setRole(identity.role);
         setSubjects(uniqueSubjects);
-        setEnabled(identity.role !== "teacher" && uniqueSubjects.length > 0);
+        setEnabled(role !== "teacher" && uniqueSubjects.length > 0);
 
-        if (identity.role === "teacher" || uniqueSubjects.length === 0) {
+        if (role === "teacher" || uniqueSubjects.length === 0) {
           localStorage.setItem(STAFF_VIEW_MODE_KEY, "primary");
           setMode("primary");
         }
       } catch {
-        if (!cancelled) timer = window.setTimeout(detect, 1200);
+        if (!cancelled) setEnabled(false);
       }
     }
 
     void detect();
     return () => {
       cancelled = true;
-      if (timer) window.clearTimeout(timer);
     };
-  }, []);
+  }, [role]);
 
   const subjectLabel = useMemo(() => subjects.join(", "), [subjects]);
   if (!enabled || !role) return null;

@@ -21,8 +21,9 @@ import {
   X,
 } from "lucide-react";
 
-import { fetchStaffIdentity, StaffRole } from "@/admin/adminApi";
 import { AdminSection, openAdminSection } from "@/admin/adminNavigation";
+import { useStaffAccess } from "@/admin/StaffAccessContext";
+import { canAccessAdminSection } from "@/admin/staffPermissions";
 import { STAFF_VIEW_MODE_EVENT, STAFF_VIEW_MODE_KEY, StaffViewMode } from "@/admin/StaffModeSwitch";
 
 const items: Array<{
@@ -30,31 +31,30 @@ const items: Array<{
   label: string;
   icon: typeof UserPlus;
   accent: "orange" | "olive" | "neutral";
-  roles: StaffRole[];
   teacherVisible?: boolean;
 }> = [
-  { section: "team-work", label: "Общий план и задачи", icon: Target, accent: "orange", roles: ["owner", "admin", "manager", "teacher"], teacherVisible: true },
-  { section: "business", label: "Бизнес", icon: WalletCards, accent: "orange", roles: ["owner"] },
-  { section: "crm", label: "CRM · Продажи", icon: Target, accent: "orange", roles: ["owner", "project_director", "admin", "manager"] },
-  { section: "payments", label: "Оплаты родителей", icon: CreditCard, accent: "olive", roles: ["owner", "project_director", "admin", "manager"] },
-  { section: "events", label: "Мероприятия", icon: CalendarDays, accent: "orange", roles: ["owner", "project_director", "admin", "manager"] },
-  { section: "payroll", label: "Зарплата педагогам", icon: WalletCards, accent: "olive", roles: ["owner", "manager", "admin"] },
-  { section: "expenses", label: "Расходы", icon: ReceiptText, accent: "olive", roles: ["owner", "project_director", "admin", "manager"] },
-  { section: "documents", label: "Документы родителей", icon: FileCheck2, accent: "orange", roles: ["owner", "project_director", "admin", "manager"] },
-  { section: "parent-activation", label: "Доступ родителей", icon: KeyRound, accent: "orange", roles: ["owner", "project_director", "admin", "manager"] },
-  { section: "add-student", label: "Добавить ученика", icon: UserPlus, accent: "orange", roles: ["owner", "project_director", "admin", "manager"] },
-  { section: "archive", label: "Выбывшие", icon: Archive, accent: "neutral", roles: ["owner", "project_director", "admin", "manager"] },
-  { section: "child-photo", label: "Фото ребёнка", icon: ImagePlus, accent: "olive", roles: ["owner", "project_director", "admin", "manager"] },
-  { section: "schedule", label: "Расписание", icon: CalendarDays, accent: "neutral", roles: ["owner", "project_director", "admin", "manager", "teacher"], teacherVisible: true },
-  { section: "study", label: "Учебная часть", icon: BookOpenCheck, accent: "orange", roles: ["owner", "project_director", "admin", "manager", "teacher"], teacherVisible: true },
-  { section: "attendance-overview", label: "Посещаемость по округам", icon: CalendarDays, accent: "olive", roles: ["owner", "project_director", "admin", "manager"] },
-  { section: "reports", label: "Excel-отчёты", icon: FileSpreadsheet, accent: "olive", roles: ["owner", "project_director", "admin", "manager", "teacher"], teacherVisible: true },
-  { section: "coins", label: "Star Coin", icon: Coins, accent: "olive", roles: ["owner", "project_director", "admin", "manager"] },
-  { section: "news", label: "Новости", icon: Newspaper, accent: "neutral", roles: ["owner", "project_director", "admin", "manager"] },
-  { section: "photos", label: "Фотосессии", icon: Camera, accent: "orange", roles: ["owner", "project_director", "admin", "manager"] },
-  { section: "feedback", label: "Обратная связь", icon: MessageSquareHeart, accent: "olive", roles: ["owner", "project_director", "admin", "manager"] },
-  { section: "crm-access", label: "Доступы CRM", icon: ShieldCheck, accent: "neutral", roles: ["owner", "project_director"] },
-  { section: "team", label: "Сотрудники", icon: ShieldCheck, accent: "neutral", roles: ["owner", "project_director"] },
+  { section: "team-work", label: "Общий план и задачи", icon: Target, accent: "orange", teacherVisible: true },
+  { section: "business", label: "Бизнес", icon: WalletCards, accent: "orange" },
+  { section: "crm", label: "CRM · Продажи", icon: Target, accent: "orange" },
+  { section: "payments", label: "Оплаты родителей", icon: CreditCard, accent: "olive" },
+  { section: "events", label: "Мероприятия", icon: CalendarDays, accent: "orange" },
+  { section: "payroll", label: "Зарплата педагогам", icon: WalletCards, accent: "olive" },
+  { section: "expenses", label: "Расходы", icon: ReceiptText, accent: "olive" },
+  { section: "documents", label: "Документы родителей", icon: FileCheck2, accent: "orange" },
+  { section: "parent-activation", label: "Доступ родителей", icon: KeyRound, accent: "orange" },
+  { section: "add-student", label: "Добавить ученика", icon: UserPlus, accent: "orange" },
+  { section: "archive", label: "Выбывшие", icon: Archive, accent: "neutral" },
+  { section: "child-photo", label: "Фото ребёнка", icon: ImagePlus, accent: "olive" },
+  { section: "schedule", label: "Расписание", icon: CalendarDays, accent: "neutral", teacherVisible: true },
+  { section: "study", label: "Учебная часть", icon: BookOpenCheck, accent: "orange", teacherVisible: true },
+  { section: "attendance-overview", label: "Посещаемость по округам", icon: CalendarDays, accent: "olive" },
+  { section: "reports", label: "Excel-отчёты", icon: FileSpreadsheet, accent: "olive", teacherVisible: true },
+  { section: "coins", label: "Star Coin", icon: Coins, accent: "olive" },
+  { section: "news", label: "Новости", icon: Newspaper, accent: "neutral" },
+  { section: "photos", label: "Фотосессии", icon: Camera, accent: "orange" },
+  { section: "feedback", label: "Обратная связь", icon: MessageSquareHeart, accent: "olive" },
+  { section: "crm-access", label: "Доступы CRM", icon: ShieldCheck, accent: "neutral" },
+  { section: "team", label: "Сотрудники", icon: ShieldCheck, accent: "neutral" },
 ];
 
 const accentClass = {
@@ -77,23 +77,8 @@ function normalize(value: string | null | undefined) {
 
 export function AdminTopMenu() {
   const [open, setOpen] = useState(false);
-  const [role, setRole] = useState<StaffRole | null>(null);
+  const { role } = useStaffAccess();
   const [staffMode, setStaffMode] = useState<StaffViewMode>(localStorage.getItem(STAFF_VIEW_MODE_KEY) === "teacher" ? "teacher" : "primary");
-
-  useEffect(() => {
-    let cancelled = false;
-    let timer = 0;
-    async function detect() {
-      try {
-        const identity = await fetchStaffIdentity();
-        if (!cancelled) setRole(identity.role);
-      } catch {
-        if (!cancelled) timer = window.setTimeout(detect, 1200);
-      }
-    }
-    void detect();
-    return () => { cancelled = true; if (timer) window.clearTimeout(timer); };
-  }, []);
 
   useEffect(() => {
     const handler = (event: Event) => {
@@ -135,7 +120,7 @@ export function AdminTopMenu() {
 
   const teacherView = role === "teacher" || staffMode === "teacher";
   const visibleItems = useMemo(() => items.filter((item) => {
-    if (!role || !item.roles.includes(role)) return false;
+    if (!canAccessAdminSection(role, item.section)) return false;
     if (teacherView) return Boolean(item.teacherVisible);
     return true;
   }), [role, teacherView]);
