@@ -1,53 +1,42 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Home, LayoutDashboard } from "lucide-react";
 
-import { AdminChild, fetchAdminChildren, fetchStaffIdentity, getValidStaffSession } from "@/admin/adminApi";
+import { AdminChild, fetchAdminChildren } from "@/admin/adminApi";
 import { ADMIN_DATA_UPDATED_EVENT, openAdminSection } from "@/admin/adminNavigation";
 import { OwnerHomeDashboard } from "@/admin/OwnerHomeDashboard";
+import { useStaffAccess } from "@/admin/StaffAccessContext";
 import { STAFF_VIEW_MODE_EVENT, STAFF_VIEW_MODE_KEY } from "@/admin/StaffModeSwitch";
 import { Logo } from "@/components/Logo";
 
 export function OwnerHomeLanding() {
-  const [isOwner, setIsOwner] = useState(false);
+  const { role } = useStaffAccess();
   const [open, setOpen] = useState(false);
   const [children, setChildren] = useState<AdminChild[]>([]);
   const [teacherMode, setTeacherMode] = useState(localStorage.getItem(STAFF_VIEW_MODE_KEY) === "teacher");
-  const openedOnce = useRef(false);
+  const [childrenLoaded, setChildrenLoaded] = useState(false);
 
-  async function detectOwner() {
-    const session = await getValidStaffSession();
-    if (!session) return false;
+  const loadChildren = useCallback(async () => {
+    if (role !== "owner") return;
     try {
-      const identity = await fetchStaffIdentity();
-      if (identity.role !== "owner") {
-        setIsOwner(false);
-        return true;
-      }
-      setIsOwner(true);
       const rows = await fetchAdminChildren("owner");
       setChildren(rows);
-      if (!teacherMode && !openedOnce.current) {
-        openedOnce.current = true;
-        setOpen(true);
-      }
-      return true;
+      setChildrenLoaded(true);
     } catch {
-      return false;
+      setChildrenLoaded(false);
     }
-  }
+  }, [role]);
 
   useEffect(() => {
-    let cancelled = false;
-    let attempts = 0;
-    const tryLoad = async () => {
-      if (cancelled) return;
-      const resolved = await detectOwner();
-      attempts += 1;
-      if (!resolved && attempts < 30 && !cancelled) window.setTimeout(() => void tryLoad(), 1000);
-    };
-    void tryLoad();
-    return () => { cancelled = true; };
-  }, []);
+    if (role !== "owner") {
+      setOpen(false);
+      setChildren([]);
+      setChildrenLoaded(false);
+    }
+  }, [role]);
+
+  useEffect(() => {
+    if (open && role === "owner" && !childrenLoaded) void loadChildren();
+  }, [open, role, childrenLoaded, loadChildren]);
 
   useEffect(() => {
     const modeHandler = (event: Event) => {
@@ -56,16 +45,19 @@ export function OwnerHomeLanding() {
       setTeacherMode(nextTeacher);
       if (nextTeacher) setOpen(false);
     };
-    const dataHandler = () => { if (isOwner) void detectOwner(); };
+    const dataHandler = () => {
+      if (role === "owner" && open) void loadChildren();
+      else setChildrenLoaded(false);
+    };
     window.addEventListener(STAFF_VIEW_MODE_EVENT, modeHandler);
     window.addEventListener(ADMIN_DATA_UPDATED_EVENT, dataHandler);
     return () => {
       window.removeEventListener(STAFF_VIEW_MODE_EVENT, modeHandler);
       window.removeEventListener(ADMIN_DATA_UPDATED_EVENT, dataHandler);
     };
-  }, [isOwner, teacherMode]);
+  }, [role, open, loadChildren]);
 
-  if (!isOwner || teacherMode) return null;
+  if (role !== "owner" || teacherMode) return null;
 
   if (!open) {
     return (

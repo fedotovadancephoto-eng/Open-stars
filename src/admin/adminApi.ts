@@ -5,6 +5,9 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_1MORh5rY7uMDVYLYVX5VAA_cyoph4-7
 const STAFF_SESSION_KEY = "openstars_staff_session";
 export const STAFF_SESSION_CHANGED_EVENT = "openstars:staff-session-changed";
 
+let refreshPromise: Promise<StaffSession | null> | null = null;
+let identityCache: { accessToken: string; promise: Promise<StaffIdentity> } | null = null;
+
 export type StaffRole = "owner" | "project_director" | "admin" | "manager" | "teacher";
 export type BranchName = "Свердловский" | "НЛО" | "Октябрьский";
 export type GroupName = "Базовый" | "Продвинутый" | "PRO";
@@ -86,11 +89,13 @@ type ApiError = { message?: string; error?: string; details?: string };
 
 function saveStaffSession(session: StaffSession) {
   localStorage.setItem(STAFF_SESSION_KEY, JSON.stringify(session));
+  identityCache = null;
   window.dispatchEvent(new Event(STAFF_SESSION_CHANGED_EVENT));
 }
 
 export function clearStaffSession() {
   localStorage.removeItem(STAFF_SESSION_KEY);
+  identityCache = null;
   window.dispatchEvent(new Event(STAFF_SESSION_CHANGED_EVENT));
 }
 
@@ -132,31 +137,39 @@ export async function loginStaff(phone: string, password: string) {
   return result;
 }
 
-export async function refreshStaffSession() {
-  const session = getStaffSession();
-  if (!session) return null;
+export function refreshStaffSession() {
+  if (refreshPromise) return refreshPromise;
 
-  const response = await fetchWithTimeout(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", apikey: SUPABASE_PUBLISHABLE_KEY },
-    body: JSON.stringify({ refresh_token: session.refresh_token }),
+  refreshPromise = (async () => {
+    const session = getStaffSession();
+    if (!session) return null;
+
+    const response = await fetchWithTimeout(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", apikey: SUPABASE_PUBLISHABLE_KEY },
+      body: JSON.stringify({ refresh_token: session.refresh_token }),
+    });
+
+    if (!response.ok) {
+      clearStaffSession();
+      return null;
+    }
+
+    const data = await response.json();
+    const next: StaffSession = {
+      access_token: data.access_token,
+      refresh_token: data.refresh_token,
+      expires_in: data.expires_in,
+      expires_at: data.expires_at ?? Math.floor(Date.now() / 1000) + data.expires_in,
+      token_type: data.token_type,
+    };
+    saveStaffSession(next);
+    return next;
+  })().finally(() => {
+    refreshPromise = null;
   });
 
-  if (!response.ok) {
-    clearStaffSession();
-    return null;
-  }
-
-  const data = await response.json();
-  const next: StaffSession = {
-    access_token: data.access_token,
-    refresh_token: data.refresh_token,
-    expires_in: data.expires_in,
-    expires_at: data.expires_at ?? Math.floor(Date.now() / 1000) + data.expires_in,
-    token_type: data.token_type,
-  };
-  saveStaffSession(next);
-  return next;
+  return refreshPromise;
 }
 
 export async function getValidStaffSession() {
@@ -277,6 +290,21 @@ export async function fetchStaffIdentity(): Promise<StaffIdentity> {
   const session = await getValidStaffSession();
   if (!session) throw new Error("Сессия сотрудника не найдена.");
 
+  if (identityCache?.accessToken === session.access_token) {
+    return identityCache.promise;
+  }
+
+  const promise = fetchStaffIdentityForSession(session);
+  identityCache = { accessToken: session.access_token, promise };
+  try {
+    return await promise;
+  } catch (error) {
+    if (identityCache?.promise === promise) identityCache = null;
+    throw error;
+  }
+}
+
+async function fetchStaffIdentityForSession(session: StaffSession): Promise<StaffIdentity> {
   const authUserId = authUserIdFromAccessToken(session.access_token);
   if (!authUserId) {
     clearStaffSession();

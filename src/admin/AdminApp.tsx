@@ -94,8 +94,8 @@ const navItems = [
 
 const inputClass = "mt-1.5 w-full rounded-[13px] border border-black/[0.08] bg-[#FAF9F5] px-3.5 py-3 text-sm text-[#171717] outline-none placeholder:text-black/25 focus:border-[#D96A24]/45 focus:ring-4 focus:ring-[#D96A24]/[0.06]";
 
-function LoadingScreen() {
-  return <div className="grid min-h-screen place-items-center bg-[#FAF9F5]"><div className="text-center"><Logo /><p className="mt-5 text-xs font-bold uppercase tracking-[0.2em] text-black/35">Загрузка рабочего кабинета</p></div></div>;
+function LoadingScreen({ delayed, onRetry, onSignOut }: { delayed: boolean; onRetry: () => void; onSignOut: () => void }) {
+  return <div className="grid min-h-screen place-items-center bg-[#FAF9F5] px-5"><div className="w-full max-w-sm text-center"><Logo /><p className="mt-5 text-xs font-bold uppercase tracking-[0.2em] text-black/35">Загрузка рабочего кабинета</p>{delayed && <div className="mt-6 rounded-[20px] border border-black/[0.06] bg-white p-5 shadow-sm"><p className="text-sm leading-6 text-black/50">Интернет отвечает медленнее обычного. Кабинет продолжает загружаться.</p><div className="mt-4 flex flex-col gap-2 sm:flex-row"><button type="button" onClick={onRetry} className="flex-1 rounded-[13px] bg-[#171717] px-4 py-3 text-sm font-semibold text-white">Повторить</button><button type="button" onClick={onSignOut} className="flex-1 rounded-[13px] bg-black/[0.06] px-4 py-3 text-sm font-semibold text-[#171717]">Войти снова</button></div></div>}</div></div>;
 }
 
 function initials(child: AdminChild) {
@@ -341,6 +341,7 @@ export default function AdminApp() {
   const [activeSection, setActiveSection] = useState<SectionId>("students");
   const [filter, setFilter] = useState<CompletenessFilter>("all");
   const [staffMode, setStaffMode] = useState<StaffViewMode>(localStorage.getItem(STAFF_VIEW_MODE_KEY) === "teacher" ? "teacher" : "primary");
+  const [loadingDelayed, setLoadingDelayed] = useState(false);
 
   async function load(silent = false) {
     setError("");
@@ -361,6 +362,15 @@ export default function AdminApp() {
   }
 
   useEffect(() => { void load(); }, []);
+
+  useEffect(() => {
+    if (state !== "checking" && state !== "loading") {
+      setLoadingDelayed(false);
+      return;
+    }
+    const timer = window.setTimeout(() => setLoadingDelayed(true), 8000);
+    return () => window.clearTimeout(timer);
+  }, [state]);
 
   useEffect(() => {
     const modeHandler = (event: Event) => {
@@ -394,7 +404,7 @@ export default function AdminApp() {
     return () => window.removeEventListener(CHILD_PHOTO_UPDATED_EVENT, handler);
   }, []);
 
-  if (state === "checking" || state === "loading") return <LoadingScreen />;
+  if (state === "checking" || state === "loading") return <LoadingScreen delayed={loadingDelayed} onRetry={() => void load()} onSignOut={() => { clearStaffSession(); setState("guest"); }} />;
   if (state === "guest") return <StaffAuth onSuccess={() => void load()} />;
   if (state === "error" || !identity) {
     return <div className="grid min-h-screen place-items-center bg-[#FAF9F5] px-5"><div className="w-full max-w-md rounded-[26px] bg-white p-6 text-center shadow-sm"><h2 className="text-xl font-semibold text-[#171717]">Не удалось открыть кабинет</h2><p className="mt-3 text-sm leading-6 text-black/45">{error}</p><div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-center"><button type="button" onClick={() => void load()} className="rounded-[14px] bg-[#171717] px-5 py-3 text-sm font-semibold text-white">Повторить</button><button type="button" onClick={() => { clearStaffSession(); setState("guest"); }} className="rounded-[14px] bg-black/[0.06] px-5 py-3 text-sm font-semibold text-[#171717]">Войти снова</button></div></div></div>;
