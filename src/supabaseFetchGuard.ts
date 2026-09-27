@@ -1,5 +1,6 @@
 const SUPABASE_HOST = "yiwiykbuaggyslfyhlfo.supabase.co";
-const MAX_CLOCK_SKEW_RETRIES = 3;
+const MAX_CLOCK_SKEW_RETRIES = 8;
+const CLOCK_SKEW_RETRY_DELAY_MS = 1_200;
 const REFRESH_DEDUP_WINDOW_MS = 1800;
 
 function sleep(ms: number) {
@@ -53,9 +54,11 @@ async function isIssuedAtFutureResponse(response: Response) {
     const code = typeof payload?.code === "string" ? payload.code : "";
     const message = typeof payload?.message === "string" ? payload.message : "";
 
-    return (
-      code === "PGRST303" &&
-      message.toLowerCase().includes("issued at future")
+    const normalizedMessage = message.toLowerCase();
+    return code === "PGRST303" && (
+      normalizedMessage.includes("issued at future") ||
+      normalizedMessage.includes("issued in the future") ||
+      normalizedMessage.includes("not yet valid")
     );
   } catch {
     return false;
@@ -80,7 +83,6 @@ export function installSupabaseFetchGuard() {
     init?: RequestInit
   ): Promise<Response> => {
     const url = getRequestUrl(input);
-    const method = getRequestMethod(input, init);
     const refreshKey = refreshRequestKey(input, init);
 
     if (refreshKey) {
@@ -109,7 +111,6 @@ export function installSupabaseFetchGuard() {
     }
 
     const shouldGuard =
-      method === "GET" &&
       url.includes(SUPABASE_HOST) &&
       url.includes("/rest/v1/");
 
@@ -132,7 +133,10 @@ export function installSupabaseFetchGuard() {
         break;
       }
 
-      await sleep(1200 * (attempt + 1));
+      // Supabase can briefly reject a freshly issued JWT because of a stale
+      // gateway clock cache. The rejected request was not executed, so it is
+      // safe to repeat GETs and mutations only for this exact 401 response.
+      await sleep(CLOCK_SKEW_RETRY_DELAY_MS);
     }
 
     if (lastResponse) {

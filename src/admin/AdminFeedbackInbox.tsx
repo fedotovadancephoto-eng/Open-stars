@@ -196,8 +196,13 @@ export function AdminFeedbackInbox() {
   useEffect(() => {
     setNotificationState(currentNotificationState());
     refresh();
-    const timer = window.setInterval(() => refresh(true), 5000);
-    return () => window.clearInterval(timer);
+    const update = () => { if (!document.hidden) void refresh(true); };
+    const timer = window.setInterval(update, 20_000);
+    document.addEventListener("visibilitychange", update);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", update);
+    };
   }, []);
 
   const newCount = rows.filter((item) => item.status === "new").length;
