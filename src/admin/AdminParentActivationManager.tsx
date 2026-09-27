@@ -1,11 +1,13 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Check, Clipboard, Download, KeyRound, LoaderCircle, LockKeyhole, RefreshCw, Search, UsersRound, X } from "lucide-react";
 
-import { AdminChild, StaffRole, fetchAdminChildren, fetchStaffIdentity, getValidStaffSession } from "@/admin/adminApi";
-import { openAdminSection } from "@/admin/adminNavigation";
+import { onAdminSection, openAdminSection } from "@/admin/adminNavigation";
 import {
   BulkParentActivationCode,
+  ParentActivationChild,
   ParentActivationCode,
+  ParentActivationRole,
+  fetchParentActivationContext,
   generateBulkParentActivationCodes,
   generateParentActivationCode,
   reissueParentActivationCode,
@@ -54,11 +56,12 @@ async function copyText(text: string) {
   area.remove();
 }
 
-export function AdminParentActivationManager() {
+export function AdminParentActivationManager({ showFloatingButton = true }: { showFloatingButton?: boolean }) {
   const [enabled, setEnabled] = useState(false);
   const [open, setOpen] = useState(false);
-  const [role, setRole] = useState<StaffRole | null>(null);
-  const [children, setChildren] = useState<AdminChild[]>([]);
+  const [role, setRole] = useState<ParentActivationRole | null>(null);
+  const [staffBranch, setStaffBranch] = useState("");
+  const [children, setChildren] = useState<ParentActivationChild[]>([]);
   const [branch, setBranch] = useState("НЛО");
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
@@ -69,20 +72,24 @@ export function AdminParentActivationManager() {
   const [copied, setCopied] = useState("");
   const [error, setError] = useState("");
 
-  async function load() {
-    const session = await getValidStaffSession();
-    if (!session) return;
-    const identity = await fetchStaffIdentity();
-    if (identity.role === "teacher") return;
-
-    setRole(identity.role);
+  const load = useCallback(async () => {
+    const context = await fetchParentActivationContext();
+    setRole(context.role);
+    setStaffBranch(context.staffBranch);
     setEnabled(true);
+    setChildren(context.children);
+    const availableBranches = Array.from(new Set(context.children.map((item) => item.branch).filter(Boolean)));
+    setBranch((current) => context.staffBranch || (availableBranches.includes(current) ? current : availableBranches[0] || current));
+  }, []);
 
-    const rows = await fetchAdminChildren(identity.role);
-    setChildren(rows.filter((item) => !item.archivedAt));
-    const availableBranches = Array.from(new Set(rows.map((item) => item.branch).filter(Boolean)));
-    if (identity.role === "admin" && availableBranches[0]) setBranch(availableBranches[0]);
-  }
+  const openManager = useCallback(async () => {
+    setOpen(true);
+    setLoading(true);
+    setError("");
+    try { await load(); }
+    catch (e) { setError(e instanceof Error ? e.message : "Не удалось загрузить родителей."); }
+    finally { setLoading(false); }
+  }, [load]);
 
   useEffect(() => {
     let cancelled = false;
@@ -96,7 +103,9 @@ export function AdminParentActivationManager() {
     };
     detect();
     return () => { cancelled = true; if (timer) window.clearTimeout(timer); };
-  }, []);
+  }, [load]);
+
+  useEffect(() => onAdminSection("parent-activation", () => { void openManager(); }), [openManager]);
 
   const availableBranches = useMemo(() => {
     const values = Array.from(new Set(children.map((item) => item.branch).filter(Boolean)));
@@ -110,21 +119,12 @@ export function AdminParentActivationManager() {
       .filter((item) => !normalized || [item.fullName, item.parentName, item.parentPhone, item.groupName].join(" ").toLowerCase().includes(normalized));
   }, [children, branch, query]);
 
-  async function openManager() {
-    setOpen(true);
-    setLoading(true);
-    setError("");
-    try { await load(); }
-    catch (e) { setError(e instanceof Error ? e.message : "Не удалось загрузить родителей."); }
-    finally { setLoading(false); }
-  }
-
   function openPasswordReset() {
     setOpen(false);
     window.setTimeout(() => openAdminSection("parent-password-reset"), 0);
   }
 
-  async function generateOne(child: AdminChild) {
+  async function generateOne(child: ParentActivationChild) {
     const reissue = child.activationStatus === "invited";
     if (reissue && !window.confirm(`Перевыпустить код для ${child.parentName || child.fullName}? Старый код сразу перестанет действовать.`)) return;
 
@@ -177,8 +177,11 @@ export function AdminParentActivationManager() {
 
   if (!enabled || !role) return null;
 
+  const canResetPassword = role !== "sales";
+  const branchLocked = role === "admin" || (role === "sales" && Boolean(staffBranch));
+
   return <>
-    <button type="button" onClick={openManager} className="fixed bottom-[36.8rem] right-4 z-40 flex items-center gap-2 rounded-full bg-[#171717] px-4 py-3 text-sm font-semibold text-white shadow-[0_10px_30px_rgba(0,0,0,0.18)] sm:right-6"><KeyRound size={17}/> Активация родителей</button>
+    {showFloatingButton && <button type="button" onClick={openManager} className="fixed bottom-[36.8rem] right-4 z-40 flex items-center gap-2 rounded-full bg-[#171717] px-4 py-3 text-sm font-semibold text-white shadow-[0_10px_30px_rgba(0,0,0,0.18)] sm:right-6"><KeyRound size={17}/> Активация родителей</button>}
 
     {open && <div className="fixed inset-0 z-[84] flex items-end justify-center bg-black/30 backdrop-blur-[2px] sm:items-center sm:p-5" onClick={() => !bulkBusy && setOpen(false)}>
       <div className="max-h-[96vh] w-full max-w-5xl overflow-y-auto rounded-t-[28px] bg-[#FAF9F5] p-5 shadow-2xl sm:rounded-[28px] sm:p-7" onClick={(e) => e.stopPropagation()}>
@@ -186,26 +189,26 @@ export function AdminParentActivationManager() {
           <div>
             <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#D96A24]">OPEN STARS ADMIN</p>
             <h2 className="mt-1 text-2xl font-semibold">Доступ родителей</h2>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-black/45">Здесь администратор решает обе задачи доступа: активирует новый кабинет или помогает уже активированному родителю восстановить пароль.</p>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-black/45">{canResetPassword ? "Здесь администратор решает обе задачи доступа: активирует новый кабинет или помогает уже активированному родителю восстановить пароль." : "Здесь можно активировать кабинет нового родителя или перевыпустить ранее выданный код."}</p>
           </div>
           <button type="button" onClick={() => setOpen(false)} className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white"><X size={20}/></button>
         </div>
 
-        <div className="mt-5 grid grid-cols-2 gap-2">
+        <div className={`mt-5 grid gap-2 ${canResetPassword ? "grid-cols-2" : "grid-cols-1"}`}>
           <div className="rounded-[16px] bg-[#171717] px-4 py-3 text-white">
             <div className="flex items-center gap-2"><KeyRound size={16}/><span className="text-sm font-semibold">Активация кабинета</span></div>
             <p className="mt-1 text-[11px] text-white/55">Для нового родителя или перевыпуска кода.</p>
           </div>
-          <button type="button" onClick={openPasswordReset} className="rounded-[16px] border border-black/[0.06] bg-white px-4 py-3 text-left transition hover:bg-[#FAF9F5] active:scale-[0.99]">
+          {canResetPassword && <button type="button" onClick={openPasswordReset} className="rounded-[16px] border border-black/[0.06] bg-white px-4 py-3 text-left transition hover:bg-[#FAF9F5] active:scale-[0.99]">
             <div className="flex items-center gap-2"><LockKeyhole size={16} className="text-[#D96A24]"/><span className="text-sm font-semibold">Сброс пароля</span></div>
             <p className="mt-1 text-[11px] text-black/40">Для уже активированного кабинета.</p>
-          </button>
+          </button>}
         </div>
 
         <section className="mt-5 rounded-[24px] border border-black/[0.06] bg-white p-5 sm:p-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
             <label className="flex-1 text-xs font-semibold text-black/55">Филиал
-              <select value={branch} onChange={(e) => { setBranch(e.target.value); setBulkRows([]); }} disabled={role === "admin"} className="mt-1.5 w-full rounded-[13px] border border-black/[0.08] bg-[#FAF9F5] px-3.5 py-3 text-sm outline-none disabled:opacity-65">
+              <select value={branch} onChange={(e) => { setBranch(e.target.value); setBulkRows([]); }} disabled={branchLocked} className="mt-1.5 w-full rounded-[13px] border border-black/[0.08] bg-[#FAF9F5] px-3.5 py-3 text-sm outline-none disabled:opacity-65">
                 {availableBranches.map((item) => <option key={item} value={item}>{item}</option>)}
               </select>
             </label>
@@ -246,7 +249,7 @@ export function AdminParentActivationManager() {
               return <div key={child.id} className="rounded-[16px] border border-black/[0.055] p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div><p className="font-semibold">{child.fullName}</p><p className="mt-1 text-xs text-black/40">{child.parentName || "Родитель"} · {child.parentPhone || "телефон не указан"} · {child.groupName}</p><p className={`mt-1 text-[11px] font-semibold ${active ? "text-[#4D512E]" : "text-[#C95320]"}`}>{active ? "Кабинет активирован" : invited ? "Код уже выдавался — при необходимости его можно перевыпустить" : "Кабинет не активирован"}</p></div>
-                  {active ? <button type="button" onClick={openPasswordReset} className="flex shrink-0 items-center justify-center gap-1.5 rounded-[12px] bg-[#5F6338]/10 px-3.5 py-2.5 text-xs font-semibold text-[#4D512E]"><LockKeyhole size={14}/> Сбросить пароль</button> : <button type="button" disabled={busyId === child.id} onClick={() => generateOne(child)} className={`flex shrink-0 items-center justify-center gap-1.5 rounded-[12px] px-3.5 py-2.5 text-xs font-semibold text-white disabled:opacity-50 ${invited ? "bg-[#D96A24]" : "bg-[#171717]"}`}>{busyId === child.id ? <LoaderCircle className="animate-spin" size={14}/> : invited ? <RefreshCw size={14}/> : <KeyRound size={14}/>} {invited ? "Перевыпустить код" : "Сгенерировать код"}</button>}
+                  {active ? (canResetPassword ? <button type="button" onClick={openPasswordReset} className="flex shrink-0 items-center justify-center gap-1.5 rounded-[12px] bg-[#5F6338]/10 px-3.5 py-2.5 text-xs font-semibold text-[#4D512E]"><LockKeyhole size={14}/> Сбросить пароль</button> : <span className="flex shrink-0 items-center justify-center gap-1.5 rounded-[12px] bg-[#5F6338]/10 px-3.5 py-2.5 text-xs font-semibold text-[#4D512E]"><Check size={14}/> Уже активирован</span>) : <button type="button" disabled={busyId === child.id} onClick={() => generateOne(child)} className={`flex shrink-0 items-center justify-center gap-1.5 rounded-[12px] px-3.5 py-2.5 text-xs font-semibold text-white disabled:opacity-50 ${invited ? "bg-[#D96A24]" : "bg-[#171717]"}`}>{busyId === child.id ? <LoaderCircle className="animate-spin" size={14}/> : invited ? <RefreshCw size={14}/> : <KeyRound size={14}/>} {invited ? "Перевыпустить код" : "Сгенерировать код"}</button>}
                 </div>
                 {result && <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-[13px] bg-[#F2F0E8] px-3.5 py-3"><div><p className="text-[10px] font-bold uppercase tracking-wide text-black/35">Код активации</p><p className="mt-0.5 text-xl font-bold tracking-[0.12em]">{result.activationCode}</p><p className="mt-1 text-[10px] text-black/35">Действует до {dateLabel(result.expiresAt)}</p>{invited && <p className="mt-1 text-[10px] font-semibold text-[#C95320]">Старый код больше не действует.</p>}</div><button type="button" onClick={() => copyCode(child.id, result.activationCode)} className="flex items-center gap-1.5 rounded-[11px] bg-white px-3 py-2 text-xs font-semibold">{copied === child.id ? <Check size={14}/> : <Clipboard size={14}/>} {copied === child.id ? "Скопировано" : "Копировать"}</button></div>}
               </div>;

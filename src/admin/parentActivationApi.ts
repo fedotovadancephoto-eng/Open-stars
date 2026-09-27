@@ -5,6 +5,39 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_1MORh5rY7uMDVYLYVX5VAA_cyoph4-7
 
 type ApiError = { message?: string; details?: string };
 
+type ActivationCodeRow = {
+  child_id?: string;
+  family_id?: string;
+  child_name?: string;
+  parent_name?: string;
+  phone?: string;
+  activation_code?: string;
+  expires_at?: string;
+};
+
+type ActivationChildRow = {
+  child_id?: string;
+  family_id?: string;
+  child_name?: string;
+  parent_name?: string;
+  phone?: string;
+  branch?: string;
+  group_name?: string;
+  activation_status?: string;
+};
+
+type BulkActivationRow = {
+  family_id?: string;
+  children?: string;
+  parent_name?: string;
+  phone?: string;
+  branch?: string;
+  group_name?: string;
+  activation_code?: string;
+  expires_at?: string;
+  error?: string;
+};
+
 export type ParentActivationCode = {
   childId: string;
   familyId: string;
@@ -13,6 +46,31 @@ export type ParentActivationCode = {
   phone: string;
   activationCode: string;
   expiresAt: string;
+};
+
+export type ParentActivationRole = "owner" | "project_director" | "manager" | "admin" | "sales";
+
+type ActivationContextPayload = {
+  role?: ParentActivationRole;
+  staff_branch?: string;
+  children?: ActivationChildRow[];
+};
+
+export type ParentActivationChild = {
+  id: string;
+  familyId: string;
+  fullName: string;
+  parentName: string;
+  parentPhone: string;
+  branch: string;
+  groupName: string;
+  activationStatus: "active" | "invited" | "not_invited";
+};
+
+export type ParentActivationContext = {
+  role: ParentActivationRole;
+  staffBranch: string;
+  children: ParentActivationChild[];
 };
 
 export type BulkParentActivationCode = {
@@ -27,7 +85,7 @@ export type BulkParentActivationCode = {
   error: string;
 };
 
-async function rpc(functionName: string, body: Record<string, unknown>) {
+async function rpc(functionName: string, body: Record<string, unknown>): Promise<unknown> {
   const session = await getValidStaffSession();
   if (!session) throw new Error("Сессия сотрудника истекла. Войдите снова.");
 
@@ -59,40 +117,73 @@ async function rpc(functionName: string, body: Record<string, unknown>) {
   return response.status === 204 ? [] : response.json();
 }
 
-function mapActivationCode(row: any): ParentActivationCode {
-  if (!row?.activation_code) throw new Error("Код не был создан.");
+function mapActivationCode(row: unknown): ParentActivationCode {
+  const value = (row || {}) as ActivationCodeRow;
+  if (!value.activation_code) throw new Error("Код не был создан.");
   return {
-    childId: row.child_id,
-    familyId: row.family_id,
-    childName: row.child_name || "",
-    parentName: row.parent_name || "Родитель",
-    phone: row.phone || "",
-    activationCode: row.activation_code,
-    expiresAt: row.expires_at || "",
+    childId: value.child_id || "",
+    familyId: value.family_id || "",
+    childName: value.child_name || "",
+    parentName: value.parent_name || "Родитель",
+    phone: value.phone || "",
+    activationCode: value.activation_code,
+    expiresAt: value.expires_at || "",
+  };
+}
+
+export async function fetchParentActivationContext(): Promise<ParentActivationContext> {
+  const response = await rpc("staff_parent_activation_context", {});
+  const payload = (Array.isArray(response) ? response[0] : response) as ActivationContextPayload | undefined;
+  const role = payload?.role as ParentActivationRole | undefined;
+  if (!role || !["owner", "project_director", "manager", "admin", "sales"].includes(role)) {
+    throw new Error("Недостаточно прав для активации родителей.");
+  }
+
+  return {
+    role,
+    staffBranch: payload?.staff_branch || "",
+    children: (payload?.children || []).map((row) => {
+      const activationStatus: ParentActivationChild["activationStatus"] = row.activation_status === "active" || row.activation_status === "invited"
+        ? row.activation_status
+        : "not_invited";
+      return {
+        id: row.child_id || "",
+        familyId: row.family_id || "",
+        fullName: row.child_name || "",
+        parentName: row.parent_name || "",
+        parentPhone: row.phone || "",
+        branch: row.branch || "",
+        groupName: row.group_name || "",
+        activationStatus,
+      };
+    }),
   };
 }
 
 export async function generateParentActivationCode(childId: string): Promise<ParentActivationCode> {
   const rows = await rpc("staff_generate_parent_invite", { p_child_id: childId, p_valid_hours: 168 });
-  return mapActivationCode(rows?.[0]);
+  return mapActivationCode(Array.isArray(rows) ? rows[0] : undefined);
 }
 
 export async function reissueParentActivationCode(childId: string): Promise<ParentActivationCode> {
   const rows = await rpc("staff_reissue_parent_invite", { p_child_id: childId, p_valid_hours: 168 });
-  return mapActivationCode(rows?.[0]);
+  return mapActivationCode(Array.isArray(rows) ? rows[0] : undefined);
 }
 
 export async function generateBulkParentActivationCodes(branch?: string): Promise<BulkParentActivationCode[]> {
   const rows = await rpc("staff_generate_parent_invites", { p_branch: branch || null, p_valid_hours: 168 });
-  return (rows || []).map((row: any) => ({
-    familyId: row.family_id,
-    children: row.children || "",
-    parentName: row.parent_name || "Родитель",
-    phone: row.phone || "",
-    branch: row.branch || "",
-    groupName: row.group_name || "",
-    activationCode: row.activation_code || "",
-    expiresAt: row.expires_at || "",
-    error: row.error || "",
-  }));
+  return (Array.isArray(rows) ? rows : []).map((value) => {
+    const row = value as BulkActivationRow;
+    return {
+      familyId: row.family_id || "",
+      children: row.children || "",
+      parentName: row.parent_name || "Родитель",
+      phone: row.phone || "",
+      branch: row.branch || "",
+      groupName: row.group_name || "",
+      activationCode: row.activation_code || "",
+      expiresAt: row.expires_at || "",
+      error: row.error || "",
+    };
+  });
 }
