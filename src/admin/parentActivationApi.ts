@@ -2,6 +2,7 @@ import { getValidStaffSession } from "@/admin/adminApi";
 
 const SUPABASE_URL = "https://yiwiykbuaggyslfyhlfo.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_1MORh5rY7uMDVYLYVX5VAA_cyoph4-7";
+const PARENT_INVITE_VALID_HOURS = 720;
 
 type ApiError = { message?: string; details?: string };
 
@@ -161,17 +162,17 @@ export async function fetchParentActivationContext(): Promise<ParentActivationCo
 }
 
 export async function generateParentActivationCode(childId: string): Promise<ParentActivationCode> {
-  const rows = await rpc("staff_generate_parent_invite", { p_child_id: childId, p_valid_hours: 168 });
+  const rows = await rpc("staff_generate_parent_invite", { p_child_id: childId, p_valid_hours: PARENT_INVITE_VALID_HOURS });
   return mapActivationCode(Array.isArray(rows) ? rows[0] : undefined);
 }
 
 export async function reissueParentActivationCode(childId: string): Promise<ParentActivationCode> {
-  const rows = await rpc("staff_reissue_parent_invite", { p_child_id: childId, p_valid_hours: 168 });
+  const rows = await rpc("staff_reissue_parent_invite", { p_child_id: childId, p_valid_hours: PARENT_INVITE_VALID_HOURS });
   return mapActivationCode(Array.isArray(rows) ? rows[0] : undefined);
 }
 
 export async function generateBulkParentActivationCodes(branch?: string): Promise<BulkParentActivationCode[]> {
-  const rows = await rpc("staff_generate_parent_invites", { p_branch: branch || null, p_valid_hours: 168 });
+  const rows = await rpc("staff_generate_parent_invites", { p_branch: branch || null, p_valid_hours: PARENT_INVITE_VALID_HOURS });
   return (Array.isArray(rows) ? rows : []).map((value) => {
     const row = value as BulkActivationRow;
     return {

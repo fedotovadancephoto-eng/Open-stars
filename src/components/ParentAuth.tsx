@@ -1,4 +1,4 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import {
   Eye,
   EyeOff,
@@ -18,18 +18,35 @@ type ParentAuthProps = {
   onSuccess: () => void;
 };
 
+type ActivationLinkPrefill = {
+  active: boolean;
+  phone: string;
+  code: string;
+};
+
+function readActivationLink(): ActivationLinkPrefill {
+  const params = new URLSearchParams(window.location.search);
+  const active = params.get("first") === "1";
+  return {
+    active,
+    phone: active ? params.get("phone") || "" : "",
+    code: active ? (params.get("code") || "").trim().toUpperCase().slice(0, 6) : "",
+  };
+}
+
 export function ParentAuth({
   onSuccess,
 }: ParentAuthProps) {
+  const [activationLink] = useState(readActivationLink);
   const [mode, setMode] = useState<
     "login" | "register" | "reset"
-  >("login");
+  >(activationLink.active ? "register" : "login");
 
-  const [phone, setPhone] = useState("");
+  const [phone, setPhone] = useState(activationLink.phone);
   const [password, setPassword] =
     useState("");
   const [activationCode, setActivationCode] =
-    useState("");
+    useState(activationLink.code);
   const [resetCode, setResetCode] =
     useState("");
 
@@ -42,6 +59,15 @@ export function ParentAuth({
   const [error, setError] = useState("");
   const [message, setMessage] =
     useState("");
+
+  useEffect(() => {
+    if (!activationLink.active) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete("first");
+    url.searchParams.delete("phone");
+    url.searchParams.delete("code");
+    window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+  }, [activationLink.active]);
 
   const handleSubmit = async (
     event: FormEvent
