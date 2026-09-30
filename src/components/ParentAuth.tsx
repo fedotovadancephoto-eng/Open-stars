@@ -80,6 +80,20 @@ export function ParentAuth({
 
     try {
       if (mode === "login") {
+        const activationCodeCandidate = password
+          .trim()
+          .toUpperCase();
+
+        if (/^[0-9A-F]{6}$/.test(activationCodeCandidate)) {
+          setActivationCode(activationCodeCandidate);
+          setPassword("");
+          setMode("register");
+          setMessage(
+            "Код активации перенесён. Теперь придумайте пароль не короче 8 символов."
+          );
+          return;
+        }
+
         await loginParent(
           phone,
           password
@@ -295,7 +309,7 @@ export function ParentAuth({
                 "
               >
                 {mode === "login"
-                  ? "Введите номер телефона и пароль."
+                  ? "Введите номер телефона и пароль. Если у вас код активации, выберите «Первый вход»."
                   : mode === "register"
                     ? "Используйте номер телефона, который указан в карточке родителя."
                     : "Введите номер телефона, код восстановления от администратора и придумайте новый пароль."}
@@ -637,7 +651,9 @@ export function ParentAuth({
                         ? "Введите пароль"
                         : "Минимум 8 символов"
                     }
-                    minLength={8}
+                    minLength={
+                      mode === "login" ? 1 : 8
+                    }
                     required
                     autoComplete={
                       mode === "login"
