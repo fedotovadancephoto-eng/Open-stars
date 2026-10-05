@@ -14,6 +14,16 @@ function monthLabel(value: string) {
   return result.charAt(0).toUpperCase() + result.slice(1);
 }
 
+function currentSchoolMonth() {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Irkutsk",
+    year: "numeric",
+    month: "2-digit",
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}`;
+}
+
 export function PaymentsTab() {
   const [paymentUrl, setPaymentUrl] = useState("");
 
@@ -27,7 +37,9 @@ export function PaymentsTab() {
     return () => { cancelled = true; };
   }, [child.id, child.branch]);
 
-  const canPay = Boolean(paymentUrl) && child.paymentStatus !== "paid";
+  const currentPayment = payments.find((payment) => String(payment.month || "").slice(0, 7) === currentSchoolMonth());
+  const currentMonthPaid = currentPayment?.status === "paid";
+  const canPay = Boolean(paymentUrl) && !currentMonthPaid;
 
   return (
     <div className="space-y-5">
@@ -50,7 +62,7 @@ export function PaymentsTab() {
             </div>
           </>
         )}
-        {paymentUrl && child.paymentStatus === "paid" && <div className="mt-5 flex items-center gap-2 rounded-[14px] bg-[#5F6338]/[0.08] px-4 py-3 text-sm font-medium text-[#4D512E]"><CheckCircle2 className="h-4 w-4" /> Оплата подтверждена администратором.</div>}
+        {paymentUrl && currentMonthPaid && <div className="mt-5 flex items-center gap-2 rounded-[14px] bg-[#5F6338]/[0.08] px-4 py-3 text-sm font-medium text-[#4D512E]"><CheckCircle2 className="h-4 w-4" /> Оплата за текущий месяц подтверждена администратором.</div>}
       </Card>
 
       {payments.length === 0 ? (
