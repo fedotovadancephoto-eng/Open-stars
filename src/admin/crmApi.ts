@@ -341,3 +341,63 @@ export async function recordCrmCampaignExpense(campaignId: string, amount: numbe
     p_description: description.trim() || null,
   });
 }
+
+
+export type CrmInboundItem = {
+  id: string;
+  source: "site" | "vk" | "instagram";
+  externalEventId: string;
+  eventType: string;
+  branch: string;
+  senderId: string;
+  senderName: string;
+  senderPhone: string;
+  senderEmail: string;
+  message: string;
+  campaign: string;
+  formId: string;
+  pageUrl: string;
+  receivedAt: string;
+};
+
+export async function fetchCrmInboundItems(): Promise<CrmInboundItem[]> {
+  const rows = await rest<any[]>(
+    "crm_inbound_items?select=id,source,external_event_id,event_type,branch,sender_id,sender_name,sender_phone,sender_email,message,campaign,form_id,page_url,received_at&status=eq.new&order=received_at.desc&limit=100"
+  );
+  return rows.map(row => ({
+    id: row.id,
+    source: row.source,
+    externalEventId: row.external_event_id || "",
+    eventType: row.event_type || "",
+    branch: row.branch || "",
+    senderId: row.sender_id || "",
+    senderName: row.sender_name || "",
+    senderPhone: row.sender_phone || "",
+    senderEmail: row.sender_email || "",
+    message: row.message || "",
+    campaign: row.campaign || "",
+    formId: row.form_id || "",
+    pageUrl: row.page_url || "",
+    receivedAt: row.received_at || "",
+  }));
+}
+
+export async function processCrmInboundItem(input: {
+  id: string;
+  action: "ignore" | "convert";
+  branch: string;
+  childName: string;
+  parentName: string;
+  parentPhone: string;
+  nextContactAt: string;
+}) {
+  return rpc<{ id: string; status: string; lead_id?: string }>("crm_process_inbound", {
+    p_inbound_id: input.id,
+    p_action: input.action,
+    p_branch: input.branch,
+    p_child_name: input.childName.trim(),
+    p_parent_name: input.parentName.trim(),
+    p_parent_phone: input.parentPhone.trim(),
+    p_next_contact_at: input.nextContactAt,
+  });
+}
