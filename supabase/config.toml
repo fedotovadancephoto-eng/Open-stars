@@ -1,0 +1,4 @@
+# Third-party webhook providers authenticate with their own signed secrets.
+# The Edge Function validates each provider before storing any data.
+[functions.crm-inbound-webhook]
+verify_jwt = false
