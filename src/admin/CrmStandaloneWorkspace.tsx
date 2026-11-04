@@ -72,7 +72,7 @@ async function loginCrmStaff(phoneInput: string, password: string) {
   const rows = await profileResponse.json() as Array<{ roles?: { name?: string } | Array<{ name?: string }> }>;
   const roles = rows[0]?.roles;
   const role = Array.isArray(roles) ? roles[0]?.name : roles?.name;
-  const allowed = new Set(["owner", "project_director", "manager", "admin", "sales", "marketer"]);
+  const allowed = new Set(["owner", "manager", "sales"]);
   if (!role || !allowed.has(role)) throw new Error("У этого аккаунта нет доступа к CRM OPEN STARS.");
 
   localStorage.setItem(STAFF_SESSION_KEY, JSON.stringify({
@@ -176,7 +176,7 @@ export default function CrmStandaloneWorkspace() {
       {role === "sales" && <button onClick={()=>openAdminSection("parent-activation")} className="mt-3 flex w-full items-center justify-center gap-2 rounded-[16px] bg-[#171717] py-3.5 text-sm font-semibold text-white"><KeyRound size={17}/>Активация родителей</button>}
       <button onClick={()=>{clearStaffSession();setRole(null);setState("guest");}} className="mt-3 flex w-full items-center justify-center gap-2 rounded-[16px] bg-[#F6F5F1] py-3 text-sm font-semibold text-black/55"><LogOut size={17}/>Выйти</button>
     </div>
-    {(role === "project_director" || role === "manager" || role === "sales") && <CrmPushAlerts/>}
+    {(role === "owner" || role === "manager" || role === "sales") && <CrmPushAlerts/>}
     <AdminCrmManager/>
     <TeamWorkBoard/>
     {role === "sales" && <AdminParentActivationManager showFloatingButton={false}/>}
