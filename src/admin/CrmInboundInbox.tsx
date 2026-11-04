@@ -38,7 +38,7 @@ export function CrmInboundInbox({
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(() => new URLSearchParams(window.location.search).get("inbox") === "1");
 
   async function load() {
     setLoading(true);
