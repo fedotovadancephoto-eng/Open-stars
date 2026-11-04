@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Check, Copy, Link2, LoaderCircle, ShieldCheck } from "lucide-react";
-import { createCrmVkSetup, fetchCrmVkSetup } from "@/admin/crmApi";
+import { createCrmVkSetup, fetchCrmVkSetup, syncCrmVkExistingSecret } from "@/admin/crmApi";
 
 const VK_CALLBACK_URL = "https://yiwiykbuaggyslfyhlfo.supabase.co/functions/v1/crm-inbound-webhook?source=vk";
 
@@ -8,6 +8,7 @@ export function CrmVkConnection() {
   const [groupId, setGroupId] = useState("176730512");
   const [confirmation, setConfirmation] = useState("");
   const [secret, setSecret] = useState("");
+  const [existingVkSecret, setExistingVkSecret] = useState("");
   const [configured, setConfigured] = useState(false);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
@@ -65,6 +66,27 @@ export function CrmVkConnection() {
     }
   }
 
+  async function syncExisting() {
+    if (busy) return;
+    const value = existingVkSecret.trim();
+    if (!/^[0-9a-f]{32}$/.test(value)) {
+      setError("Нужен ключ из 32 символов, уже сохранённый в настройках Сервера 6 ВКонтакте.");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      await syncCrmVkExistingSecret(groupId.trim(), value);
+      setExistingVkSecret("");
+      setNotice("Ключ CRM синхронизирован с ВКонтакте. Теперь можно проверить тестовое сообщение.");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Не удалось синхронизировать ключ ВКонтакте.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (loading) {
     return <section className="mt-5 rounded-[22px] border border-black/[0.07] bg-white p-4 text-sm text-black/55">Загрузка настроек ВКонтакте…</section>;
   }
@@ -84,9 +106,9 @@ export function CrmVkConnection() {
             className="rounded-xl bg-[#F7F5EF] px-3 py-2 text-xs font-semibold">Настройки</button>
         </div>
         <p className="mt-3 text-xs leading-5 text-amber-800">
-          Если тестовое сообщение не приходит, проверьте секретный ключ в Callback API → Сервер 6.
-          Он должен точно совпадать с последним ключом, созданным в CRM.
-          Настройки amoCRM не изменяйте.
+          Если сообщение не приходит, откройте «Настройки», скопируйте действующий секретный ключ
+          из VK → Callback API → Сервер 6 и синхронизируйте его с CRM.
+          Не нужно генерировать новый ключ или менять amoCRM.
         </p>
       </section>
     );
@@ -129,6 +151,26 @@ export function CrmVkConnection() {
       {configured && <p className="mt-2 text-xs text-amber-800">
         Новый ключ заменяет предыдущий. Скопируйте все 32 символа без пробелов и сохраните ключ на новом сервере VK.
       </p>}
+
+      {configured && !secret && <div className="mt-4 rounded-xl border border-black/10 bg-[#F7F5EF] p-3">
+        <p className="text-sm font-semibold">Ключ уже сохранён в ВК?</p>
+        <p className="mt-1 text-xs leading-5 text-black/60">
+          Скопируйте текущий секретный ключ из VK → Callback API → Сервер 6 и вставьте сюда.
+          CRM проверит его формат и сохранит только защищённый отпечаток. Новый ключ создавать не нужно.
+        </p>
+        <label className="mt-3 block text-xs font-semibold text-black/60">
+          Текущий ключ из VK (32 символа)
+          <input type="password" autoComplete="off" spellCheck={false}
+            className="mt-1 w-full rounded-xl border border-black/10 bg-white px-3 py-3 text-sm"
+            value={existingVkSecret} onChange={event => setExistingVkSecret(event.target.value)}
+            placeholder="Вставить ключ, не отправляя его в чат"/>
+        </label>
+        <button type="button" disabled={busy || !existingVkSecret}
+          onClick={() => void syncExisting()}
+          className="mt-2 w-full rounded-xl bg-[#D96A24] px-3 py-3 text-xs font-semibold text-white disabled:opacity-50">
+          Синхронизировать ключ с ВК
+        </button>
+      </div>}
 
       <div className="mt-4 rounded-xl bg-[#F7F5EF] p-3">
         <p className="text-xs font-semibold text-black/55">Адрес сервера для VK</p>

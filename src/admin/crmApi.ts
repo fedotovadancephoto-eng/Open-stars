@@ -422,6 +422,13 @@ export async function fetchCrmVkSetup(): Promise<CrmVkSetup> {
   return rpc<CrmVkSetup>("crm_vk_get_setup", {});
 }
 
+export async function syncCrmVkExistingSecret(groupId: string, secret: string): Promise<{ ok: boolean }> {
+  return rpc<{ ok: boolean }>("crm_vk_sync_secret", {
+    p_group_id: Number(groupId),
+    p_secret: secret,
+  });
+}
+
 export async function createCrmVkSetup(groupId: string, confirmationCode: string): Promise<CrmVkGeneratedSetup> {
   return rpc<CrmVkGeneratedSetup>("crm_vk_generate_setup", {
     p_group_id: Number(groupId),
