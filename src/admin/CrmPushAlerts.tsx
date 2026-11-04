@@ -177,13 +177,14 @@ export function CrmPushAlerts() {
       {notice && <div role="status" className="mt-2 rounded-xl bg-[#FFF3E9] px-3 py-2 text-xs font-semibold text-[#9B4612]">
         {notice}
       </div>}
+      {connected && <p className="mt-2 text-xs font-semibold text-[#4D512E]">Push-уведомления активны на этом устройстве</p>}
       {support === "supported" && !blocked && (
         <div className="mt-3 flex flex-wrap gap-2">
           <button type="button" disabled={!ready || busy} onClick={() => void (connected ? disable() : enable())}
             className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#D96A24] px-3 py-2.5 text-xs font-semibold text-white disabled:opacity-50">
             {busy ? <LoaderCircle size={15} className="animate-spin"/> :
               connected ? <CheckCircle2 size={15}/> : <Bell size={15}/>}
-            {connected ? "Push включён" : "Включить на телефоне"}
+            {connected ? "Выключить push" : "Включить на телефоне"}
           </button>
           {connected && <button type="button" disabled={busy} onClick={() => void test()}
             className="rounded-xl bg-[#F7F5EF] px-3 py-2.5 text-xs font-semibold disabled:opacity-50">
