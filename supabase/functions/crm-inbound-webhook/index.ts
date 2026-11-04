@@ -110,6 +110,7 @@ async function receiveTilda(req: Request, raw: string) {
     metadata: {
       utm_source: getField(fields, "utm_source"),
       utm_medium: getField(fields, "utm_medium"),
+      requested_branch: getField(fields, "branch", "filial", "филиал", "округ", "location"),
     },
   });
   return response("ok");
