@@ -53,7 +53,7 @@ export function CrmVkConnection() {
       const result = await createCrmVkSetup(groupId.trim(), confirmation.trim());
       setSecret(result.secret);
       setConfigured(true);
-      setNotice("Ключ создан. Скопируйте его в VK: после обновления страницы он больше не показывается.");
+      setNotice("Создан новый ключ из 32 символов, совместимый с VK. Скопируйте его в настройки нового сервера VK: после обновления страницы он больше не показывается.");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Не удалось подготовить подключение VK");
     } finally {
@@ -96,7 +96,7 @@ export function CrmVkConnection() {
         {configured ? "Сгенерировать новый ключ" : "Подготовить подключение"}
       </button>
       {configured && <p className="mt-2 text-xs text-amber-800">
-        Новый ключ заменяет предыдущий. Если VK уже подключён, потребуется обновить ключ и там.
+        Новый ключ заменяет предыдущий. Скопируйте все 32 символа без пробелов и сохраните ключ на новом сервере VK.
       </p>}
 
       <div className="mt-4 rounded-xl bg-[#F7F5EF] p-3">
@@ -109,7 +109,7 @@ export function CrmVkConnection() {
       </div>
 
       {secret && <div className="mt-3 rounded-xl border border-[#D96A24]/20 bg-[#FFF7F0] p-3">
-        <p className="text-xs font-semibold">Секретный ключ для VK (показывается один раз)</p>
+        <p className="text-xs font-semibold">Секретный ключ для VK — 32 символа (показывается один раз)</p>
         <p className="mt-2 break-all font-mono text-xs">{secret}</p>
         <div className="mt-2 flex flex-wrap gap-2">
           <button type="button" onClick={() => void copy(secret, "Ключ")}
