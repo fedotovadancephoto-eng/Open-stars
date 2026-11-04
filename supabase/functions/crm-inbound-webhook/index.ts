@@ -76,9 +76,25 @@ async function store(item: Inbound) {
   throw new Error("database insert failed: " + result.status);
 }
 
+
+async function verifyTildaKey(value: string): Promise<boolean> {
+  if (!/^[0-9a-f]{64}$/.test(value)) return false;
+  if (!SUPABASE_URL || !SUPABASE_ADMIN_KEY) throw new Error("missing database configuration");
+  const result = await fetch(SUPABASE_URL + "/rest/v1/rpc/crm_verify_tilda_key", {
+    method: "POST",
+    headers: {
+      apikey: SUPABASE_ADMIN_KEY,
+      Authorization: "Bearer " + SUPABASE_ADMIN_KEY,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ p_key: value }),
+  });
+  if (!result.ok) throw new Error("key verifier unavailable");
+  return (await result.json()) === true;
+}
+
 async function receiveTilda(req: Request, raw: string) {
-  const secret = Deno.env.get("TILDA_WEBHOOK_KEY") ?? "";
-  if (!secret || !sameSecret(req.headers.get("x-open-stars-webhook-key") ?? "", secret)) return response("unauthorized", 401);
+  if (!(await verifyTildaKey(req.headers.get("x-open-stars-webhook-key") ?? ""))) return response("unauthorized", 401);
   let fields: Record<string, unknown>;
   try { fields = parseTilda(raw, req.headers.get("content-type") ?? ""); }
   catch { return response("invalid form", 400); }
