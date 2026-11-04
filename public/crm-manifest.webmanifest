@@ -1,0 +1,15 @@
+{
+  "id": "/admin/crm",
+  "name": "OPEN STARS · CRM",
+  "short_name": "OPEN STARS CRM",
+  "lang": "ru",
+  "start_url": "/admin/crm?inbox=1",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#FAF9F5",
+  "theme_color": "#FAF9F5",
+  "icons": [
+    { "src": "/icons/open-stars-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icons/open-stars-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

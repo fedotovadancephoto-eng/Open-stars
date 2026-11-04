@@ -63,7 +63,8 @@ Deno.serve(async (req: Request) => {
                 endpoint: job.endpoint, keys: { p256dh: job.p256dh, auth: job.auth },
               }, JSON.stringify({
                 title: job.title,
-                body: job.target === "push_test" ? "Уведомления OPEN STARS подключены." : "Откройте OPEN STARS, чтобы посмотреть подробности.",
+                body: job.target === "push_test" || job.target === "crm_push_test" ? "Уведомления OPEN STARS подключены." : "Откройте OPEN STARS, чтобы посмотреть подробности.",
+                target: job.target,
                 notificationId: job.notificationId,
               }), {
                 vapidDetails: { subject: "https://open-stars-cabinet.vercel.app", ...keys },

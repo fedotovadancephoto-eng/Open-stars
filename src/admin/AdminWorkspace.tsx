@@ -2,6 +2,7 @@ import AdminApp from "@/admin/AdminApp";
 import { TeamWorkBoard } from "@/admin/TeamWorkBoard";
 import { AdminCoinManager } from "@/admin/AdminCoinManager";
 import { AdminCrmManager } from "@/admin/AdminCrmManager";
+import { CrmPushAlerts } from "@/admin/CrmPushAlerts";
 import { AdminDocumentsManager } from "@/admin/AdminDocumentsManager";
 import { AdminEventsManager } from "@/admin/AdminEventsManager";
 import { AdminExpenseManager } from "@/admin/AdminExpenseManager";
@@ -67,6 +68,7 @@ function RoleAwareWorkspace() {
       {role && <AdminTopMenu />}
       {role && role !== "teacher" && <StaffModeSwitch />}
       <AdminApp />
+      {allowed("crm") && <CrmPushAlerts />}
       {allowed("add-student") && <DeferredManager sections={["add-student", "archive"]}><AdminStudentOperations /></DeferredManager>}
       {allowed("parent-activation") && <DeferredManager sections={["parent-activation"]}><AdminParentActivationManager /></DeferredManager>}
       {allowed("parent-password-reset") && <DeferredManager sections={["parent-password-reset"]}><AdminParentPasswordResetManager /></DeferredManager>}

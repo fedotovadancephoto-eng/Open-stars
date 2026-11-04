@@ -9,13 +9,14 @@ self.addEventListener("push", (event) => {
     try { data = event.data ? event.data.json() : {}; } catch { /* still show a visible notification */ }
     const id = validId(data.notificationId) ? data.notificationId : null;
     const tag = id ? `open-stars-${id}` : "open-stars-update";
+    const target = data.target === "crm_inbound" || data.target === "crm_push_test" ? data.target : null;
     // Redeliveries can occur after a worker timeout. Do not ring twice for an existing notification.
     const existing = await self.registration.getNotifications({ tag });
     if (!existing.length) await self.registration.showNotification(
       typeof data.title === "string" ? data.title.slice(0,120) : "OPEN STARS", {
         body: typeof data.body === "string" ? data.body.slice(0,200) : "В кабинете появилась новая информация.",
         icon: "/icons/open-stars-192.png", badge: "/icons/open-stars-72.png",
-        tag, renotify: false, silent: false, data: { notificationId: id },
+        tag, renotify: false, silent: false, data: { notificationId: id, target },
       });
     const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
     for (const client of windows) client.postMessage({ type: "OPEN_STARS_PUSH_RECEIVED" });
@@ -25,11 +26,12 @@ self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   event.waitUntil((async () => {
     const id = event.notification.data?.notificationId;
-    const path = validId(id) ? `/?notification=${encodeURIComponent(id)}` : "/";
+    const crm = event.notification.data?.target === "crm_inbound" || event.notification.data?.target === "crm_push_test";
+    const path = crm ? "/admin/crm?inbox=1" : validId(id) ? `/?notification=${encodeURIComponent(id)}` : "/";
     const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
     const parent = windows.find((client) => {
       const url = new URL(client.url);
-      return url.origin === self.location.origin && url.pathname === "/";
+      return url.origin === self.location.origin && (crm ? url.pathname.startsWith("/admin/crm") : url.pathname === "/");
     });
     if (parent) {
       await parent.focus();
