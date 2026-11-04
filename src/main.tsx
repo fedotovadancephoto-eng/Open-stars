@@ -12,6 +12,10 @@ installSupabaseFetchGuard();
 
 const pathname = window.location.pathname;
 const isCrmPath = pathname === '/admin/crm' || pathname.startsWith('/admin/crm/');
+if (isCrmPath) {
+  document.querySelector('link[rel="manifest"]')?.setAttribute('href', '/crm-manifest.webmanifest');
+  document.title = 'OPEN STARS · CRM';
+}
 const isAdminPath = pathname === '/admin' || pathname.startsWith('/admin/');
 const isDocumentsPath = pathname === '/documents' || pathname.startsWith('/documents/');
 const isSafeCrmVisualPreview =
