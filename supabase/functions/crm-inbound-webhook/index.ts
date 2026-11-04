@@ -145,7 +145,7 @@ function vkLeadText(object: Record<string, unknown>) {
 }
 
 async function verifyVkCallback(groupId: number, secret: string): Promise<{ authorized: boolean; confirmation_code?: string }> {
-  if (!Number.isSafeInteger(groupId) || groupId < 1 || !/^[0-9a-f]{64}$/.test(secret)) {
+  if (!Number.isSafeInteger(groupId) || groupId < 1 || !/^[0-9a-f]{32}([0-9a-f]{32})?$/.test(secret)) {
     return { authorized: false };
   }
   if (!SUPABASE_URL || !SUPABASE_ADMIN_KEY) throw new Error("missing database configuration");
@@ -162,6 +162,23 @@ async function verifyVkCallback(groupId: number, secret: string): Promise<{ auth
   return await result.json() as { authorized: boolean; confirmation_code?: string };
 }
 
+async function vkConfirmationCode(groupId: number): Promise<string | null> {
+  if (!Number.isSafeInteger(groupId) || groupId < 1) return null;
+  if (!SUPABASE_URL || !SUPABASE_ADMIN_KEY) throw new Error("missing database configuration");
+  const result = await fetch(SUPABASE_URL + "/rest/v1/rpc/crm_vk_confirmation", {
+    method: "POST",
+    headers: {
+      apikey: SUPABASE_ADMIN_KEY,
+      Authorization: "Bearer " + SUPABASE_ADMIN_KEY,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ p_group_id: groupId }),
+  });
+  if (!result.ok) throw new Error("VK confirmation verifier unavailable");
+  const code: unknown = await result.json();
+  return typeof code === "string" && code.length >= 4 && code.length <= 128 ? code : null;
+}
+
 async function receiveVk(raw: string) {
   let payload: Record<string, unknown>;
   try {
@@ -171,11 +188,14 @@ async function receiveVk(raw: string) {
   } catch { return response("invalid json", 400); }
 
   const groupId = Number(payload.group_id);
+  // VK's confirmation POST contains type + group_id, but no shared event secret.
+  if (payload.type === "confirmation") {
+    const code = await vkConfirmationCode(groupId);
+    return code ? response(code) : response("not configured", 403);
+  }
+  // All subsequent event deliveries must have the exact secret.
   const verification = await verifyVkCallback(groupId, short(payload.secret, 500));
   if (!verification.authorized) return response("unauthorized", 403);
-  if (payload.type === "confirmation") {
-    return response(verification.confirmation_code ?? "", verification.confirmation_code ? 200 : 503);
-  }
   const eventType = short(payload.type, 100);
   if (eventType !== "message_new" && eventType !== "lead_forms_new") return response("ok");
   const object = payload.object && typeof payload.object === "object" && !Array.isArray(payload.object)
