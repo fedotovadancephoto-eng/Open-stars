@@ -33,6 +33,7 @@ create index if not exists crm_inbound_branch_idx
 alter table public.crm_inbound_items enable row level security;
 revoke all on public.crm_inbound_items from public, anon, authenticated;
 grant select on public.crm_inbound_items to authenticated;
+grant select, insert, update on public.crm_inbound_items to service_role;
 
 drop policy if exists crm_inbound_staff_read on public.crm_inbound_items;
 create policy crm_inbound_staff_read on public.crm_inbound_items
