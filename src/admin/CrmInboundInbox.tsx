@@ -52,7 +52,7 @@ export function CrmInboundInbox({
     }
   }
 
-  useEffect(() => { if (role && role !== "marketer") void load(); }, [role]);
+  useEffect(() => { if (role && ["owner", "project_director", "manager", "sales"].includes(role)) void load(); }, [role]);
 
   function choose(item: CrmInboundItem) {
     setSelected(item);
@@ -90,7 +90,7 @@ export function CrmInboundInbox({
     }
   }
 
-  if (!role || role === "marketer") return null;
+  if (!role || !["owner", "project_director", "manager", "sales"].includes(role)) return null;
   return (
     <section className="mt-5 rounded-[22px] bg-white p-4">
       <div className="flex items-center justify-between gap-3">
