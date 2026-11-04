@@ -1,6 +1,6 @@
 export async function prepareCrmPush(): Promise<ServiceWorkerRegistration> {
-  const registration = await navigator.serviceWorker.register("/admin/crm/sw.js", {
-    scope: "/admin/crm/",
+  const registration = await navigator.serviceWorker.register("/admin/crm-sw.js", {
+    scope: "/admin/",
     updateViaCache: "none",
   });
   if (registration.active) return registration;
