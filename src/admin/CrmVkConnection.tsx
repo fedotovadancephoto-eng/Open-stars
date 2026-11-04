@@ -9,6 +9,8 @@ export function CrmVkConnection() {
   const [confirmation, setConfirmation] = useState("");
   const [secret, setSecret] = useState("");
   const [configured, setConfigured] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -22,6 +24,8 @@ export function CrmVkConnection() {
       if (result.confirmation_code) setConfirmation(result.confirmation_code);
     }).catch(cause => {
       if (active) setError(cause instanceof Error ? cause.message : "Не удалось загрузить настройки VK");
+    }).finally(() => {
+      if (active) setLoading(false);
     });
     return () => { active = false; };
   }, []);
@@ -59,6 +63,33 @@ export function CrmVkConnection() {
     } finally {
       setBusy(false);
     }
+  }
+
+  if (loading) {
+    return <section className="mt-5 rounded-[22px] border border-black/[0.07] bg-white p-4 text-sm text-black/55">Загрузка настроек ВКонтакте…</section>;
+  }
+
+  // A configured callback is not proof of successful event delivery.
+  // Keep setup available to the owner, but do not show the long setup form by default.
+  if (configured && !editing && !secret) {
+    return (
+      <section className="mt-5 rounded-[22px] border border-black/[0.07] bg-white p-4">
+        <div className="flex items-center gap-2">
+          <Link2 size={20} className="text-[#D96A24]"/>
+          <div className="flex-1">
+            <h2 className="font-semibold">Сервер ВКонтакте</h2>
+            <p className="text-xs text-black/50">Настройки сохранены · передача сообщений ещё не подтверждена</p>
+          </div>
+          <button type="button" onClick={() => setEditing(true)}
+            className="rounded-xl bg-[#F7F5EF] px-3 py-2 text-xs font-semibold">Настройки</button>
+        </div>
+        <p className="mt-3 text-xs leading-5 text-amber-800">
+          Если тестовое сообщение не приходит, проверьте секретный ключ в Callback API → Сервер 6.
+          Он должен точно совпадать с последним ключом, созданным в CRM.
+          Настройки amoCRM не изменяйте.
+        </p>
+      </section>
+    );
   }
 
   return (
