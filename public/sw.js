@@ -7,6 +7,8 @@ self.addEventListener("push", (event) => {
   event.waitUntil((async () => {
     let data = {};
     try { data = event.data ? event.data.json() : {}; } catch { /* still show a visible notification */ }
+    // Parent application never displays CRM staff notifications.
+    if (data.target === "crm_inbound" || data.target === "crm_push_test") return;
     const id = validId(data.notificationId) ? data.notificationId : null;
     const tag = id ? `open-stars-${id}` : "open-stars-update";
     const target = data.target === "crm_inbound" || data.target === "crm_push_test" ? data.target : null;

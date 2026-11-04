@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Bell, BellOff, CheckCircle2, LoaderCircle, X } from "lucide-react";
-import { applicationKey, prepareParentPush, pushSupport } from "@/parentPushApi";
+import { applicationKey, pushSupport } from "@/parentPushApi";
+import { prepareCrmPush } from "@/admin/crmPushWorker";
 import { crmPushAction, fetchCrmInboundAlertIds } from "@/admin/crmPushApi";
 
 type Prepared = { registration: ServiceWorkerRegistration; publicKey: string };
@@ -62,7 +63,7 @@ export function CrmPushAlerts() {
     void (async () => {
       try {
         const [registration, config] = await Promise.all([
-          prepareParentPush(),
+          prepareCrmPush(),
           crmPushAction<{ publicKey: string | null }>("config"),
         ]);
         if (!config.publicKey) throw new Error("Push-сервис временно недоступен.");
@@ -122,7 +123,7 @@ export function CrmPushAlerts() {
     setBusy(true);
     setMessage("");
     try {
-      const registration = await navigator.serviceWorker.getRegistration("/");
+      const registration = await navigator.serviceWorker.getRegistration("/admin/crm/");
       const subscription = await registration?.pushManager.getSubscription();
       if (subscription) {
         await crmPushAction("unsubscribe", { endpoint: subscription.endpoint });
@@ -177,7 +178,7 @@ export function CrmPushAlerts() {
       {notice && <div role="status" className="mt-2 rounded-xl bg-[#FFF3E9] px-3 py-2 text-xs font-semibold text-[#9B4612]">
         {notice}
       </div>}
-      {connected && <p className="mt-2 text-xs font-semibold text-[#4D512E]">Push-уведомления активны на этом устройстве</p>}
+      {connected && <p className="mt-2 text-xs font-semibold text-[#4D512E]">Push-уведомления CRM активны на этом устройстве</p>}
       {support === "supported" && !blocked && (
         <div className="mt-3 flex flex-wrap gap-2">
           <button type="button" disabled={!ready || busy} onClick={() => void (connected ? disable() : enable())}
