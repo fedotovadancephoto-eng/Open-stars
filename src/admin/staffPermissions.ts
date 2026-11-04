@@ -27,8 +27,8 @@ export const STAFF_SECTION_ROLES: Record<AdminSection, readonly StaffRole[]> = {
   reports: allStaff,
   expenses: administration,
   payroll: ["owner", "admin", "manager"],
-  crm: administration,
-  "crm-access": ["owner", "project_director"],
+  crm: ["owner", "manager"],
+  "crm-access": ["owner"],
   business: ["owner"],
 };
 
