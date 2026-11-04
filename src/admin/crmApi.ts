@@ -403,3 +403,28 @@ export async function processCrmInboundItem(input: {
     p_next_contact_at: input.nextContactAt,
   });
 }
+
+
+export type CrmVkSetup = {
+  configured: boolean;
+  group_id?: string;
+  confirmation_code?: string;
+  updated_at?: string;
+};
+
+export type CrmVkGeneratedSetup = {
+  group_id: string;
+  confirmation_code: string;
+  secret: string;
+};
+
+export async function fetchCrmVkSetup(): Promise<CrmVkSetup> {
+  return rpc<CrmVkSetup>("crm_vk_get_setup", {});
+}
+
+export async function createCrmVkSetup(groupId: string, confirmationCode: string): Promise<CrmVkGeneratedSetup> {
+  return rpc<CrmVkGeneratedSetup>("crm_vk_generate_setup", {
+    p_group_id: Number(groupId),
+    p_confirmation_code: confirmationCode,
+  });
+}

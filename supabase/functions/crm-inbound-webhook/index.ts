@@ -144,11 +144,25 @@ function vkLeadText(object: Record<string, unknown>) {
   return "";
 }
 
+async function verifyVkCallback(groupId: number, secret: string): Promise<{ authorized: boolean; confirmation_code?: string }> {
+  if (!Number.isSafeInteger(groupId) || groupId < 1 || !/^[0-9a-f]{64}$/.test(secret)) {
+    return { authorized: false };
+  }
+  if (!SUPABASE_URL || !SUPABASE_ADMIN_KEY) throw new Error("missing database configuration");
+  const result = await fetch(SUPABASE_URL + "/rest/v1/rpc/crm_vk_verify_callback", {
+    method: "POST",
+    headers: {
+      apikey: SUPABASE_ADMIN_KEY,
+      Authorization: "Bearer " + SUPABASE_ADMIN_KEY,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ p_group_id: groupId, p_secret: secret }),
+  });
+  if (!result.ok) throw new Error("VK callback verifier unavailable");
+  return await result.json() as { authorized: boolean; confirmation_code?: string };
+}
+
 async function receiveVk(raw: string) {
-  const secret = Deno.env.get("VK_CALLBACK_SECRET") ?? "";
-  const groupId = Deno.env.get("VK_GROUP_ID") ?? "";
-  const confirmation = Deno.env.get("VK_CONFIRMATION_CODE") ?? "";
-  if (!secret || !groupId || !confirmation) return response("not configured", 503);
   let payload: Record<string, unknown>;
   try {
     const parsed: unknown = JSON.parse(raw);
@@ -156,11 +170,12 @@ async function receiveVk(raw: string) {
     payload = parsed as Record<string, unknown>;
   } catch { return response("invalid json", 400); }
 
-  if (!sameSecret(short(payload.secret, 500), secret) || String(payload.group_id ?? "") !== groupId) {
-    return response("unauthorized", 403);
+  const groupId = Number(payload.group_id);
+  const verification = await verifyVkCallback(groupId, short(payload.secret, 500));
+  if (!verification.authorized) return response("unauthorized", 403);
+  if (payload.type === "confirmation") {
+    return response(verification.confirmation_code ?? "", verification.confirmation_code ? 200 : 503);
   }
-  if (payload.type === "confirmation") return response(confirmation);
-
   const eventType = short(payload.type, 100);
   if (eventType !== "message_new" && eventType !== "lead_forms_new") return response("ok");
   const object = payload.object && typeof payload.object === "object" && !Array.isArray(payload.object)
@@ -172,7 +187,7 @@ async function receiveVk(raw: string) {
   const messageId = eventType === "message_new"
     ? short(msg.id || msg.conversation_message_id)
     : short(object.lead_id || object.id);
-  const eventId = short(payload.event_id) || (messageId ? groupId + ":" + senderId + ":" + messageId : "");
+  const eventId = short(payload.event_id) || (messageId ? String(groupId) + ":" + senderId + ":" + messageId : "");
   await store({
     source: "vk",
     external_event_id: eventId ? "vk:" + eventId.slice(0, 270) : null,
@@ -180,7 +195,7 @@ async function receiveVk(raw: string) {
     sender_id: senderId || null,
     message: eventType === "message_new" ? short(msg.text, 4000) : vkLeadText(object),
     form_id: eventType === "lead_forms_new" ? short(object.form_id) : null,
-    metadata: { group_id: groupId },
+    metadata: { group_id: String(groupId) },
   });
   return response("ok");
 }
