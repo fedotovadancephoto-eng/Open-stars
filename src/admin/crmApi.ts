@@ -17,6 +17,7 @@ export type CrmLead = {
   plannedLessonTime: string;
   parentName: string;
   parentPhone: string;
+  phoneNormalized: string;
   source: string;
   sourceNote: string;
   campaign: string;
@@ -135,6 +136,13 @@ function friendly(message: string) {
   if (message.includes("child full name required")) return "Укажите имя и фамилию ребёнка.";
   if (message.includes("invalid group")) return "Выберите группу ребёнка.";
   if (message.includes("not authorized")) return "Недостаточно прав для этого действия.";
+  if (message.includes("select two different leads")) return "Выберите две разные карточки.";
+  if (message.includes("not the same child and phone")) return "Нельзя объединять разных детей или разные телефоны.";
+  if (message.includes("different branch")) return "Нельзя объединять лиды из разных филиалов.";
+  if (message.includes("different birth dates")) return "У карточек разные даты рождения. Проверьте данные.";
+  if (message.includes("choose an active unpaid primary lead")) return "Основная карточка должна быть активной, без оплаты и оформления ученика.";
+  if (message.includes("cannot merge student or paid leads")) return "Оплаченные лиды и карточки учеников объединять нельзя.";
+  if (message.includes("lead not found")) return "Одна из карточек уже удалена или объединена. Обновите CRM.";
   return message || "Не удалось выполнить действие CRM.";
 }
 
@@ -186,6 +194,7 @@ function mapLead(row: any): CrmLead {
     plannedLessonTime: (row.planned_lesson_time || "").slice(0, 5),
     parentName: row.parent_name || "",
     parentPhone: row.parent_phone || "",
+    phoneNormalized: row.phone_normalized || "",
     source: row.source || "",
     sourceNote: row.source_note || "",
     campaign: row.campaign || "",
@@ -209,6 +218,13 @@ export async function fetchCrmLeads(branch = "") {
   const filter = branch ? `&branch=eq.${encodeURIComponent(branch)}` : "";
   const rows = await rest<any[]>(`crm_leads?select=*&order=next_contact_at.asc${filter}`);
   return rows.map(mapLead);
+}
+
+export async function mergeCrmLeads(primaryId: string, duplicateId: string) {
+  return rpc<{ primaryId: string; mergedId: string; movedTasks: number; movedHistory: number; movedInbound: number }>(
+    "crm_merge_leads",
+    { p_primary_id: primaryId, p_duplicate_id: duplicateId }
+  );
 }
 
 export async function fetchCrmTasks() {
