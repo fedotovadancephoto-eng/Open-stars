@@ -68,7 +68,7 @@ function RoleAwareWorkspace() {
       {role && <AdminTopMenu />}
       {role && role !== "teacher" && <StaffModeSwitch />}
       <AdminApp />
-      {allowed("crm") && <CrmPushAlerts />}
+      {(role === "owner" || role === "project_director" || role === "manager") && <CrmPushAlerts />}
       {allowed("add-student") && <DeferredManager sections={["add-student", "archive"]}><AdminStudentOperations /></DeferredManager>}
       {allowed("parent-activation") && <DeferredManager sections={["parent-activation"]}><AdminParentActivationManager /></DeferredManager>}
       {allowed("parent-password-reset") && <DeferredManager sections={["parent-password-reset"]}><AdminParentPasswordResetManager /></DeferredManager>}
