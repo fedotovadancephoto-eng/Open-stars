@@ -176,7 +176,7 @@ export default function CrmStandaloneWorkspace() {
       {role === "sales" && <button onClick={()=>openAdminSection("parent-activation")} className="mt-3 flex w-full items-center justify-center gap-2 rounded-[16px] bg-[#171717] py-3.5 text-sm font-semibold text-white"><KeyRound size={17}/>Активация родителей</button>}
       <button onClick={()=>{clearStaffSession();setRole(null);setState("guest");}} className="mt-3 flex w-full items-center justify-center gap-2 rounded-[16px] bg-[#F6F5F1] py-3 text-sm font-semibold text-black/55"><LogOut size={17}/>Выйти</button>
     </div>
-    {(role === "owner" || role === "project_director" || role === "manager" || role === "sales") && <CrmPushAlerts/>}
+    {(role === "project_director" || role === "manager" || role === "sales") && <CrmPushAlerts/>}
     <AdminCrmManager/>
     <TeamWorkBoard/>
     {role === "sales" && <AdminParentActivationManager showFloatingButton={false}/>}
