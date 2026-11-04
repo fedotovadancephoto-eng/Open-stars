@@ -72,7 +72,7 @@ async function loginCrmStaff(phoneInput: string, password: string) {
   const rows = await profileResponse.json() as Array<{ roles?: { name?: string } | Array<{ name?: string }> }>;
   const roles = rows[0]?.roles;
   const role = Array.isArray(roles) ? roles[0]?.name : roles?.name;
-  const allowed = new Set(["owner", "manager", "sales"]);
+  const allowed = new Set(["owner", "manager", "sales", "admin"]);
   if (!role || !allowed.has(role)) throw new Error("У этого аккаунта нет доступа к CRM OPEN STARS.");
 
   localStorage.setItem(STAFF_SESSION_KEY, JSON.stringify({
