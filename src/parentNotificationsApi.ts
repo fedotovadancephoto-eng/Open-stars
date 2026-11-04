@@ -39,6 +39,7 @@ export async function fetchParentNotifications(): Promise<ParentNotification[]> 
   const query = new URLSearchParams({
     select: "id,title,body,target,target_id,is_read,created_at",
     recipient_user_id: `eq.${userId}`,
+    or: "(target.is.null,target.not.in.(crm_inbound,crm_push_test))",
     target: "in.(news,coins,progress,homework,comments,payments,feedback,push_test)",
     order: "created_at.desc",
     limit: "30",
@@ -48,7 +49,7 @@ export async function fetchParentNotifications(): Promise<ParentNotification[]> 
   });
   if (!response.ok) throw new Error("Не удалось загрузить уведомления.");
   const rows = await response.json();
-  return (rows || []).map((row: any) => ({
+  return (rows || []).filter((row: any) => row.target !== "crm_inbound" && row.target !== "crm_push_test").map((row: any) => ({
     id: row.id,
     title: row.title || "OPEN STARS",
     body: row.body || "",
