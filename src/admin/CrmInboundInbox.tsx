@@ -131,6 +131,7 @@ export function CrmInboundInbox({
           <div className="mt-4 rounded-xl bg-white p-3 text-sm">
             <p>{selected.senderName || "Контакт не указан"} · {selected.senderPhone || selected.senderEmail || selected.senderId || "Без контакта"}</p>
             <p className="mt-2 whitespace-pre-wrap text-black/65">{selected.message || "Без текста"}</p>
+            {selected.requestedBranch && <p className="mt-2 text-xs text-black/45">Запрошенный филиал: {selected.requestedBranch}</p>}
             {selected.campaign && <p className="mt-2 text-xs text-black/45">Кампания: {selected.campaign}</p>}
           </div>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
