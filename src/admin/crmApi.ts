@@ -357,12 +357,13 @@ export type CrmInboundItem = {
   campaign: string;
   formId: string;
   pageUrl: string;
+  requestedBranch: string;
   receivedAt: string;
 };
 
 export async function fetchCrmInboundItems(): Promise<CrmInboundItem[]> {
   const rows = await rest<any[]>(
-    "crm_inbound_items?select=id,source,external_event_id,event_type,branch,sender_id,sender_name,sender_phone,sender_email,message,campaign,form_id,page_url,received_at&status=eq.new&order=received_at.desc&limit=100"
+    "crm_inbound_items?select=id,source,external_event_id,event_type,branch,sender_id,sender_name,sender_phone,sender_email,message,campaign,form_id,page_url,metadata,received_at&status=eq.new&order=received_at.desc&limit=100"
   );
   return rows.map(row => ({
     id: row.id,
@@ -378,6 +379,7 @@ export async function fetchCrmInboundItems(): Promise<CrmInboundItem[]> {
     campaign: row.campaign || "",
     formId: row.form_id || "",
     pageUrl: row.page_url || "",
+    requestedBranch: row.metadata?.requested_branch || "",
     receivedAt: row.received_at || "",
   }));
 }
