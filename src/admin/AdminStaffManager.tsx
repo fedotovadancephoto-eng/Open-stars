@@ -198,7 +198,7 @@ export function AdminStaffManager() {
     setCreated(null);
     try {
       const isCrmRole = roleName === "marketer" || roleName === "sales";
-      const next = await createStaffInvite({ fullName, phone, roleName, branch: isCrmRole ? "" : branch, teachingSubject: isCrmRole ? "" : teachingSubject });
+      const next = await createStaffInvite({ fullName, phone, roleName, branch: (isCrmRole || roleName === "manager") ? "" : branch, teachingSubject: (isCrmRole || roleName === "manager") ? "" : teachingSubject });
       setCreated(next);
       setSuccess(`Код создан. Передайте сотруднику телефон, код и ссылку ${isCrmRole ? "/admin/crm" : "/admin"}. Код показывается только сейчас.`);
       setFullName("");
@@ -331,7 +331,7 @@ export function AdminStaffManager() {
 
   if (!enabled) return null;
   const isCrmRole = roleName === "marketer" || roleName === "sales";
-  const needsBranch = roleName !== "project_director" && !isCrmRole;
+  const needsBranch = roleName !== "project_director" && roleName !== "manager" && !isCrmRole;
   const canChooseProjectDirector = actorRole === "owner";
 
   return (
@@ -352,6 +352,7 @@ export function AdminStaffManager() {
               <label className="mt-4 block text-xs font-semibold text-black/55">Имя и фамилия<input className={inputClass} value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Белова Марина" /></label>
               <label className="mt-3 block text-xs font-semibold text-black/55">Рабочий телефон<input className={inputClass} value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+7 999 123-45-67" inputMode="tel" /></label>
               <label className="mt-3 block text-xs font-semibold text-black/55">Основная роль<select className={inputClass} value={roleName} onChange={(e) => setRoleName(e.target.value)}><option value="teacher">Педагог</option><option value="admin">Администратор филиала</option><option value="manager">Управляющий</option><option value="marketer">Маркетолог</option><option value="sales">Продажник</option>{canChooseProjectDirector && <option value="project_director">Директор по проекту</option>}</select></label>
+              {roleName === "manager" && <div className="mt-3 rounded-[13px] border border-[#5F6338]/20 bg-[#5F6338]/[0.07] px-3.5 py-3"><p className="text-xs font-semibold text-[#4D512E]">Филиал: Все филиалы</p><p className="mt-1 text-xs leading-5 text-black/55">Управляющий получает доступ к НЛО, Октябрьскому и Свердловскому филиалам.</p></div>}
               {needsBranch && <label className="mt-3 block text-xs font-semibold text-black/55">Филиал<select className={inputClass} value={branch} onChange={(e) => setBranch(e.target.value)}>{branches.map((item) => <option key={item}>{item}</option>)}</select></label>}
               {needsBranch && <div className="mt-3">
                 <label className="block text-xs font-semibold text-black/55">Педагогический предмет {roleName === "teacher" ? "· обязательно" : "· необязательно"}
