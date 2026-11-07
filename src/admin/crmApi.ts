@@ -36,6 +36,32 @@ export type CrmLead = {
   updatedAt: string;
 };
 
+export type CrmCallLog = {
+  id: string;
+  leadId: string;
+  direction: "inbound" | "outbound";
+  clientPhone: string;
+  startedAt: string;
+  durationSeconds: number | null;
+  outcome: "answered" | "missed" | "busy" | "failed" | "unknown";
+  recordingState: "unavailable" | "pending" | "ready" | "failed";
+};
+
+export async function fetchCrmCallLogs(leadId: string): Promise<CrmCallLog[]> {
+  if (!/^[a-f0-9-]{36}$/i.test(leadId)) throw new Error("Некорректная карточка клиента.");
+  const rows = await rest<any[]>(`crm_call_logs?select=id,lead_id,direction,client_phone,started_at,duration_seconds,outcome,recording_state&lead_id=eq.${encodeURIComponent(leadId)}&order=started_at.desc&limit=100`);
+  return rows.map((row) => ({
+    id: row.id,
+    leadId: row.lead_id,
+    direction: row.direction,
+    clientPhone: row.client_phone || "",
+    startedAt: row.started_at,
+    durationSeconds: row.duration_seconds,
+    outcome: row.outcome,
+    recordingState: row.recording_state,
+  }));
+}
+
 export type CrmTask = {
   id: string;
   leadId: string;
