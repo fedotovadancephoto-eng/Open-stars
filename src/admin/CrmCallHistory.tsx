@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Headphones, LoaderCircle, PhoneIncoming, PhoneOutgoing } from "lucide-react";
 
-import { CrmCallLog, fetchCrmCallLogs } from "@/admin/crmApi";
+import { CrmCallLog, fetchCrmCallLogs, fetchCrmCallRecording } from "@/admin/crmApi";
 
 function formatCallDate(value: string) {
   const date = new Date(value);
@@ -28,6 +28,22 @@ export function CrmCallHistory({ leadId }: { leadId: string }) {
   const [calls, setCalls] = useState<CrmCallLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [playingId, setPlayingId] = useState("");
+  const [audioUrl, setAudioUrl] = useState("");
+  const [audioError, setAudioError] = useState("");
+  const [audioBusy, setAudioBusy] = useState("");
+  useEffect(() => () => { if (audioUrl) URL.revokeObjectURL(audioUrl); }, [audioUrl]);
+  async function play(callId: string) {
+    setAudioBusy(callId); setAudioError("");
+    try {
+      const blob = await fetchCrmCallRecording(callId);
+      const url = URL.createObjectURL(blob);
+      setAudioUrl(url);
+      setPlayingId(callId);
+    } catch (e) { setAudioError(e instanceof Error ? e.message : "Не удалось открыть запись."); }
+    finally { setAudioBusy(""); }
+  }
+
 
   useEffect(() => {
     let active = true;
@@ -52,6 +68,7 @@ export function CrmCallHistory({ leadId }: { leadId: string }) {
       {!loading && !error && calls.length === 0 && (
         <p className="mt-2 text-sm leading-6 text-black/50">Звонков пока нет. Раздел подготовлен, но АТС и автоматическая запись ещё не подключены.</p>
       )}
+      {audioError && <p role="alert" className="mt-2 text-xs text-red-600">{audioError}</p>}
       {!loading && !error && calls.length > 0 && (
         <ul className="mt-3 space-y-2">
           {calls.map((call) => (
@@ -62,7 +79,12 @@ export function CrmCallHistory({ leadId }: { leadId: string }) {
                 <span className="ml-auto text-xs text-black/45">{formatCallDate(call.startedAt)}</span>
               </div>
               <p className="mt-1 text-xs text-black/55">{outcomeLabels[call.outcome]} · {formatDuration(call.durationSeconds)} · {call.clientPhone || "Номер скрыт"}</p>
-              {call.recordingState === "ready" && <p className="mt-1 text-xs text-[#5F6338]">Запись получена. Прослушивание станет доступно после настройки защищённого хранения.</p>}
+              {call.recordingState === "ready" && <div className="mt-2">
+                <button type="button" disabled={Boolean(audioBusy)} onClick={() => void play(call.id)} className="rounded-lg bg-[#5F6338]/10 px-3 py-2 text-xs font-semibold text-[#4D512E] disabled:opacity-40">
+                  {audioBusy === call.id ? "Загрузка записи…" : "Слушать запись"}
+                </button>
+                {playingId === call.id && audioUrl && <audio controls preload="none" src={audioUrl} className="mt-2 w-full" />}
+              </div>}
             </li>
           ))}
         </ul>

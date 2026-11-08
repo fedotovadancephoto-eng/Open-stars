@@ -62,6 +62,23 @@ export async function fetchCrmCallLogs(leadId: string): Promise<CrmCallLog[]> {
   }));
 }
 
+export async function fetchCrmCallRecording(callId: string): Promise<Blob> {
+  if (!/^[a-f0-9-]{36}$/i.test(callId)) throw new Error("Некорректный звонок.");
+  const session = await getValidStaffSession();
+  if (!session) throw new Error("Войди в CRM повторно.");
+  const response = await fetch(SUPABASE_URL + "/functions/v1/t2-crm-bridge", {
+    method: "POST",
+    headers: {
+      apikey: SUPABASE_PUBLISHABLE_KEY,
+      Authorization: "Bearer " + session.access_token,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ action: "recording", callId }),
+  });
+  if (!response.ok) throw new Error("Запись пока недоступна. Проверь подключение Т2.");
+  return response.blob();
+}
+
 export type CrmTask = {
   id: string;
   leadId: string;
