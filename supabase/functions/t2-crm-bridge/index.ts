@@ -165,8 +165,8 @@ Deno.serve(async (req: Request) => {
       if (ids.length !== 1) { unmatched++; continue; }
       const startTime = new Date(call.date || "");
       if (Number.isNaN(startTime.getTime())) continue;
-      const duration = Number.isFinite(call.conversationDuration) ? call.conversationDuration : call.callDuration;
-      const seconds = Number.isFinite(duration) ? Math.max(0, Math.round(Number(duration))) : null;
+      const duration = typeof call.conversationDuration === "number" && Number.isFinite(call.conversationDuration) ? call.conversationDuration : call.callDuration;
+      const seconds = typeof duration === "number" && Number.isFinite(duration) ? Math.max(0, Math.round(duration)) : null;
       const status = call.callStatus || "";
       const outcome = status.startsWith("ANSWERED") ? "answered" :
         status.includes("BUSY") ? "busy" : status.includes("NOT_ANSWERED") || status.includes("CANCELLED") ? "missed" : "unknown";
