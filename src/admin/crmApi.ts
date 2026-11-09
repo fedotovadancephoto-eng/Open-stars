@@ -404,6 +404,8 @@ export async function recordCrmCampaignExpense(campaignId: string, amount: numbe
 
 export type CrmInboundItem = {
   id: string;
+  status: "new" | "ignored";
+  staffComment: string;
   source: "site" | "vk" | "instagram";
   externalEventId: string;
   eventType: string;
@@ -420,13 +422,15 @@ export type CrmInboundItem = {
   receivedAt: string;
 };
 
-export async function fetchCrmInboundItems(): Promise<CrmInboundItem[]> {
+export async function fetchCrmInboundItems(status: "new" | "ignored" = "new"): Promise<CrmInboundItem[]> {
   const rows = await rest<any[]>(
-    "crm_inbound_items?select=id,source,external_event_id,event_type,branch,sender_id,sender_name,sender_phone,sender_email,message,campaign,form_id,page_url,metadata,received_at&status=eq.new&order=received_at.desc&limit=100"
+    `crm_inbound_items?select=id,status,staff_comment,source,external_event_id,event_type,branch,sender_id,sender_name,sender_phone,sender_email,message,campaign,form_id,page_url,metadata,received_at&status=eq.${status}&order=received_at.desc&limit=100`
   );
   return rows.map(row => ({
     id: row.id,
     source: row.source,
+    status: row.status,
+    staffComment: row.staff_comment || "",
     externalEventId: row.external_event_id || "",
     eventType: row.event_type || "",
     branch: row.branch || "",
@@ -445,21 +449,23 @@ export async function fetchCrmInboundItems(): Promise<CrmInboundItem[]> {
 
 export async function processCrmInboundItem(input: {
   id: string;
-  action: "ignore" | "convert";
+  action: "save" | "archive" | "restore" | "convert";
+  comment: string;
   branch: string;
   childName: string;
   parentName: string;
   parentPhone: string;
   nextContactAt: string;
 }) {
-  return rpc<{ id: string; status: string; lead_id?: string }>("crm_process_inbound", {
+  return rpc<{ id: string; status: string; lead_id?: string }>("crm_review_inbound", {
     p_inbound_id: input.id,
     p_action: input.action,
+    p_comment: input.comment,
     p_branch: input.branch,
     p_child_name: input.childName.trim(),
     p_parent_name: input.parentName.trim(),
     p_parent_phone: input.parentPhone.trim(),
-    p_next_contact_at: input.nextContactAt,
+    p_next_contact_at: input.nextContactAt || null,
   });
 }
 

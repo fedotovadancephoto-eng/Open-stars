@@ -28,6 +28,8 @@ export function CrmInboundInbox({
   staffBranch: string;
   onConverted: () => void;
 }) {
+  const [view, setView] = useState<"new" | "ignored">("new");
+  const [comment, setComment] = useState("");
   const [items, setItems] = useState<CrmInboundItem[]>([]);
   const [selected, setSelected] = useState<CrmInboundItem | null>(null);
   const [branch, setBranch] = useState("НЛО");
@@ -43,7 +45,7 @@ export function CrmInboundInbox({
   async function load() {
     setLoading(true);
     try {
-      setItems(await fetchCrmInboundItems());
+      setItems(await fetchCrmInboundItems(view));
       setError("");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Не удалось загрузить входящие.");
@@ -52,10 +54,11 @@ export function CrmInboundInbox({
     }
   }
 
-  useEffect(() => { if (role && ["owner", "manager", "sales"].includes(role)) void load(); }, [role]);
+  useEffect(() => { if (role && ["owner", "manager", "sales"].includes(role)) void load(); }, [role, view]);
 
   function choose(item: CrmInboundItem) {
     setSelected(item);
+    setComment(item.staffComment);
     setBranch(role === "admin" ? staffBranch : item.branch || "НЛО");
     setParentName(item.senderName || "");
     setParentPhone(item.senderPhone || "");
@@ -64,7 +67,7 @@ export function CrmInboundInbox({
     setError("");
   }
 
-  async function process(action: "ignore" | "convert") {
+  async function process(action: "save" | "archive" | "restore" | "convert") {
     if (!selected || busy) return;
     if (action === "convert" && (!childName.trim() || !parentName.trim() || !parentPhone.trim() || !nextContact)) {
       setError("Для создания CRM-лида нужны имя ученика, имя контактного лица, телефон и следующий контакт.");
@@ -76,9 +79,10 @@ export function CrmInboundInbox({
       await processCrmInboundItem({
         id: selected.id,
         action,
+        comment,
         branch: role === "admin" ? staffBranch : branch,
         childName, parentName, parentPhone,
-        nextContactAt: new Date(nextContact).toISOString(),
+        nextContactAt: action === "convert" ? new Date(nextContact).toISOString() : "",
       });
       setSelected(null);
       await load();
@@ -98,7 +102,7 @@ export function CrmInboundInbox({
           <Inbox size={20} className="text-[#D96A24]"/>
           <div>
             <h2 className="font-semibold">Входящие обращения</h2>
-            <p className="text-xs text-black/45">Сайт и соцсети · ожидают проверки: {items.length}</p>
+            <p className="text-xs text-black/45">Сайт и соцсети · {view === "new" ? "ожидают проверки" : "в архиве"}: {items.length}</p>
           </div>
         </div>
         <button type="button" onClick={() => { setExpanded(value => !value); if (!expanded) void load(); }}
@@ -107,26 +111,30 @@ export function CrmInboundInbox({
         </button>
       </div>
       {expanded && <>
-        <p className="mt-3 text-xs leading-5 text-black/50">Обращение ещё не является CRM-лидом. Отметьте нерелевантное или заполните недостающие сведения и создайте лид.</p>
+        <p className="mt-3 text-xs leading-5 text-black/50">Сохраните комментарий, создайте лид или уберите обращение в архив. Из архива заявку можно вернуть в работу.</p>
+        <div className="mt-3 flex gap-2">{(["new", "ignored"] as const).map(value => <button key={value} type="button" onClick={() => setView(value)} className={`rounded-xl px-4 py-2 text-sm font-semibold ${view === value ? "bg-[#171717] text-white" : "bg-[#F7F5EF] text-black/60"}`}>{value === "new" ? "Новые заявки" : "Архив"}</button>)}</div>
         {loading && <p className="mt-3 flex items-center gap-2 text-sm text-black/45"><LoaderCircle size={15} className="animate-spin"/>Загрузка…</p>}
         {error && <p role="alert" className="mt-3 rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
         <div className="mt-3 space-y-2">
+          {!loading && <>
           {items.map(item => <button key={item.id} type="button" onClick={() => choose(item)}
             className="flex w-full items-start justify-between gap-3 rounded-xl border border-black/[0.07] p-3 text-left">
             <div className="min-w-0">
               <p className="text-sm font-semibold">{item.senderName || item.senderPhone || item.senderId || "Без имени"}</p>
               <p className="mt-1 truncate text-xs text-black/50">{item.message || item.eventType}</p>
+              {item.staffComment && <p className="mt-1 whitespace-pre-wrap text-xs text-[#5F6338]">Комментарий: {item.staffComment}</p>}
             </div>
             <span className="shrink-0 rounded-lg bg-[#F7F5EF] px-2 py-1 text-xs">{labels[item.source]}</span>
           </button>)}
-          {!loading && items.length === 0 && <p className="py-5 text-center text-sm text-black/45">Новых обращений нет.</p>}
+          </>}
+          {!loading && items.length === 0 && <p className="py-5 text-center text-sm text-black/45">{view === "new" ? "Новых обращений нет." : "Архив пуст."}</p>}
         </div>
       </>}
       {selected && <div className="fixed inset-0 z-[90] overflow-y-auto bg-black/30 p-3">
         <div className="mx-auto max-w-lg rounded-2xl bg-[#FAF9F5] p-5">
           <div className="flex items-center justify-between">
             <div><p className="text-xs font-semibold text-[#D96A24]">{labels[selected.source]}</p><h3 className="text-xl font-semibold">Обработка обращения</h3></div>
-            <button type="button" onClick={() => { setSelected(null); setError(""); }} className="rounded-full bg-white p-2"><X size={20}/></button>
+            <button type="button" disabled={busy} onClick={() => { setSelected(null); setError(""); }} className="rounded-full bg-white p-2"><X size={20}/></button>
           </div>
           <div className="mt-4 rounded-xl bg-white p-3 text-sm">
             <p>{selected.senderName || "Контакт не указан"} · {selected.senderPhone || selected.senderEmail || selected.senderId || "Без контакта"}</p>
@@ -134,17 +142,20 @@ export function CrmInboundInbox({
             {selected.requestedBranch && <p className="mt-2 text-xs text-black/45">Запрошенный филиал: {selected.requestedBranch}</p>}
             {selected.campaign && <p className="mt-2 text-xs text-black/45">Кампания: {selected.campaign}</p>}
           </div>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          {selected.status === "new" && <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <label className="text-xs font-semibold text-black/50">Филиал<select disabled={role === "admin"} className={inputClass} value={role === "admin" ? staffBranch : branch} onChange={event => setBranch(event.target.value)}>{branches.map(item => <option key={item}>{item}</option>)}</select></label>
             <label className="text-xs font-semibold text-black/50">Имя ученика / клиента<input className={inputClass} value={childName} onChange={event => setChildName(event.target.value)}/></label>
             <label className="text-xs font-semibold text-black/50">Контактное лицо<input className={inputClass} value={parentName} onChange={event => setParentName(event.target.value)}/></label>
             <label className="text-xs font-semibold text-black/50">Телефон<input className={inputClass} inputMode="tel" value={parentPhone} onChange={event => setParentPhone(event.target.value)}/></label>
             <label className="text-xs font-semibold text-black/50 sm:col-span-2">Следующий контакт<input className={inputClass} type="datetime-local" value={nextContact} onChange={event => setNextContact(event.target.value)}/></label>
           </div>
+          }
+          <label className="mt-4 block text-xs font-semibold text-black/60">Комментарий по заявке<textarea disabled={busy} maxLength={4000} className={`${inputClass} min-h-28`} value={comment} onChange={event => setComment(event.target.value)} placeholder="Причина отказа, результат разговора или что сделать дальше"/></label>
           {error && <p role="alert" className="mt-3 rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
-          <div className="mt-4 flex gap-2">
-            <button disabled={busy} onClick={() => void process("ignore")} className="rounded-xl bg-white px-4 py-3 text-sm font-semibold disabled:opacity-50">Не заявка</button>
-            <button disabled={busy} onClick={() => void process("convert")} className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#D96A24] px-4 py-3 text-sm font-semibold text-white disabled:opacity-50"><Check size={17}/>Создать лид</button>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button disabled={busy} onClick={() => void process("save")} className="rounded-xl bg-white px-4 py-3 text-sm font-semibold disabled:opacity-50">Сохранить комментарий</button>
+            <button disabled={busy} onClick={() => void process(selected.status === "ignored" ? "restore" : "archive")} className="rounded-xl border border-black/10 bg-white px-4 py-3 text-sm font-semibold disabled:opacity-50">{selected.status === "ignored" ? "Вернуть в работу" : "В архив"}</button>
+            {selected.status === "new" && <button disabled={busy} onClick={() => void process("convert")} className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#D96A24] px-4 py-3 text-sm font-semibold text-white disabled:opacity-50"><Check size={17}/>Создать лид</button>}
           </div>
         </div>
       </div>}
