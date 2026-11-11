@@ -1,3 +1,4 @@
+import { CashbookExport } from "./CashbookExport";
 import { FinanceRegister, FinanceRow } from "@/admin/FinanceRegister";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -523,6 +524,7 @@ export function AdminExpenseManager() {
               </section>
             )}
 
+            {isOwner && <CashbookExport/>}
             {isOwner && <FinanceRegister kind="expenses" onEditExpense={row => void startExpenseEdit(row)} onCancelExpense={row => void cancelExpense(row)} onPayroll={openPayrollFromExpense} onPeriodChange={changePeriod} busy={saving} />}
 
             {isOwner && <section className="mt-5 rounded-3xl border border-black/5 bg-white p-4 sm:p-5">
