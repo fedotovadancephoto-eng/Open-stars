@@ -309,7 +309,7 @@ export async function fetchParentDashboard() {
   const [gradeRows, attendanceRows, homeworkRows, commentRows, achievementRows, scheduleRows, paymentRows, coinRows, newsRows, photoRows, ruleRows] = await Promise.all([
     fetchParentGradeRows(childId, token),
     restSelect<any>("attendance", `select=*&child_id=eq.${childId}&order=lesson_date.desc`, token),
-    restSelect<any>("homework", `select=*&child_id=eq.${childId}&order=due_date.asc.nullslast,lesson_date.desc`, token),
+    restSelect<any>("homework", `select=*&child_id=eq.${childId}&order=created_at.desc.nullslast,lesson_date.desc.nullslast,id.desc`, token),
     restSelect<any>("teacher_comments", `select=*&child_id=eq.${childId}&order=comment_date.desc`, token),
     restSelect<any>("achievements", `select=*&child_id=eq.${childId}&order=achieved_at.desc`, token),
     restSelect<any>("schedules", `select=*&child_id=eq.${childId}&lesson_date=gte.${today}&order=lesson_date.asc,start_time.asc`, token),

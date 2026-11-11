@@ -14,7 +14,7 @@ import {
 } from "@/admin/parentActivationApi";
 
 const branches = ["НЛО", "Свердловский", "Октябрьский"];
-const PARENT_PORTAL_URL = "https://open-stars-cabinet.vercel.app/";
+const PARENT_PORTAL_URL = "https://db-open-stars.ru/";
 
 function activationLink(phone: string, code: string) {
   const url = new URL(PARENT_PORTAL_URL);
