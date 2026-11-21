@@ -1,3 +1,5 @@
+import { selectedStaffContext } from "@/temporaryStaffContext";
+import { fetchStaffAccessContext } from "@/admin/adminApi";
 import { getValidStaffSession } from "@/admin/adminApi";
 
 const SUPABASE_URL = "https://yiwiykbuaggyslfyhlfo.supabase.co";
@@ -91,6 +93,11 @@ function authUserIdFromToken(accessToken: string) {
 }
 
 export async function fetchScheduleContext() {
+  if (selectedStaffContext()) {
+    const context = await fetchStaffAccessContext();
+    if (!context.selectedValid) throw new Error("Временный доступ завершён.");
+    return { role: context.role as ScheduleRole, staffBranch: context.branch || "", canManage: context.role === "admin" };
+  }
   const session = await getValidStaffSession();
   if (!session) throw new Error("Сессия сотрудника не найдена. Войдите снова.");
 

@@ -1,3 +1,4 @@
+import { staffContextRequestInit } from "@/temporaryStaffContext";
 const SUPABASE_HOST = "yiwiykbuaggyslfyhlfo.supabase.co";
 const MAX_CLOCK_SKEW_RETRIES = 8;
 const CLOCK_SKEW_RETRY_DELAY_MS = 1_200;
@@ -82,6 +83,7 @@ export function installSupabaseFetchGuard() {
     input: RequestInfo | URL,
     init?: RequestInit
   ): Promise<Response> => {
+    init = staffContextRequestInit(input, init);
     const url = getRequestUrl(input);
     const refreshKey = refreshRequestKey(input, init);
 

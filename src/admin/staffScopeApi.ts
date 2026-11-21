@@ -1,3 +1,5 @@
+import { selectedStaffContext } from "@/temporaryStaffContext";
+import { fetchStaffAccessContext } from "@/admin/adminApi";
 import { BranchName, StaffRole, getValidStaffSession } from "@/admin/adminApi";
 
 const SUPABASE_URL = "https://yiwiykbuaggyslfyhlfo.supabase.co";
@@ -8,6 +10,12 @@ type Scope = { role: StaffRole | null; branch: BranchName | "" };
 export async function getCurrentStaffScope(): Promise<Scope> {
   const session = await getValidStaffSession();
   if (!session) return { role: null, branch: "" };
+
+  if (selectedStaffContext()) {
+    const context = await fetchStaffAccessContext();
+    if (!context.selectedValid) throw new Error("Временный доступ завершён.");
+    return { role: context.role as StaffRole, branch: (context.branch || "") as BranchName | "" };
+  }
 
   const userResponse = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
     headers: {

@@ -1,3 +1,5 @@
+import { selectedStaffContext } from "@/temporaryStaffContext";
+import { fetchStaffAccessContext } from "@/admin/adminApi";
 import { fetchStaffIdentity, getValidStaffSession, StaffRole } from "@/admin/adminApi";
 
 const SUPABASE_URL = "https://yiwiykbuaggyslfyhlfo.supabase.co";
@@ -154,6 +156,8 @@ function safeNumber(value: unknown) {
 
 export async function fetchBusinessExpenseContext(): Promise<BusinessExpenseContext> {
   const [identity, token] = await Promise.all([fetchStaffIdentity(), sessionToken()]);
+  const context = selectedStaffContext() ? await fetchStaffAccessContext() : null;
+  if (context && !context.selectedValid) throw new Error("Временный доступ завершён.");
   if (!(["owner", "manager", "project_director", "admin"] as StaffRole[]).includes(identity.role)) {
     throw new Error("Раздел расходов недоступен для этой роли.");
   }
@@ -273,7 +277,7 @@ export async function fetchBusinessExpenseContext(): Promise<BusinessExpenseCont
 
   return {
     role: identity.role,
-    staffBranch: profileRows[0]?.staff_branch || "",
+    staffBranch: context?.branch || profileRows[0]?.staff_branch || "",
     branches,
     categories,
     requests,

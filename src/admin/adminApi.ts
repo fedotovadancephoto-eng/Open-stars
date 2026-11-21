@@ -1,3 +1,4 @@
+import { selectedStaffContext, switchStaffContext, TEMP_STAFF_CONTEXT_KEY } from "@/temporaryStaffContext";
 import { fetchWithTimeout } from "@/apiRequest";
 
 const SUPABASE_URL = "https://yiwiykbuaggyslfyhlfo.supabase.co";
@@ -94,6 +95,7 @@ function saveStaffSession(session: StaffSession) {
 }
 
 export function clearStaffSession() {
+  sessionStorage.removeItem(TEMP_STAFF_CONTEXT_KEY);
   localStorage.removeItem(STAFF_SESSION_KEY);
   identityCache = null;
   window.dispatchEvent(new Event(STAFF_SESSION_CHANGED_EVENT));
@@ -317,7 +319,15 @@ async function fetchStaffIdentityForSession(session: StaffSession): Promise<Staf
     session.access_token
   );
   const row = rows[0];
-  const role = roleFromRow(row);
+  let role = roleFromRow(row);
+  if (selectedStaffContext()) {
+    const context = await fetchStaffAccessContext();
+    if (!context.selectedValid) {
+      switchStaffContext("", context.baseRole);
+      throw new Error("Временный доступ завершён. Возвращаем основную роль.");
+    }
+    role = roleFromRow({ roles: { name: context.role } });
+  }
 
   if (!row || !role) {
     clearStaffSession();
@@ -482,4 +492,17 @@ export async function fetchAdminChildren(role: StaffRole): Promise<AdminChild[]>
       activationStatus,
     };
   });
+}
+
+export type StaffAccessContextData = {
+  baseRole: string;
+  baseBranch: string | null;
+  role: string;
+  branch: string | null;
+  selectedValid: boolean;
+  grants: Array<{ key: string; branch: string; expiresAt: string }>;
+};
+
+export async function fetchStaffAccessContext(): Promise<StaffAccessContextData> {
+  return rpc<StaffAccessContextData>("staff_access_context", {});
 }

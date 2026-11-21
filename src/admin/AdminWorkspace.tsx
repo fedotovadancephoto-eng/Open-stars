@@ -1,3 +1,4 @@
+import { TemporaryStaffAccess } from "@/admin/TemporaryStaffAccess";
 import AdminApp from "@/admin/AdminApp";
 import { TeamWorkBoard } from "@/admin/TeamWorkBoard";
 import { AdminCoinManager } from "@/admin/AdminCoinManager";
@@ -67,6 +68,7 @@ function RoleAwareWorkspace() {
     <>
       {role && <AdminTopMenu />}
       {role && role !== "teacher" && <StaffModeSwitch />}
+      <TemporaryStaffAccess />
       <AdminApp />
       {(role === "owner" || role === "manager") && <CrmPushAlerts />}
       {allowed("add-student") && <DeferredManager sections={["add-student", "archive"]}><AdminStudentOperations /></DeferredManager>}

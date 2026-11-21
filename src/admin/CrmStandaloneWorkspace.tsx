@@ -1,3 +1,4 @@
+import { TemporaryStaffAccess } from "@/admin/TemporaryStaffAccess";
 import { FormEvent, useEffect, useState } from "react";
 import { Eye, EyeOff, KeyRound, LockKeyhole, LogOut, Phone, Target } from "lucide-react";
 
@@ -168,6 +169,7 @@ export default function CrmStandaloneWorkspace() {
   if (state === "error") return <div className="grid min-h-screen place-items-center bg-[#FAF9F5] px-5"><div className="w-full max-w-md rounded-[24px] bg-white p-6 text-center"><h2 className="text-xl font-semibold">Не удалось открыть CRM</h2><p className="mt-3 text-sm text-black/45">{error}</p><button onClick={()=>{clearStaffSession();setState("guest");}} className="mt-5 rounded-[14px] bg-[#171717] px-5 py-3 text-sm font-semibold text-white">Войти снова</button></div></div>;
 
   return <div className="min-h-screen bg-[#FAF9F5] px-5 py-8">
+    <TemporaryStaffAccess/>
     <div className="mx-auto max-w-lg rounded-[26px] bg-white p-6 shadow-sm">
       <Logo/>
       <div className="mt-7 flex items-center justify-between gap-3"><div><p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#D96A24]">OPEN STARS · CRM</p><h1 className="mt-1 text-2xl font-semibold">{role?roleLabels[role]:"CRM"}</h1></div><Target className="text-[#D96A24]"/></div>

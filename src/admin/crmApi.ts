@@ -1,3 +1,5 @@
+import { selectedStaffContext } from "@/temporaryStaffContext";
+import { fetchStaffAccessContext } from "@/admin/adminApi";
 import { getValidStaffSession } from "@/admin/adminApi";
 
 const SUPABASE_URL = "https://yiwiykbuaggyslfyhlfo.supabase.co";
@@ -221,9 +223,11 @@ export async function fetchCrmContext(): Promise<{ role: CrmRole; staffBranch: s
   if (!authUserId) throw new Error("Не удалось определить аккаунт сотрудника. Войдите снова.");
   const rows = await rest<CrmContextRow[]>(`users_profile?select=id,staff_branch,roles(name)&auth_user_id=eq.${encodeURIComponent(authUserId)}&limit=1`);
   const row = rows[0];
-  const role = roleFromContextRow(row);
+  const context = selectedStaffContext() ? await fetchStaffAccessContext() : null;
+  if (context && !context.selectedValid) throw new Error("Временный доступ завершён.");
+  const role = roleFromContextRow(context ? { ...row, roles: { name: context.role } } : row);
   if (!row || !role) throw new Error("CRM недоступна для этой роли.");
-  return { role, staffBranch: row.staff_branch || "", profileId: row.id };
+  return { role, staffBranch: context?.branch || row.staff_branch || "", profileId: row.id };
 }
 
 function mapLead(row: any): CrmLead {
