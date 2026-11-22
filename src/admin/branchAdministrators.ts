@@ -1,7 +1,7 @@
 export const branchAdministrators: Record<string, string> = {
   "НЛО": "Белова Марина",
   "Свердловский": "Додарчук Светлана",
-  "Октябрьский": "Кошкина Юлия",
+  "Октябрьский": "Маргарита Семидельская",
 };
 
 export function administratorForBranch(branch: string) {
