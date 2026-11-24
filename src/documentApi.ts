@@ -6,8 +6,10 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_1MORh5rY7uMDVYLYVX5VAA_cyoph4-7
 export type DocumentStatus = "pending" | "accept" | "decline" | "revoke";
 
 export type ParentDocumentItem = {
-  code: "esign_agreement" | "personal_data" | "education_contract" | "photo_video";
+  code: "esign_agreement" | "personal_data" | "education_contract" | "photo_video" | "education_program" | "study_plan";
   version: number;
+  contentHash: string;
+  sourceUrl?: string | null;
   title: string;
   shortTitle: string;
   required: boolean;
@@ -96,10 +98,12 @@ export function saveParentDocumentDetails(input: {
   });
 }
 
-export function signParentDocument(childId: string, code: ParentDocumentItem["code"], decision: "accept" | "decline" | "revoke" = "accept") {
-  return parentRpc<{ ok: true; status: DocumentStatus; hash: string; signedAt: string }>("parent_sign_document", {
+export function signParentDocument(childId: string, item: ParentDocumentItem, decision: "accept" | "decline" | "revoke" = "accept") {
+  return parentRpc<{ ok: true; status: DocumentStatus; hash: string; signedAt: string }>("parent_sign_document_versioned", {
     p_child_id: childId,
-    p_code: code,
+    p_code: item.code,
+    p_expected_version: item.version,
+    p_expected_hash: item.contentHash,
     p_decision: decision,
   });
 }

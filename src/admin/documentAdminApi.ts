@@ -18,6 +18,8 @@ export type StaffDocumentRow = {
   personal_data_status: string;
   contract_status: string;
   photo_status: string;
+  program_status: string;
+  study_plan_status: string;
 };
 
 type RpcError = { message?: string; details?: string; hint?: string };
@@ -48,7 +50,7 @@ async function staffRpc<T>(name: string, body: Record<string, unknown>): Promise
 }
 
 export function fetchStaffDocumentRegistry(branch = "") {
-  return staffRpc<StaffDocumentRow[]>("staff_document_registry", { p_branch: branch || null });
+  return staffRpc<StaffDocumentRow[]>("staff_document_registry_v2", { p_branch: branch || null });
 }
 
 export function upsertContractTerms(input: {

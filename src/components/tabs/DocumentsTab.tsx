@@ -45,7 +45,7 @@ function DocumentModal({
 }) {
   const [checked, setChecked] = useState(false);
   const accepted = item.status === "accept";
-  const canAccept = Boolean(item.body) && checked && (item.code === "esign_agreement" || esignAccepted) && (item.code === "esign_agreement" || item.code === "photo_video" || detailsReady);
+  const canAccept = Boolean(item.body) && checked && (item.code === "esign_agreement" || esignAccepted) && (!["personal_data", "education_contract"].includes(item.code) || detailsReady);
 
   useEffect(() => setChecked(false), [item.code, item.version]);
 
@@ -62,6 +62,7 @@ function DocumentModal({
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6">
+          {item.sourceUrl && <a href={item.sourceUrl} download className="mb-4 inline-flex rounded-xl border border-black/10 bg-white px-4 py-3 text-sm font-semibold text-[#171717]">Скачать оригинал документа (Word)</a>}
           {item.body ? (
             <div className="whitespace-pre-wrap rounded-[20px] border border-black/[0.06] bg-white p-5 text-[13px] leading-6 text-black/75 sm:p-6 sm:text-sm">{item.body}</div>
           ) : (
@@ -163,7 +164,7 @@ export function DocumentsTab() {
   async function decide(item: ParentDocumentItem, decision: "accept" | "decline" | "revoke") {
     setSaving(true); setError(""); setSuccess("");
     try {
-      await signParentDocument(child.id, item.code, decision);
+      await signParentDocument(child.id, item, decision);
       const next = await load();
       const refreshed = next.documents.find((doc) => doc.code === item.code) || null;
       setActiveDocument(refreshed);
@@ -189,6 +190,8 @@ export function DocumentsTab() {
         </div>
         <div className="mt-5 rounded-[16px] bg-[#5F6338]/[0.08] px-4 py-3 text-sm font-medium text-[#4D512E]">Обязательные документы: {signedRequired} из {requiredCount} подписано</div>
       </Card>
+
+      <div className="rounded-[18px] border border-[#D96A24]/20 bg-[#D96A24]/[0.06] p-4 text-sm leading-6 text-[#171717]">Обновление от 24 ноября 2026 года: ознакомьтесь с новой редакцией договора, программой обучения и учебным планом. Подтвердите согласие с каждым из трёх документов отдельно. Предыдущая подпись договора не заменяет согласие с новой редакцией.</div>
 
       {(error || success) && <div className={`rounded-[16px] px-4 py-3 text-sm ${error ? "bg-red-50 text-red-700" : "bg-[#5F6338]/[0.08] text-[#4D512E]"}`}>{error || success}</div>}
 

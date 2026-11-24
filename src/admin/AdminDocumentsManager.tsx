@@ -77,13 +77,15 @@ export function AdminDocumentsManager() {
         {loading ? <div className="mt-6 flex items-center gap-3 rounded-[20px] bg-white p-6 text-sm text-black/50"><LoaderCircle className="h-5 w-5 animate-spin" /> Загружаем реестр…</div> : (
           <div className="mt-4 space-y-3">
             {filtered.map((row) => {
-              const es=statusLabel(row.esign_status); const pd=statusLabel(row.personal_data_status); const ct=statusLabel(row.contract_status); const ph=statusLabel(row.photo_status,true);
+              const es=statusLabel(row.esign_status); const pd=statusLabel(row.personal_data_status); const ct=statusLabel(row.contract_status); const ph=statusLabel(row.photo_status,true); const pr=statusLabel(row.program_status); const sp=statusLabel(row.study_plan_status);
               return <div key={row.child_id} className="rounded-[20px] border border-black/[0.055] bg-white p-4 sm:p-5">
                 <div><p className="text-[10px] font-bold uppercase tracking-[0.14em] text-black/35">{row.branch}</p><h3 className="mt-1 text-lg font-semibold text-[#171717]">{row.child_name}</h3><p className="mt-1 text-xs text-black/45">{row.parent_name || "Родитель не привязан"}{row.parent_phone ? ` · ${row.parent_phone}` : ""}</p></div>
                 <div className="mt-4 flex flex-wrap gap-2">
                   <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${es.cls}`}>{row.esign_status==="accept"&&<CheckCircle2 className="mr-1 inline h-3 w-3"/>}ЭП: {es.text}</span>
                   <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${pd.cls}`}>ПД: {pd.text}</span>
                   <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${ct.cls}`}>Договор: {ct.text}</span>
+                  <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${pr.cls}`}>Программа: {pr.text}</span>
+                  <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${sp.cls}`}>Учебный план: {sp.text}</span>
                   <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${ph.cls}`}>Фото: {ph.text}</span>
                 </div>
               </div>;
