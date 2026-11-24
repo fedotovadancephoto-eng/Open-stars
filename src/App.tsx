@@ -201,6 +201,7 @@ function App() {
   const openNotification = useCallback(async (id: string) => {
     const destination = await notificationDestination(id);
     if (!destination) throw new Error("Уведомление больше недоступно.");
+    if (destination.tab === "documents") { window.location.href = "/documents"; return; }
     const allowedTabs = ["coins", "progress", "homework", "comments", "news", "photos", "payments", "feedback"];
     if (!allowedTabs.includes(destination.tab)) return;
     if (destination.childId && destination.childId !== child.id) {

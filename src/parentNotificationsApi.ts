@@ -40,7 +40,7 @@ export async function fetchParentNotifications(): Promise<ParentNotification[]> 
     select: "id,title,body,target,target_id,is_read,created_at",
     recipient_user_id: `eq.${userId}`,
     or: "(target.is.null,target.not.in.(crm_inbound,crm_push_test))",
-    target: "in.(news,coins,progress,homework,comments,payments,feedback,push_test)",
+    target: "in.(documents,news,coins,progress,homework,comments,payments,feedback,push_test)",
     order: "created_at.desc",
     limit: "30",
   });

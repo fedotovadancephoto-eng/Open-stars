@@ -219,6 +219,26 @@ export function DocumentsTab() {
         })}
       </div>
 
+      <Card className="p-5 sm:p-6" hover={false}>
+        <div className="flex items-start gap-3"><ShieldCheck className="mt-1 h-5 w-5 shrink-0 text-[#C95320]" /><div>
+          <h3 className="font-semibold text-[#171717]">Образовательная лицензия</h3>
+          <p className="mt-2 text-sm leading-6 text-black/55">ИП Федотова Кристина Владимировна · № Л035-01220-38/03861554 от 28 ноября 2025 года. Министерство образования Иркутской области.</p>
+          <p className="mt-1 text-xs leading-5 text-black/45">Документы для ознакомления. Подписывать лицензию не нужно.</p>
+        </div></div>
+        <div className="mt-4 space-y-3">
+          {[
+            { title: "Выписка из реестра лицензий", file: "license-register.pdf" },
+            { title: "Уведомление о предоставлении лицензии", file: "license-notice.pdf" },
+          ].map((file) => <div key={file.file} className="rounded-2xl border border-black/[0.08] p-4">
+            <p className="text-sm font-semibold">{file.title}</p>
+            <div className="mt-3 flex flex-wrap gap-3 text-sm font-semibold">
+              <a href={`/documents/2026-11-24/${file.file}`} target="_blank" rel="noopener noreferrer" className="rounded-xl bg-[#171717] px-4 py-2 text-white">Открыть PDF</a>
+              <a href={`/documents/2026-11-24/${file.file}`} download className="rounded-xl border border-black/10 px-4 py-2">Скачать</a>
+            </div>
+          </div>)}
+        </div>
+      </Card>
+
       {activeDocument && <DocumentModal item={activeDocument} esignAccepted={esignAccepted} detailsReady={detailsReady} saving={saving} onClose={() => setActiveDocument(null)} onDecision={(decision) => void decide(activeDocument, decision)} />}
     </div>
   );
