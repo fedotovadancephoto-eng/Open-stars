@@ -305,6 +305,11 @@ export async function fetchParentDashboard() {
 
   const childId = encodeURIComponent(dbChild.id);
   const today = dateInSchoolTimeZone();
+  const weekStartDate = new Date(today + "T00:00:00Z");
+  weekStartDate.setUTCDate(weekStartDate.getUTCDate() - (weekStartDate.getUTCDay() + 6) % 7);
+  const weekStart = weekStartDate.toISOString().slice(0, 10);
+  weekStartDate.setUTCDate(weekStartDate.getUTCDate() + 7);
+  const weekEnd = weekStartDate.toISOString().slice(0, 10);
 
   const [gradeRows, attendanceRows, homeworkRows, commentRows, achievementRows, scheduleRows, paymentRows, coinRows, newsRows, photoRows, ruleRows] = await Promise.all([
     fetchParentGradeRows(childId, token),
@@ -312,7 +317,7 @@ export async function fetchParentDashboard() {
     restSelect<any>("homework", `select=*&child_id=eq.${childId}&order=created_at.desc.nullslast,lesson_date.desc.nullslast,id.desc`, token),
     restSelect<any>("teacher_comments", `select=*&child_id=eq.${childId}&order=comment_date.desc`, token),
     restSelect<any>("achievements", `select=*&child_id=eq.${childId}&order=achieved_at.desc`, token),
-    restSelect<any>("schedules", `select=*&child_id=eq.${childId}&lesson_date=gte.${today}&order=lesson_date.asc,start_time.asc`, token),
+    restSelect<any>("schedules", `select=*&child_id=eq.${childId}&lesson_date=gte.${weekStart}&lesson_date=lt.${weekEnd}&order=lesson_date.asc,start_time.asc`, token),
     restSelect<any>("payments", `select=*&child_id=eq.${childId}&order=month.desc`, token),
     restSelect<any>("coin_transactions", `select=*&child_id=eq.${childId}&order=created_at.desc`, token),
     restSelect<any>("school_news", "select=*&active=eq.true&order=published_at.desc.nullslast,created_at.desc", token),

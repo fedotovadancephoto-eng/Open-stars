@@ -14,13 +14,13 @@ export function ScheduleTab() {
           Расписание
         </h3>
         <p className="mt-2 text-sm text-black/45">
-          Актуальные занятия ребёнка в OPEN STARS.
+          Занятия текущей недели (понедельник — воскресенье).
         </p>
       </div>
 
       {schedule.length === 0 ? (
         <div className="mt-5 rounded-[20px] border border-black/[0.06] bg-[#FAF9F5] px-5 py-8 text-center text-sm text-black/45">
-          Расписание пока не опубликовано.
+          Расписание на текущую неделю пока не опубликовано.
         </div>
       ) : (
         <div className="mt-5 space-y-3">
